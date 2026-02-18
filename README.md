@@ -73,7 +73,7 @@ Always sends a POST request.
 ```bash
 cwrap send https://httpbin.org/post name=thanos
 cwrap send https://httpbin.org/post json name=thanos age=30
-cwrap send https://api.site json user.name=thanos user.age=30
+cwrap upload https://api.site file=@file
 ```
 
 ---
