@@ -120,7 +120,7 @@ send api json active=true count=5 price=3.14 name=your_name nullval=null
   "active": true,
   "count": 5,
   "price": 3.14,
-  "name": "",
+  "name": "your_name",
   "nullval": null
 }
 ```
