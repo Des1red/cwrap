@@ -55,10 +55,11 @@ func (FetchHandler) Translate(args []string) []string {
 				s.profile = p
 				continue
 			}
-			if c, ok := IsContent(t.Value); ok {
-				s.content = c
-				continue
+			if _, ok := IsContent(t.Value); ok {
+				println("cwrap: fetch cannot use json/form/xml — use send")
+				os.Exit(1)
 			}
+
 			if v, ok := IsBooleanWord(t.Value); ok {
 				s.follow = &v
 				continue
@@ -84,15 +85,6 @@ func emitFetchModifiers(out *[]Token, s *fetchState) {
 		*out = append(*out, Token{Type: TokenFlag, Raw: "--as\x00" + s.profile})
 	}
 
-	switch s.content {
-	case "json":
-		*out = append(*out, Token{Type: TokenFlag, Raw: "--as-json"})
-	case "xml":
-		*out = append(*out, Token{Type: TokenFlag, Raw: "--as-xml"})
-	case "form":
-		*out = append(*out, Token{Type: TokenFlag, Raw: "--as-form"})
-	}
-
 	if s.follow != nil {
 		if *s.follow {
 			*out = append(*out, Token{Type: TokenFlag, Raw: "--follow"})
@@ -112,8 +104,9 @@ func (FetchHandler) ApplyDefaults(req *model.Request, f *model.Flags) {
 	f.Debug = true
 
 	// fetch is strictly retrieval
-	if f.Body != "" || len(f.Form) > 0 {
-		println("cwrap: fetch does not send data — use 'send'")
+	// GET cannot have body semantics
+	if f.JSON || f.ContentProfile != "" || f.Body != "" || len(f.Form) > 0 {
+		println("cwrap: fetch cannot send data — use send")
 		os.Exit(1)
 	}
 

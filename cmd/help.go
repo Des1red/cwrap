@@ -16,17 +16,20 @@ func printHelp() {
 
 	fmt.Println("Commands:")
 	clihelp.Print(
-		clihelp.F("fetch <url>", "", "read resource (GET / HEAD only)"),
-		clihelp.F("send  <url>", "", "send data to server (POST)"),
+		clihelp.F("fetch  <url>", "", "retrieve resource (follows redirects)"),
+		clihelp.F("send   <url>", "", "submit structured data (POST)"),
+		clihelp.F("upload <url>", "", "upload files (multipart POST)"),
 	)
 
 	fmt.Println("\nSemantic words (order doesn't matter):")
 	clihelp.Print(
-		clihelp.F("json", "", "encode body as JSON"),
-		clihelp.F("form", "", "encode body as form"),
-		clihelp.F("browser", "", "browser profile (firefox)"),
+		clihelp.F("json", "", "encode body as JSON (send)"),
+		clihelp.F("form", "", "encode body as form (send)"),
+		clihelp.F("browser", "", "browser profile (firefox headers)"),
 		clihelp.F("api", "", "API profile (json headers)"),
-		clihelp.F("key=value", "", "query (fetch) or body (send)"),
+		clihelp.F("nofollow", "", "do not follow redirects"),
+		clihelp.F("key=value", "", "query (fetch) or body (send/upload field)"),
+		clihelp.F("file=@path", "", "file field (upload only)"),
 		clihelp.F("cookie:name=value", "", "add cookie"),
 		clihelp.F("bearer=TOKEN", "", "authorization bearer token"),
 	)
@@ -37,6 +40,7 @@ func printHelp() {
 	fmt.Println("Read data:")
 	clihelp.Print(
 		clihelp.F("cwrap fetch https://site.com", "", "simple request"),
+		clihelp.F("cwrap fetch https://site.com nofollow", "", "inspect redirect response"),
 		clihelp.F("cwrap fetch https://api.site/users api", "", "API headers"),
 		clihelp.F("cwrap fetch https://site.com page=2 limit=10", "", "query params"),
 		clihelp.F("cwrap fetch https://site.com cookie:session=abc", "", "session cookie"),
@@ -49,6 +53,13 @@ func printHelp() {
 		clihelp.F("cwrap send https://api.site json user.name=thanos user.age=30", "", "nested JSON"),
 	)
 
+	fmt.Println("\nUpload files:")
+	clihelp.Print(
+		clihelp.F("cwrap upload https://site/upload file=@avatar.png", "", "simple upload"),
+		clihelp.F("cwrap upload https://site/post title=hello file=@a.jpg", "", "file + fields"),
+		clihelp.F("cwrap upload https://api.site/import browser file=@dump.zip", "", "browser style upload"),
+	)
+
 	fmt.Println("\nAuthentication:")
 	clihelp.Print(
 		clihelp.F("cwrap fetch https://api.site/me bearer=TOKEN", "", "bearer auth"),
@@ -58,7 +69,6 @@ func printHelp() {
 	clihelp.Print(
 		clihelp.F("-h \"Header: value\"", "", "manual header"),
 		clihelp.F("-d '{...}'", "", "raw body"),
-		clihelp.F("-f file=@a.png", "", "multipart upload"),
 		clihelp.F("--proxy URL", "", "proxy"),
 		clihelp.F("--run", "", "execute without prompt"),
 	)

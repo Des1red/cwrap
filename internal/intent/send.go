@@ -4,6 +4,7 @@ import (
 	"cwrap/internal/model"
 	"encoding/json"
 	"fmt"
+	"os"
 )
 
 type sendState struct {
@@ -38,6 +39,11 @@ func (SendHandler) Translate(args []string) []string {
 
 		case TokenKeyValue:
 			var v any = t.Value
+			if t.Key == "file" || t.Key == "files" {
+				println("cwrap: send does not upload files — use 'upload'")
+				os.Exit(1)
+			}
+
 			if s.content == "json" {
 				v = inferJSONValue(t.Value)
 			}
@@ -130,6 +136,15 @@ func emitSendModifiers(out *[]Token, s *sendState) {
 }
 
 func (SendHandler) ApplyDefaults(req *model.Request, f *model.Flags) {
+
 	f.Debug = true
 	req.Method = "POST"
+
+	// forbid multipart usage
+	for _, form := range f.Form {
+		if form.IsFile {
+			println("cwrap: send does not upload files — use 'upload'")
+			os.Exit(1)
+		}
+	}
 }
