@@ -188,7 +188,7 @@ cwrap send https://api.site json filter.name=your_name filter.age=30 tag=a tag=b
 ```
 
 ## Why not curl?
-curl describes how
+curl describes how, 
 cwrap describes what
 ```bash
 curl -X POST -H "Content-Type: application/json" -d '{"user":"admin"}'
