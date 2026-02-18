@@ -39,5 +39,7 @@ func register(fs *flag.FlagSet, f *model.Flags) *rawInput {
 	fs.BoolVar(&r.asForm, "as-form", false, "form content profile")
 	fs.BoolVar(&r.asXML, "as-xml", false, "xml content profile")
 
+	fs.BoolVar(&f.Debug, "debug", false, "show interpreted request")
+
 	return r
 }

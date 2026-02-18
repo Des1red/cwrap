@@ -3,8 +3,8 @@ package cmd
 import (
 	"cwrap/internal/builder"
 	"cwrap/internal/flags"
+	"cwrap/internal/intent"
 	"cwrap/internal/logger"
-	"cwrap/internal/method"
 	"cwrap/internal/runner"
 	"fmt"
 	"os"
@@ -20,10 +20,20 @@ func Execute() {
 		return
 	}
 
-	req := method.Parse(os.Args)
+	req := intent.Parse(os.Args)
+	handler := intent.Resolve(req)
+
+	args := os.Args[3:]
+	if handler != nil {
+		args = handler.Translate(args)
+	}
 
 	// parse flags after method + url
-	req.Flags = flags.Parse(os.Args[3:])
+	req.Flags = flags.Parse(args)
+	if handler != nil {
+		handler.ApplyDefaults(&req, &req.Flags)
+	}
+
 	result := builder.Build(req)
 	logger.PrintCommand(req, result)
 	if err := runner.ConfirmAndRun(result.Args, req.Flags.Run); err != nil {

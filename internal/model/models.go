@@ -1,9 +1,10 @@
 package model
 
 type Request struct {
-	Method string
-	URL    string
-	Flags  Flags
+	Method   string
+	URL      string
+	Flags    Flags
+	Original string
 }
 
 type Flags struct {
@@ -31,6 +32,8 @@ type Flags struct {
 	Query []QueryParam
 
 	ContentProfile string
+
+	Debug bool
 }
 
 type Header struct {

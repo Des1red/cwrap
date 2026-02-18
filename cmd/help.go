@@ -8,66 +8,60 @@ import (
 
 func printHelp() {
 
-	fmt.Println("cwrap — smart curl wrapper")
+	fmt.Println("cwrap — human friendly HTTP client")
 	fmt.Println()
 	fmt.Println("Usage:")
-	fmt.Println("  cwrap <method> <url> [options]")
+	fmt.Println("  cwrap <command> <url> [words] [flags]")
 	fmt.Println()
-	fmt.Println("Methods:")
-	fmt.Println("  get, post, put, delete")
-	fmt.Println()
-	fmt.Println("Options:")
+
+	fmt.Println("Commands:")
 	clihelp.Print(
-		clihelp.F("--run", "bool", "execute request after confirmation"),
-		clihelp.F("--as", "string", "request profile (firefox, chrome, api, curl)"),
-		clihelp.F("-h", "header", "add header \"Key: Value\""),
-		clihelp.F("-c", "cookie", "add cookie \"name=value\""),
-		clihelp.F("-b", "string", "bearer token"),
-		clihelp.F("-d", "string", "raw request body"),
-		clihelp.F("-j", "string", "json body (auto content-type)"),
-		clihelp.F("-f", "field", "multipart form field key=value or key=@file"),
-		clihelp.F("--filename", "string", "override uploaded filename"),
-		clihelp.F("--as-image", "string", "treat next file as image (jpeg,png,gif)"),
-		clihelp.F("--follow", "bool", "follow redirects"),
-		clihelp.F("--head", "bool", "send HEAD request"),
-		clihelp.F("--proxy", "string", "proxy url (http://, socks5://, socks5h://)"),
-		clihelp.F("-q", "key=value", "add query parameter"),
+		clihelp.F("fetch <url>", "", "read resource (GET / HEAD only)"),
+		clihelp.F("send  <url>", "", "send data to server (POST)"),
 	)
+
+	fmt.Println("\nSemantic words (order doesn't matter):")
+	clihelp.Print(
+		clihelp.F("json", "", "encode body as JSON"),
+		clihelp.F("form", "", "encode body as form"),
+		clihelp.F("browser", "", "browser profile (firefox)"),
+		clihelp.F("api", "", "API profile (json headers)"),
+		clihelp.F("key=value", "", "query (fetch) or body (send)"),
+		clihelp.F("cookie:name=value", "", "add cookie"),
+		clihelp.F("bearer=TOKEN", "", "authorization bearer token"),
+	)
+
 	fmt.Println("\nExamples:")
 	fmt.Println()
-	fmt.Println("Basic requests:")
+
+	fmt.Println("Read data:")
 	clihelp.Print(
-		clihelp.F("cwrap get https://example.com", "", "simple GET request"),
-		clihelp.F("cwrap get https://api.site/users --as api", "", "API profile"),
-		clihelp.F("cwrap get https://site.com -h \"X-API-Key: 123\"", "", "custom header"),
+		clihelp.F("cwrap fetch https://site.com", "", "simple request"),
+		clihelp.F("cwrap fetch https://api.site/users api", "", "API headers"),
+		clihelp.F("cwrap fetch https://site.com page=2 limit=10", "", "query params"),
+		clihelp.F("cwrap fetch https://site.com cookie:session=abc", "", "session cookie"),
+	)
+
+	fmt.Println("\nSend data:")
+	clihelp.Print(
+		clihelp.F("cwrap send https://api.site/login user=admin pass=123", "", "form body"),
+		clihelp.F("cwrap send https://api.site/login json user=admin pass=123", "", "JSON body"),
+		clihelp.F("cwrap send https://api.site json user.name=thanos user.age=30", "", "nested JSON"),
 	)
 
 	fmt.Println("\nAuthentication:")
 	clihelp.Print(
-		clihelp.F("cwrap get https://api.site/me -b TOKEN", "", "bearer authentication"),
-		clihelp.F("cwrap get https://site.com -c \"PHPSESSID=abc123\"", "", "cookie session"),
+		clihelp.F("cwrap fetch https://api.site/me bearer=TOKEN", "", "bearer auth"),
 	)
 
-	fmt.Println("\nJSON requests:")
+	fmt.Println("\nEscape hatch (raw curl flags still work):")
 	clihelp.Print(
-		clihelp.F("cwrap post https://api.site/login -j '{\"user\":\"admin\",\"pass\":\"123\"}'", "", "JSON body request"),
+		clihelp.F("-h \"Header: value\"", "", "manual header"),
+		clihelp.F("-d '{...}'", "", "raw body"),
+		clihelp.F("-f file=@a.png", "", "multipart upload"),
+		clihelp.F("--proxy URL", "", "proxy"),
+		clihelp.F("--run", "", "execute without prompt"),
 	)
 
-	fmt.Println("\nMultipart forms:")
-	clihelp.Print(
-		clihelp.F("cwrap post https://site/upload -f \"user=admin\"", "", "form field"),
-		clihelp.F("cwrap post https://site/upload -f \"file=@shell.php\"", "", "file upload"),
-	)
-
-	fmt.Println("\nUpload bypass helpers:")
-	clihelp.Print(
-		clihelp.F("cwrap post /upload -f \"file=@shell.php\" --filename image.jpg", "", "spoof filename"),
-		clihelp.F("cwrap post /upload -f \"file=@shell.php\" --as-image jpeg", "", "image mime bypass"),
-	)
-
-	fmt.Println("\nExecution:")
-	clihelp.Print(
-		clihelp.F("cwrap get https://example.com --run", "", "execute immediately"),
-	)
 	fmt.Println()
 }
