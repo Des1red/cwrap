@@ -88,7 +88,7 @@ cwrap upload https://api.site file=@file
 
 
 ### Profiles
-- browser → Firefox headers (defualt)
+- browser → Firefox headers (default)
 - chrome → Chrome headers
 - api → JSON API headers
 - curl → Curl headers
