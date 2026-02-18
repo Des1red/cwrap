@@ -50,7 +50,7 @@ func printHelp() {
 	clihelp.Print(
 		clihelp.F("cwrap send https://api.site/login user=admin pass=123", "", "form body"),
 		clihelp.F("cwrap send https://api.site/login json user=admin pass=123", "", "JSON body"),
-		clihelp.F("cwrap send https://api.site json user.name=thanos user.age=30", "", "nested JSON"),
+		clihelp.F("cwrap send https://api.site json user.name=your_name user.age=30", "", "nested JSON"),
 	)
 
 	fmt.Println("\nUpload files:")

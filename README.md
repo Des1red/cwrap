@@ -17,6 +17,7 @@ cwrap <command> <url> [words] [flags]
 ```bash
 cwrap fetch https://site.com page=2
 cwrap send https://api.site/login json user=admin pass=123
+cwrap upload https://site.com/uploads file=@file
 ```
 ## Philosophy
 
@@ -73,7 +74,7 @@ Always sends a POST request.
 ```bash
 cwrap send https://httpbin.org/post name=your_name
 cwrap send https://httpbin.org/post json name=your_name age=30
-cwrap upload https://api.site file=@file
+cwrap send https://api.site json user.name=your_name user.age=30
 ```
 
 ---
@@ -88,7 +89,7 @@ cwrap upload https://api.site file=@file
 
 
 ### Profiles
-- browser → Firefox headers (default)
+- browser → Firefox headers (defualt)
 - chrome → Chrome headers
 - api → JSON API headers
 - curl → Curl headers
@@ -119,7 +120,7 @@ send api json active=true count=5 price=3.14 name=your_name nullval=null
   "active": true,
   "count": 5,
   "price": 3.14,
-  "name": "your_name",
+  "name": "",
   "nullval": null
 }
 ```
@@ -188,7 +189,7 @@ cwrap send https://api.site json filter.name=your_name filter.age=30 tag=a tag=b
 ```
 
 ## Why not curl?
-curl describes how, 
+curl describes how
 cwrap describes what
 ```bash
 curl -X POST -H "Content-Type: application/json" -d '{"user":"admin"}'
