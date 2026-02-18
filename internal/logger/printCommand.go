@@ -7,25 +7,25 @@ import (
 )
 
 func PrintCommand(req model.Request, result builder.Result) {
-	fmt.Println("method:", req.Method)
-	fmt.Println("url:", req.URL)
-	fmt.Println("run:", req.Flags.Run)
-	fmt.Println("profile:", req.Flags.Profile)
+	fmt.Println(key("method")+":", val(req.Method))
+	fmt.Println(key("url")+":", val(req.URL))
+	fmt.Println(key("run")+":", val(fmt.Sprint(req.Flags.Run)))
+	fmt.Println(key("profile")+":", val(req.Flags.Profile))
 
-	fmt.Println("effective headers:")
+	fmt.Println(key("effective headers") + ":")
 	for _, h := range result.Headers {
-		fmt.Printf("  %s: %s\n", h.Name, h.Value)
+		fmt.Printf("  %s: %s\n", key(h.Name), val(h.Value))
 	}
 
-	fmt.Println("cookies:")
+	fmt.Println(key("cookies") + ":")
 	for _, c := range req.Flags.Cookies {
-		fmt.Printf("  %s=%s\n", c.Name, c.Value)
+		fmt.Printf("  %s=%s\n", key(c.Name), val(c.Value))
 	}
 
 	if req.Flags.Body != "" && len(req.Flags.Form) == 0 {
-		fmt.Println("body:", req.Flags.Body)
+		fmt.Println(key("body")+":", val(req.Flags.Body))
 	}
 
 	fmt.Println("-------------------------------------")
-	fmt.Println("curl command:", result.Cmd)
+	fmt.Println(key("curl command")+":", val(result.Cmd))
 }
