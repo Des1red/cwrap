@@ -71,8 +71,8 @@ cwrap send <url> [words]
 
 Always sends a POST request.
 ```bash
-cwrap send https://httpbin.org/post name=thanos
-cwrap send https://httpbin.org/post json name=thanos age=30
+cwrap send https://httpbin.org/post name=your_name
+cwrap send https://httpbin.org/post json name=your_name age=30
 cwrap upload https://api.site file=@file
 ```
 
@@ -119,18 +119,18 @@ send api json active=true count=5 price=3.14 name=your_name nullval=null
   "active": true,
   "count": 5,
   "price": 3.14,
-  "name": "thanos",
+  "name": "your_name",
   "nullval": null
 }
 ```
 #### Nested objects
 ```bash
-send api json user.name=thanos user.age=30
+send api json user.name=your_name user.age=30
 ```
 ```json
 {
   "user": {
-    "name": "thanos",
+    "name": "your_name",
     "age": 30
   }
 }
@@ -184,7 +184,7 @@ cwrap fetch https://api.site/me bearer=TOKEN
 
 #### Complex JSON
 ```bash
-cwrap send https://api.site json filter.name=thanos filter.age=30 tag=a tag=b
+cwrap send https://api.site json filter.name=your_name filter.age=30 tag=a tag=b
 ```
 
 ## Why not curl?
