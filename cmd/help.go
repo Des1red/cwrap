@@ -28,6 +28,10 @@ func printHelp() {
 		clihelp.F("-f", "field", "multipart form field key=value or key=@file"),
 		clihelp.F("--filename", "string", "override uploaded filename"),
 		clihelp.F("--as-image", "string", "treat next file as image (jpeg,png,gif)"),
+		clihelp.F("--follow", "bool", "follow redirects"),
+		clihelp.F("--head", "bool", "send HEAD request"),
+		clihelp.F("--proxy", "string", "proxy url (http://, socks5://, socks5h://)"),
+		clihelp.F("-q", "key=value", "add query parameter"),
 	)
 	fmt.Println("\nExamples:")
 	fmt.Println()

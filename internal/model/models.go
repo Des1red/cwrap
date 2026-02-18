@@ -21,6 +21,16 @@ type Flags struct {
 
 	Filename string
 	AsImage  string
+
+	Follow bool
+
+	Head bool
+
+	Proxy string
+
+	Query []QueryParam
+
+	ContentProfile string
 }
 
 type Header struct {
@@ -38,4 +48,9 @@ type FormField struct {
 	Value  string
 	IsFile bool
 	Extra  string // ;type= ;filename= etc (future helpers)
+}
+
+type QueryParam struct {
+	Key   string
+	Value string
 }
