@@ -49,16 +49,3 @@ func walkJSON(e *Engine, ent *knowledge.Entity, v any) {
 		}
 	}
 }
-
-// fallback for non-JSON responses: strip numbers to get a rough structural diff
-func stripNumbers(b []byte) []byte {
-	out := make([]byte, len(b))
-	copy(out, b)
-
-	for i := range out {
-		if out[i] >= '0' && out[i] <= '9' {
-			out[i] = '#'
-		}
-	}
-	return out
-}
