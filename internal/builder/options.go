@@ -1,14 +1,15 @@
 package builder
 
 import (
+	"cwrap/internal/httpcore"
 	"cwrap/internal/model"
 	"fmt"
 	"strings"
 )
 
-func buildOptions(args []string, req model.Request, headers []model.Header) []string {
+func buildOptions(args []string, req model.Request) []string {
 
-	if hasAcceptEncoding(headers) {
+	if httpcore.SupportsCompression(req.Flags.Profile) {
 		args = append(args, "--compressed")
 	}
 

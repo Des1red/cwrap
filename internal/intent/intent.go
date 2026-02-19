@@ -20,6 +20,8 @@ func Resolve(req model.Request) Handler {
 		return SendHandler{}
 	case "upload":
 		return UploadHandler{}
+	case "recon":
+		return &ReconHandler{}
 	default:
 		return nil
 	}
@@ -48,7 +50,11 @@ func Parse(args []string) model.Request {
 			URL:      url,
 			Original: "upload",
 		}
-
+	case "recon":
+		return model.Request{
+			Method:   "GET",
+			URL:      url,
+			Original: "recon"}
 	case "get", "post", "put", "delete", "download":
 		return model.Request{
 			Method:   strings.ToUpper(cmd),

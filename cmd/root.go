@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"cwrap/internal/builder"
 	"cwrap/internal/flags"
 	"cwrap/internal/intent"
-	"cwrap/internal/logger"
 	"cwrap/internal/runner"
 	"fmt"
 	"os"
@@ -34,9 +32,9 @@ func Execute() {
 		handler.ApplyDefaults(&req, &req.Flags)
 	}
 
-	result := builder.Build(req)
-	logger.PrintCommand(req, result)
-	if err := runner.ConfirmAndRun(result.Args, req.Flags.Run); err != nil {
-		fmt.Println("execution error:", err)
+	if err := runner.Execute(req); err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
 	}
+
 }

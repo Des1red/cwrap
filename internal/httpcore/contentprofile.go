@@ -1,4 +1,4 @@
-package builder
+package httpcore
 
 import "cwrap/internal/model"
 

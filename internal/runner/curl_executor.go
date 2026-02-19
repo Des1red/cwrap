@@ -1,14 +1,22 @@
 package runner
 
 import (
+	"cwrap/internal/builder"
+	"cwrap/internal/logger"
+	"cwrap/internal/model"
 	"fmt"
 	"os"
 	"os/exec"
 )
 
-func ConfirmAndRun(args []string, auto bool) error {
+type CurlExecutor struct{}
 
-	if !auto {
+func (CurlExecutor) Run(req model.Request) error {
+
+	result := builder.Build(req)
+	logger.PrintCommand(req, result)
+
+	if !req.Flags.Run {
 		fmt.Print("\nExecute request? (y/n): ")
 
 		var input string
@@ -20,7 +28,7 @@ func ConfirmAndRun(args []string, auto bool) error {
 		}
 	}
 
-	cmd := exec.Command("curl", args...)
+	cmd := exec.Command("curl", result.Args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin

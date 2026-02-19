@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"cwrap/internal/httpcore"
 	"cwrap/internal/model"
 )
 
@@ -19,10 +20,10 @@ func Build(req model.Request) Result {
 	args = append(args, finalURL)
 	args = buildMultipart(args, req)
 
-	headers := buildHeaders(req)
+	headers := httpcore.BuildHeaders(req)
 	args = appendHeaderArgs(args, headers)
 
-	args = buildOptions(args, req, headers)
+	args = buildOptions(args, req)
 
 	return Result{
 		Args:    args,
