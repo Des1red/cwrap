@@ -6,18 +6,19 @@ import (
 	"cwrap/internal/recon/transport"
 )
 
-func (e *Engine) runQueuedProbes(base model.Request, url string, baseStatus int, baseBody []byte) error {
+func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 	ent := e.k.Entity(url)
-	basefp := makeFingerprint(baseStatus, baseBody)
+	basefp := makeFingerprint(e.baseStatus, e.baseBody)
 
-	responses := map[string]map[string][]byte{}
-	statuses := map[string]map[string]int{}
+	// param -> value -> identity -> body/status
+	responses := map[string]map[string]map[string][]byte{}
+	statuses := map[string]map[string]map[string]int{}
 
 	for ent.ProbeQueue.Len() > 0 {
 
 		probe, _ := ent.ProbeQueue.PopBest()
-
 		key := probe.Key()
+
 		if ent.SeenProbes[key] {
 			continue
 		}
@@ -30,17 +31,10 @@ func (e *Engine) runQueuedProbes(base model.Request, url string, baseStatus int,
 		req.Flags.Headers = nil
 
 		for k, v := range probe.Headers {
-			req.Flags.Headers = append(req.Flags.Headers, model.Header{
-				Name:  k,
-				Value: v,
-			})
+			req.Flags.Headers = append(req.Flags.Headers, model.Header{Name: k, Value: v})
 		}
-
 		for k, v := range probe.AddQuery {
-			req.Flags.Query = append(req.Flags.Query, model.QueryParam{
-				Key:   k,
-				Value: v,
-			})
+			req.Flags.Query = append(req.Flags.Query, model.QueryParam{Key: k, Value: v})
 
 			ent.AddParam(k, knowledge.ParamQuery)
 			e.k.AddParam(k)
@@ -48,44 +42,41 @@ func (e *Engine) runQueuedProbes(base model.Request, url string, baseStatus int,
 			ent.Tag(knowledge.SigHasQueryParams)
 		}
 
-		// ---- execute request FIRST ----
-		resp, err := transport.Do(req)
-		if err != nil {
-			continue
-		}
+		// identity dimension
+		for _, id := range e.identities {
 
-		body, err := transport.ReadBody(resp)
-		if err != nil {
-			continue
-		}
+			reqID := id.Apply(req)
 
-		// ---- NOW store + lazy baseline ----
-		for k, v := range probe.AddQuery {
-
-			if responses[k] == nil {
-				responses[k] = map[string][]byte{}
-				statuses[k] = map[string]int{}
-
-				// seed baseline for THIS param
-				baseVal := extractCurrentValue(base.URL, k)
-				if baseVal != "" {
-					responses[k][baseVal] = baseBody
-					statuses[k][baseVal] = baseStatus
-				}
+			resp, err := transport.Do(reqID)
+			if err != nil {
+				continue
+			}
+			body, err := transport.ReadBody(resp)
+			if err != nil {
+				continue
 			}
 
-			responses[k][v] = body
-			statuses[k][v] = resp.StatusCode
+			if makeFingerprint(resp.StatusCode, body) != basefp {
+				ent.Tag(knowledge.SigStateChanging)
+			}
+
+			e.int.Learn(reqID.URL, resp, body)
+
+			storeResponse(
+				ent,
+				responses,
+				statuses,
+				probe,
+				id.Name,
+				resp.StatusCode,
+				body,
+				e.baseStatus,
+				e.baseBody,
+				base.URL,
+			)
 		}
 
-		fp := makeFingerprint(resp.StatusCode, body)
-		if fp != basefp {
-			ent.Tag(knowledge.SigStateChanging)
-		}
-
-		e.int.Learn(req.URL, resp, body)
-
-		// reasoning
+		// reasoning now compares identity differences
 		e.analyzeParamBehavior(ent, responses)
 		e.analyzeAuthBoundary(ent, statuses)
 		e.analyzeOwnership(ent, statuses)

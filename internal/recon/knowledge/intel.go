@@ -60,6 +60,8 @@ type ParamIntel struct {
 	PossibleIDOR      bool
 	RiskScore         int
 	RiskLabel         string
+	IdentityAccess    map[string]int // identity -> success count (200s)
+	IdentityDenied    map[string]int // identity -> denied count (401/403)
 }
 
 type Signals struct {

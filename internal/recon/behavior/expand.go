@@ -54,8 +54,18 @@ func (e *Engine) Expand(ent *knowledge.Entity) {
 		}
 	}
 
-	// ownership probes
-	if ent.SeenSignal(knowledge.SigObjectOwnership) {
+	// identity probes should run early when auth/idor is plausible
+	shouldTryIdentities := ent.SeenSignal(knowledge.SigAuthBoundary) || ent.HTTP.AuthLikely
+
+	// also run identities on id-like params (ownership detection needs it)
+	for _, p := range ent.Params {
+		if p.IDLike {
+			shouldTryIdentities = true
+			break
+		}
+	}
+
+	if shouldTryIdentities {
 		e.expandIdentityProbes(ent)
 	}
 	// enumeration is a separate strategy

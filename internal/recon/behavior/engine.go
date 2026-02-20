@@ -11,6 +11,12 @@ type LearnFunc func(url string, resp *http.Response, body []byte)
 type Engine struct {
 	k   *knowledge.Knowledge
 	int Interpreter
+
+	identities []Identity
+
+	baseStatus int
+	baseBody   []byte
+	baseFP     fingerprint
 }
 
 func New(k *knowledge.Knowledge, i Interpreter) *Engine {

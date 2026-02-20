@@ -95,6 +95,8 @@ func (e *Entity) AddParam(name string, src ParamSource) {
 			Name:            name,
 			Sources:         map[ParamSource]bool{},
 			ObservedChanges: map[string]bool{},
+			IdentityAccess:  map[string]int{},
+			IdentityDenied:  map[string]int{},
 		}
 		e.Params[name] = p
 	}
