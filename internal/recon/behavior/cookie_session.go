@@ -21,22 +21,36 @@ func cookieHeader(cookies map[string]string) string {
 	return strings.Join(parts, "; ")
 }
 
-func captureSession(ent *knowledge.Entity, idName string, resp *http.Response, rawURL string) {
+func (e *Engine) captureSession(ent *knowledge.Entity, idMeta Identity, resp *http.Response, rawURL string) {
+	// never persist synthetic probe identities
+	if idMeta.Synthetic {
+		return
+	}
+
+	// only persist if the identity actually exists on the entity (was observed)
+	id := ent.Identities[idMeta.Name]
+	if id == nil {
+		return
+	}
+
+	// don't persist rejected identities
+	if id.Rejected {
+		return
+	}
 
 	store, _ := session.Load(rawURL)
 
-	ident := store.Identities[idName]
+	ident := store.Identities[idMeta.Name]
 	if ident == nil {
 		ident = &session.IdentitySession{
 			Cookies: make(map[string]*session.CookieEntry),
 		}
-		store.Identities[idName] = ident
+		store.Identities[idMeta.Name] = ident
 	}
 
 	updated := false
 
 	for _, c := range resp.Cookies() {
-
 		entry := &session.CookieEntry{
 			Name:     c.Name,
 			Value:    c.Value,
@@ -52,6 +66,8 @@ func captureSession(ent *knowledge.Entity, idName string, resp *http.Response, r
 			ident.Cookies[c.Name] = entry
 			updated = true
 		}
+
+		// always keep in-memory cookies for this run
 		ent.SessionCookies[c.Name] = c.Value
 	}
 

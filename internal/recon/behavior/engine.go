@@ -26,6 +26,6 @@ func New(k *knowledge.Knowledge, i Interpreter) *Engine {
 		k:   k,
 		int: i,
 
-		debug: false, // toggle here
+		debug: true, // toggle here
 	}
 }

@@ -65,8 +65,13 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 				println("[PROBE]", probe.URL, "as identity:", id.Name)
 			}
 
-			reqID := id.Apply(cloneRequest(req))
-
+			// Start from clean clone
+			reqID := cloneRequest(req)
+			if id.Synthetic {
+				reqID.Flags.Headers = removeAuthHeaders(reqID.Flags.Headers)
+			}
+			// Apply identity mutation
+			reqID = id.Apply(reqID)
 			if e.debug {
 				println("Headers for", id.Name)
 				for _, h := range reqID.Flags.Headers {
@@ -86,12 +91,11 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			if err != nil {
 				continue
 			}
-
-			captureSession(ent, id.Name, resp, base.URL)
+			extractIdentity(ent, id.Name, resp)
+			e.captureSession(ent, id, resp, base.URL)
 			probeFP[id.Name] = fpString(resp.StatusCode, body)
 
 			e.int.Learn(reqID.URL, resp, body)
-			extractIdentity(ent, id.Name, resp)
 
 			if makeFingerprint(resp.StatusCode, body) != basefp {
 				ent.Tag(knowledge.SigStateChanging)

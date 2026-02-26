@@ -12,6 +12,22 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	// ---- what client SENT ----
 	sentAuth := resp.Request.Header.Get("Authorization") != ""
 	sentCookie := resp.Request.Header.Get("Cookie") != ""
+	// ---- parse SENT cookies too (not only Set-Cookie) ----
+	if sentCookie {
+		for _, c := range resp.Request.Cookies() {
+			// optional: track sent cookie names (dedupe like you did for issued)
+			// id.SentCookieNames = append(...)
+
+			// try parse JWT-like cookies (auth_token / refresh_token)
+			if strings.Count(c.Value, ".") == 2 {
+				claims := parseJWT(c.Value)
+				role := extractRoleFromClaims(claims)
+				if role != "" {
+					id.Role = role
+				}
+			}
+		}
+	}
 	id.SentCreds = sentAuth || sentCookie
 	seen := map[string]bool{}
 	// ---- cookies ISSUED by server (Set-Cookie) ----
