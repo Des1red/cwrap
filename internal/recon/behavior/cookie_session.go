@@ -4,7 +4,21 @@ import (
 	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/recon/session"
 	"net/http"
+	"strings"
 )
+
+// build a single Cookie header value
+func cookieHeader(cookies map[string]string) string {
+	if len(cookies) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(cookies))
+	for k, v := range cookies {
+		parts = append(parts, k+"="+v)
+	}
+	// optional: sort.Strings(parts) for determinism
+	return strings.Join(parts, "; ")
+}
 
 func captureSession(ent *knowledge.Entity, resp *http.Response, rawURL string) {
 

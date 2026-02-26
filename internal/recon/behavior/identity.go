@@ -47,10 +47,7 @@ func deriveIdentities(base model.Request) []Identity {
 	ids = append(ids, Identity{
 		Name: "fake-admin",
 		Apply: func(r model.Request) model.Request {
-			r.Flags.Headers = append(r.Flags.Headers, model.Header{
-				Name:  "X-Forwarded-User",
-				Value: "admin",
-			})
+			r.Flags.Headers = upsertHeader(r.Flags.Headers, "X-Forwarded-User", "admin")
 			return r
 		},
 	})

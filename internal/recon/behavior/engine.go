@@ -17,11 +17,15 @@ type Engine struct {
 	baseStatus int
 	baseBody   []byte
 	baseFP     fingerprint
+
+	debug bool
 }
 
 func New(k *knowledge.Knowledge, i Interpreter) *Engine {
 	return &Engine{
 		k:   k,
 		int: i,
+
+		debug: false, // toggle here
 	}
 }

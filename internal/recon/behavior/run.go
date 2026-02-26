@@ -8,9 +8,15 @@ import (
 
 // Run executes the full probing lifecycle.
 func (e *Engine) Run(base model.Request, url string) error {
-
 	ent := e.k.Entity(url)
 	e.identities = deriveIdentities(base)
+
+	if e.debug {
+		println("== Active Identities ==")
+		for _, id := range e.identities {
+			println(" -", id.Name)
+		}
+	}
 
 	// ---- LOAD SESSION ----
 	store, _ := session.Load(base.URL)
@@ -18,17 +24,17 @@ func (e *Engine) Run(base model.Request, url string) error {
 		ent.SessionCookies[c.Name] = c.Value
 		ent.SessionUsed = true
 	}
-	// inject stored cookies into baseline request
-	for name, value := range ent.SessionCookies {
-		base.Flags.Headers = upsertHeader(
-			base.Flags.Headers,
-			"Cookie",
-			name+"="+value,
-		)
+
+	// IMPORTANT: don't mutate the caller's base
+	baseReq := cloneRequest(base)
+
+	// Inject cookies once, as a single Cookie header
+	if ck := cookieHeader(ent.SessionCookies); ck != "" {
+		baseReq.Flags.Headers = upsertHeader(baseReq.Flags.Headers, "Cookie", ck)
 	}
 
 	// ---- TRUE BASELINE REQUEST ----
-	resp, err := transport.Do(base)
+	resp, err := transport.Do(baseReq)
 	if err != nil {
 		return err
 	}
@@ -38,31 +44,25 @@ func (e *Engine) Run(base model.Request, url string) error {
 		return err
 	}
 
-	// capture newly issued cookies
 	captureSession(ent, resp, base.URL)
-	// store global baseline (used everywhere)
+
 	e.baseStatus = resp.StatusCode
 	e.baseBody = body
 	e.baseFP = makeFingerprint(resp.StatusCode, body)
 
-	// let interpreter learn from baseline
-	e.int.Learn(base.URL, resp, body)
+	e.int.Learn(baseReq.URL, resp, body)
 
-	// ---- initial strategy seed ----
 	e.Expand(ent)
 
-	// ---- probing loop ----
 	for {
 		before := ent.ProbeQueue.Len()
 
-		err := e.runQueuedProbes(base, url)
+		err := e.runQueuedProbes(baseReq, url) // pass the cookie-injected baseReq
 		if err != nil {
 			return err
 		}
 
 		after := ent.ProbeQueue.Len()
-
-		// stop when no new probes generated
 		if after == 0 || after == before {
 			break
 		}
