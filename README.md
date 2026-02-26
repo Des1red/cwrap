@@ -1,11 +1,8 @@
 # cwrap
 
-Human-friendly HTTP client.
+cwrap is an intelligent HTTP client with built-in active security analysis.
 
-cwrap lets you talk to websites and APIs using intent instead of curl syntax.
-
-Instead of remembering headers, encodings and flags — you describe what you want:
-
+It translates intent into HTTP requests and automatically performs identity-aware probing, session tracking, and object-level authorization reasoning.
 
 
 Basic Usage
@@ -188,16 +185,6 @@ cwrap fetch https://api.site/me bearer=TOKEN
 cwrap send https://api.site json filter.name=your_name filter.age=30 tag=a tag=b
 ```
 
-## Why not curl?
-curl describes how
-cwrap describes what
-```bash
-curl -X POST -H "Content-Type: application/json" -d '{"user":"admin"}'
-```
-### vs
-```bash
-cwrap send site json user=admin
-```
 License
 MIT
 
