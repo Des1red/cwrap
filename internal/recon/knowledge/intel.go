@@ -37,8 +37,9 @@ type ContentIntel struct {
 	LooksLikeJSON bool
 	LooksLikeXML  bool
 
-	JSFindings map[string]int // kind -> count (jwt/aws_key/pem/firebase/keyword)
-	JSLeaks    []JSLeak       // optional evidence (redacted unless enabled)
+	JSFindings  map[string]int  // kind -> count (jwt/aws_key/pem/firebase/keyword)
+	JSLeaks     []JSLeak        // optional evidence (redacted unless enabled)
+	SeenJSLeaks map[string]bool // to avoid dupes in JS leaks
 }
 
 type JSLeak struct {

@@ -10,7 +10,7 @@ func (e *Engine) Run(base model.Request, url string) error {
 	ent := e.k.Entity(url)
 
 	// ----------------------------------------
-	// 1️⃣ Clone base immediately (do not mutate caller)
+	//  Clone base immediately
 	// ----------------------------------------
 	baseReq := cloneRequest(base)
 

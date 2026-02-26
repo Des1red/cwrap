@@ -623,53 +623,51 @@ func reportNextSteps(ent *knowledge.Entity) {
 
 func reportGraph(ent *knowledge.Entity, k *knowledge.Knowledge) {
 
-	count := 0
-
-	seenAdmin := make(map[string]bool)
-	seenUpload := make(map[string]bool)
-
-	// optional: unique endpoints discovered (for better "count")
 	seenTo := make(map[string]bool)
 
 	for _, edge := range k.Edges {
 		if edge.From != ent.URL {
 			continue
 		}
-
-		count++
-
-		// unique endpoint count (instead of edge count)
 		seenTo[edge.To] = true
-
-		if strings.Contains(edge.To, "admin") {
-			if !seenAdmin[edge.To] {
-				seenAdmin[edge.To] = true
-			}
-		}
-
-		if strings.Contains(edge.To, "upload") {
-			if !seenUpload[edge.To] {
-				seenUpload[edge.To] = true
-			}
-		}
 	}
 
-	// nothing meaningful
-	if len(seenTo) == 0 && count == 0 {
+	if len(seenTo) == 0 {
 		return
 	}
 
 	section("Discovered Surface")
 
-	if len(seenTo) > 0 {
-		info(fmt.Sprintf("%d related endpoints discovered", len(seenTo)))
-	}
+	info(fmt.Sprintf("%d related endpoints discovered", len(seenTo)))
 
-	for target := range seenAdmin {
-		warn("Administrative surface discovered: " + target)
+	// ---- Sort for deterministic output ----
+	endpoints := make([]string, 0, len(seenTo))
+	for target := range seenTo {
+		endpoints = append(endpoints, target)
 	}
-	for target := range seenUpload {
-		warn("Upload endpoint discovered: " + target)
+	sort.Strings(endpoints)
+
+	max := 15
+	for i, target := range endpoints {
+
+		if i >= max {
+			info(fmt.Sprintf("... %d more truncated", len(endpoints)-max))
+			break
+		}
+
+		switch {
+		case strings.Contains(target, "admin"):
+			warn("Administrative surface: " + target)
+
+		case strings.Contains(target, "upload"):
+			warn("Upload surface: " + target)
+
+		case strings.Contains(target, "/api/"):
+			info("API endpoint: " + target)
+
+		default:
+			info("• " + target)
+		}
 	}
 
 	fmt.Println()
@@ -677,23 +675,78 @@ func reportGraph(ent *knowledge.Entity, k *knowledge.Knowledge) {
 
 func reportJS(ent *knowledge.Entity) {
 
-	if len(ent.Content.JSFindings) == 0 {
+	if len(ent.Content.JSFindings) == 0 && len(ent.Content.JSLeaks) == 0 {
 		return
 	}
 
 	section("JS Intelligence")
 
-	for kind, count := range ent.Content.JSFindings {
-		info(fmt.Sprintf("%s: %d", kind, count))
+	// ---- Sort findings keys ----
+	keys := make([]string, 0, len(ent.Content.JSFindings))
+	for k := range ent.Content.JSFindings {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// ---- High-level summary ----
+	for _, k := range keys {
+		count := ent.Content.JSFindings[k]
+
+		switch k {
+
+		//  High severity
+		case "pem", "aws_key", "jwt", "keyword":
+			warn(fmt.Sprintf("%s: %d", k, count))
+
+		//  Medium
+		case "endpoint", "role_check", "priv_flag", "priv_gate":
+			info(fmt.Sprintf("%s: %d", k, count))
+
+		//  Low / structural
+		default:
+			info(fmt.Sprintf("%s: %d", k, count))
+		}
 	}
 
-	for _, leak := range ent.Content.JSLeaks {
-		warn(fmt.Sprintf("[%s] %s -> %s = %s",
-			leak.Kind,
-			leak.Source,
-			leak.Key,
-			leak.Value,
-		))
+	// ---- Leak Details (limited output) ----
+	maxLeaks := 10
+	if len(ent.Content.JSLeaks) > 0 {
+
+		fmt.Println()
+		info("Evidence:")
+
+		for i, leak := range ent.Content.JSLeaks {
+
+			if i >= maxLeaks {
+				info(fmt.Sprintf("... %d more findings truncated", len(ent.Content.JSLeaks)-maxLeaks))
+				break
+			}
+
+			value := leak.Value
+
+			// Defensive trimming
+			if len(value) > 120 {
+				value = value[:120] + "..."
+			}
+
+			// Classify display severity
+			switch leak.Kind {
+			case "pem", "aws_key", "jwt", "keyword":
+				warn(fmt.Sprintf("[%s] %s → %s = %s",
+					leak.Kind,
+					leak.Source,
+					leak.Key,
+					value,
+				))
+			default:
+				info(fmt.Sprintf("[%s] %s → %s = %s",
+					leak.Kind,
+					leak.Source,
+					leak.Key,
+					value,
+				))
+			}
+		}
 	}
 
 	fmt.Println()
