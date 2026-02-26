@@ -87,7 +87,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 				continue
 			}
 
-			captureSession(ent, resp, base.URL)
+			captureSession(ent, id.Name, resp, base.URL)
 			probeFP[id.Name] = fpString(resp.StatusCode, body)
 
 			e.int.Learn(reqID.URL, resp, body)

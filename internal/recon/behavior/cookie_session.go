@@ -5,6 +5,7 @@ import (
 	"cwrap/internal/recon/session"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // build a single Cookie header value
@@ -20,27 +21,42 @@ func cookieHeader(cookies map[string]string) string {
 	return strings.Join(parts, "; ")
 }
 
-func captureSession(ent *knowledge.Entity, resp *http.Response, rawURL string) {
+func captureSession(ent *knowledge.Entity, idName string, resp *http.Response, rawURL string) {
+
+	store, _ := session.Load(rawURL)
+
+	ident := store.Identities[idName]
+	if ident == nil {
+		ident = &session.IdentitySession{
+			Cookies: make(map[string]*session.CookieEntry),
+		}
+		store.Identities[idName] = ident
+	}
 
 	updated := false
 
 	for _, c := range resp.Cookies() {
 
-		if ent.SessionCookies[c.Name] != c.Value {
-			ent.SessionCookies[c.Name] = c.Value
-			ent.SessionIssued = true
+		entry := &session.CookieEntry{
+			Name:     c.Name,
+			Value:    c.Value,
+			Source:   "server",
+			Path:     c.Path,
+			Domain:   c.Domain,
+			Secure:   c.Secure,
+			HttpOnly: c.HttpOnly,
+		}
+
+		prev := ident.Cookies[c.Name]
+		if prev == nil || prev.Value != c.Value {
+			ident.Cookies[c.Name] = entry
 			updated = true
 		}
+		ent.SessionCookies[c.Name] = c.Value
 	}
 
 	if updated {
-		var out session.Store
-		for name, value := range ent.SessionCookies {
-			out.Cookies = append(out.Cookies, session.Cookie{
-				Name:  name,
-				Value: value,
-			})
-		}
-		session.Save(rawURL, &out)
+		ident.Updated = time.Now()
+		session.Save(rawURL, store)
 	}
 }

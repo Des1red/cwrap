@@ -1,6 +1,7 @@
 package knowledge
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 )
@@ -14,8 +15,8 @@ type Knowledge struct {
 	Entities map[string]*Entity
 
 	// Relationships between entities (how we discovered / why we care).
-	Edges []Edge
-
+	Edges    []Edge
+	EdgeSeen map[string]bool
 	// Global parameter dictionary (useful for cross-target heuristics).
 	Params map[string]bool
 }
@@ -25,6 +26,7 @@ func New(target string) *Knowledge {
 		Target:   target,
 		Entities: make(map[string]*Entity),
 		Edges:    make([]Edge, 0, 256),
+		EdgeSeen: make(map[string]bool),
 		Params:   make(map[string]bool),
 	}
 }
@@ -46,11 +48,18 @@ func (k *Knowledge) AddEdge(from, to string, t EdgeType) {
 	if from == "" || to == "" {
 		return
 	}
+
+	key := fmt.Sprintf("%s|%s|%d", from, to, t)
+
 	k.mu.Lock()
+	if k.EdgeSeen[key] {
+		k.mu.Unlock()
+		return
+	}
+	k.EdgeSeen[key] = true
 	k.Edges = append(k.Edges, Edge{From: from, To: to, Type: t})
 	k.mu.Unlock()
 }
-
 func (k *Knowledge) AddParam(name string) {
 	if name == "" {
 		return

@@ -18,11 +18,21 @@ func (e *Engine) Run(base model.Request, url string) error {
 		}
 	}
 
-	// ---- LOAD SESSION ----
+	// ---- LOAD SESSION (identity-aware) ----
 	store, _ := session.Load(base.URL)
-	for _, c := range store.Cookies {
-		ent.SessionCookies[c.Name] = c.Value
-		ent.SessionUsed = true
+
+	// merge cookies from all identities (simple reuse model)
+	for _, ident := range store.Identities {
+		if ident == nil {
+			continue
+		}
+		for _, c := range ident.Cookies {
+			if c == nil {
+				continue
+			}
+			ent.SessionCookies[c.Name] = c.Value
+			ent.SessionUsed = true
+		}
 	}
 
 	// IMPORTANT: don't mutate the caller's base
@@ -44,7 +54,7 @@ func (e *Engine) Run(base model.Request, url string) error {
 		return err
 	}
 
-	captureSession(ent, resp, base.URL)
+	captureSession(ent, "none", resp, base.URL)
 
 	e.baseStatus = resp.StatusCode
 	e.baseBody = body

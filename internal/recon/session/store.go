@@ -7,40 +7,47 @@ import (
 	"path/filepath"
 )
 
-type Store struct {
-	Cookies []Cookie `json:"cookies"`
-}
-
-type Cookie struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-func pathFor(raw string) string {
+func pathFor(raw string) (string, string) {
 	u, _ := url.Parse(raw)
-	host := u.Host
+	host := u.Hostname()
+
 	dir, _ := os.UserConfigDir()
 	base := filepath.Join(dir, "cwrap", "sessions")
 	os.MkdirAll(base, 0755)
-	return filepath.Join(base, host+".json")
+
+	return filepath.Join(base, host+".json"), host
 }
 
 func Load(raw string) (*Store, error) {
-	p := pathFor(raw)
+	p, host := pathFor(raw)
 
 	b, err := os.ReadFile(p)
 	if err != nil {
-		return &Store{}, nil
+		return &Store{
+			Host:       host,
+			Identities: make(map[string]*IdentitySession),
+		}, nil
 	}
 
 	var s Store
-	json.Unmarshal(b, &s)
+	if err := json.Unmarshal(b, &s); err != nil {
+		return nil, err
+	}
+
+	if s.Identities == nil {
+		s.Identities = make(map[string]*IdentitySession)
+	}
+
 	return &s, nil
 }
 
 func Save(raw string, s *Store) error {
-	p := pathFor(raw)
+	p, _ := pathFor(raw)
 
-	b, _ := json.MarshalIndent(s, "", "  ")
+	b, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+
 	return os.WriteFile(p, b, 0644)
 }

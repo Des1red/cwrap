@@ -558,9 +558,13 @@ func reportNextSteps(ent *knowledge.Entity) {
 
 func reportGraph(ent *knowledge.Entity, k *knowledge.Knowledge) {
 
-	var lines []func()
-
 	count := 0
+
+	seenAdmin := make(map[string]bool)
+	seenUpload := make(map[string]bool)
+
+	// optional: unique endpoints discovered (for better "count")
+	seenTo := make(map[string]bool)
 
 	for _, edge := range k.Edges {
 		if edge.From != ent.URL {
@@ -569,34 +573,38 @@ func reportGraph(ent *knowledge.Entity, k *knowledge.Knowledge) {
 
 		count++
 
+		// unique endpoint count (instead of edge count)
+		seenTo[edge.To] = true
+
 		if strings.Contains(edge.To, "admin") {
-			target := edge.To
-			lines = append(lines, func() {
-				warn("Administrative surface discovered: " + target)
-			})
+			if !seenAdmin[edge.To] {
+				seenAdmin[edge.To] = true
+			}
 		}
 
 		if strings.Contains(edge.To, "upload") {
-			target := edge.To
-			lines = append(lines, func() {
-				warn("Upload endpoint discovered: " + target)
-			})
+			if !seenUpload[edge.To] {
+				seenUpload[edge.To] = true
+			}
 		}
 	}
 
-	// If nothing meaningful → hide section
-	if len(lines) == 0 && count == 0 {
+	// nothing meaningful
+	if len(seenTo) == 0 && count == 0 {
 		return
 	}
 
 	section("Discovered Surface")
 
-	if count > 0 {
-		info(fmt.Sprintf("%d related endpoints discovered", count))
+	if len(seenTo) > 0 {
+		info(fmt.Sprintf("%d related endpoints discovered", len(seenTo)))
 	}
 
-	for _, l := range lines {
-		l()
+	for target := range seenAdmin {
+		warn("Administrative surface discovered: " + target)
+	}
+	for target := range seenUpload {
+		warn("Upload endpoint discovered: " + target)
 	}
 
 	fmt.Println()
