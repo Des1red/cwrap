@@ -391,11 +391,22 @@ func reportConclusion(ent *knowledge.Entity) {
 			hasIdentityAuth = true
 		}
 	}
+	hasSuspect := false
+	for _, p := range ent.Params {
+		if p.SuspectIDOR {
+			hasSuspect = true
+			break
+		}
+	}
 	switch {
 	case hasIDOR:
 		bad("Broken object-level authorization confirmed")
 	case hasBypass:
 		bad("Authentication enforcement inconsistent")
+	case hasIDOR:
+		bad("Broken object-level authorization confirmed")
+	case hasSuspect:
+		warn("Possible broken object-level authorization (needs additional identities to confirm)")
 	case ent.SeenSignal(knowledge.SigAuthBoundary):
 		good("Authorization enforced correctly")
 	case hasBootstrap || hasElevated || hasIdentityAuth:
@@ -474,6 +485,11 @@ func reportFindings(ent *knowledge.Entity) {
 		if p.InjectedOnly() {
 			continue
 		}
+		if p.SuspectIDOR && p.IDLike {
+			warn("Possible object-level authorization risk via parameter: " + name + " (needs second user identity to confirm)")
+			found = true
+		}
+
 		if p.PossibleIDOR && p.OwnershipBoundary {
 			bad("Horizontal privilege escalation via parameter: " + name)
 			found = true

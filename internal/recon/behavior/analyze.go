@@ -117,56 +117,70 @@ func (e *Engine) analyzeIDOR(
 		}
 
 		noCredDenied := false
-		var bodies [][]byte
+
+		// canonicalized bodies (strong structural diff)
+		var canonBodies [][]byte
+
+		// raw fingerprint bodies (weak diff)
+		rawFPs := map[string]bool{}
 
 		for val, byIDBody := range byVal {
 
-			// need statuses for this param/value to reason about auth
 			if statuses[name] == nil || statuses[name][val] == nil {
 				continue
 			}
 			byIDStatus := statuses[name][val]
 
-			// require at least one credentialed success for this value
+			// require at least one credentialed success
 			if !anyCredStatus(ent, byIDStatus, 200) {
 				continue
 			}
 
-			// choose a credentialed body for structural comparison
 			body, ok := pickCredBody(ent, byIDBody, byIDStatus)
 			if !ok || len(body) == 0 {
 				continue
 			}
 
+			// --- RAW fingerprint tracking (weak signal)
+			rawFPs[fpString(200, body)] = true
+
+			// --- Canonicalized structural diff (strong signal)
 			n, err := e.int.Canonicalize(body, "")
 			if err != nil {
 				n = stripNumbers(body)
 			}
-			bodies = append(bodies, n)
+			canonBodies = append(canonBodies, n)
 
-			// stronger signal: no-cred denied for same value
 			if anyNoCredDenied(ent, byIDStatus) {
 				noCredDenied = true
 			}
 		}
 
-		if len(bodies) < 2 {
+		// --- WEAK IDOR SIGNAL ---
+		// If credentialed responses differ for different values
+		if len(rawFPs) >= 2 && noCredDenied && p.IDLike {
+			p.SuspectIDOR = true
+			p.ObservedChanges["idor-raw-diff"] = true
+		}
+
+		// --- STRONG IDOR SIGNAL ---
+		if len(canonBodies) < 2 {
 			continue
 		}
 
-		first := bodies[0]
-		different := false
-		for i := 1; i < len(bodies); i++ {
-			if !bytes.Equal(first, bodies[i]) {
-				different = true
+		first := canonBodies[0]
+		structDiff := false
+
+		for i := 1; i < len(canonBodies); i++ {
+			if !bytes.Equal(first, canonBodies[i]) {
+				structDiff = true
 				break
 			}
 		}
 
-		if different {
+		if structDiff {
 			p.ObservedChanges["idor-structure-diff"] = true
 
-			// escalate only if a no-cred identity is denied too
 			if noCredDenied {
 				p.PossibleIDOR = true
 				ent.Tag(knowledge.SigPossibleIDOR)
