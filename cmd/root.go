@@ -22,7 +22,12 @@ func Execute() {
 	req := intent.Parse(os.Args)
 	handler := intent.Resolve(req)
 
-	args := os.Args[3:]
+	offset := 2
+	if req.URL != "" {
+		offset = 3
+	}
+
+	args := os.Args[offset:]
 	if handler != nil {
 		args = handler.Translate(args)
 	}

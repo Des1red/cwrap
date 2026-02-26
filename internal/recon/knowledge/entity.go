@@ -2,7 +2,6 @@ package knowledge
 
 import (
 	"fmt"
-	"time"
 )
 
 // Entity is the ONLY primary object: intelligence about a URL.
@@ -43,10 +42,6 @@ func NewEntity(url string) *Entity {
 		URL: url,
 		State: EntityState{
 			Seen:       false,
-			Scanned:    false,
-			FirstSeen:  time.Time{},
-			LastSeen:   time.Time{},
-			LastProbe:  time.Time{},
 			ProbeCount: 0,
 		},
 		HTTP: HTTPIntel{
@@ -72,20 +67,7 @@ func NewEntity(url string) *Entity {
 	}
 }
 
-func (e *Entity) MarkSeen(now time.Time) {
-	if !e.State.Seen {
-		e.State.Seen = true
-		e.State.FirstSeen = now
-	}
-	e.State.LastSeen = now
-}
-
-func (e *Entity) MarkScanned(now time.Time) {
-	e.State.Scanned = true
-	e.State.LastProbe = now
-	e.State.ProbeCount++
-}
-
+// ---------- helpers for analyzers ----------
 func (e *Entity) AddMethod(m string) {
 	if m == "" {
 		return

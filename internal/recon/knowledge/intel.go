@@ -1,15 +1,7 @@
 package knowledge
 
-import "time"
-
 type EntityState struct {
-	Seen    bool
-	Scanned bool
-
-	FirstSeen time.Time
-	LastSeen  time.Time
-
-	LastProbe  time.Time
+	Seen       bool
 	ProbeCount int
 }
 

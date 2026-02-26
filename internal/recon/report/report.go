@@ -1,753 +1,967 @@
+// report/report.go
 package report
 
 import (
 	"cwrap/internal/recon/knowledge"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
-func Print(k *knowledge.Knowledge) {
-	// deterministic order
-	urls := make([]string, 0, len(k.Entities))
-	for u := range k.Entities {
-		urls = append(urls, u)
+// CreateSummary prints an executive summary to the terminal and saves a full,
+// in-depth tree report to ./reports/<target>_<timestamp>.report.
+// The full file report contains ALL collected data (no redaction, no truncation).
+func CreateSummary(k *knowledge.Knowledge) (string, error) {
+	if k == nil {
+		return "", fmt.Errorf("nil knowledge")
 	}
-	sort.Strings(urls)
+
+	path, err := CreateFileReport(k)
+	// Even if file creation fails, still print a summary of what we have.
+	printSummary(os.Stdout, k, path, err)
+
+	return path, err
+}
+
+// CreateFileReport writes the full report (tree + deep per-entity analysis) to a file.
+// No hidden data, no exceptions.
+func CreateFileReport(k *knowledge.Knowledge) (string, error) {
+	if k == nil {
+		return "", fmt.Errorf("nil knowledge")
+	}
+	if err := ensureDir(); err != nil {
+		return "", err
+	}
+
+	f, path, err := createFile(k)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	writeFullReport(f, k)
+
+	return path, nil
+}
+
+// ---- file plumbing ----
+
+func ensureDir() error {
+	return os.MkdirAll("reports", 0o755)
+}
+
+func createFile(k *knowledge.Knowledge) (*os.File, string, error) {
+	targetPart := sanitizeTargetForFilename(k.Target)
+	if targetPart == "" {
+		targetPart = "target"
+	}
+
+	// Local time (your machine / environment timezone). Filename includes date.
+	ts := time.Now().Format("2006-01-02_15-04-05")
+	name := fmt.Sprintf("%s_%s.report", targetPart, ts)
+	path := filepath.Join("reports", name)
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return nil, "", err
+	}
+	return f, path, nil
+}
+
+func sanitizeTargetForFilename(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+
+	// Drop scheme if present.
+	if i := strings.Index(s, "://"); i >= 0 {
+		s = s[i+3:]
+	}
+
+	// Cut at first whitespace.
+	if i := strings.IndexAny(s, " \t\r\n"); i >= 0 {
+		s = s[:i]
+	}
+
+	// Replace unsafe filename characters with '-'.
+	repl := strings.NewReplacer(
+		"/", "-",
+		"\\", "-",
+		":", "-",
+		"?", "-",
+		"&", "-",
+		"=", "-",
+		"#", "-",
+		"%", "-",
+		"@", "-",
+		"+", "-",
+		",", "-",
+		";", "-",
+		"(", "-",
+		")", "-",
+		"[", "-",
+		"]", "-",
+		"{", "-",
+		"}", "-",
+		"\"", "-",
+		"'", "-",
+		"<", "-",
+		">", "-",
+		"|", "-",
+		"*", "-",
+		"!", "-",
+	)
+	s = repl.Replace(s)
+
+	// Collapse repeats.
+	for strings.Contains(s, "--") {
+		s = strings.ReplaceAll(s, "--", "-")
+	}
+	s = strings.Trim(s, "-._")
+	return s
+}
+
+// ---- summary ----
+
+func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr error) {
+	urls := sortedEntityURLs(k)
+
+	// Global counts / flags
+	var (
+		entityCount     = len(urls)
+		edgeCount       = len(k.Edges)
+		globalParamCnt  = len(k.Params)
+		hasAuthBoundary = false
+		hasOwnership    = false
+		possibleIDOR    = 0
+		adminSurface    = 0
+		jsLeakCount     = 0
+	)
 
 	for _, u := range urls {
 		ent := k.Entities[u]
 		if ent == nil {
 			continue
 		}
-		reportEntity(ent)
-		reportGraph(ent, k)
-	}
-}
 
-func hasValidIdentity(ent *knowledge.Entity) bool {
-	for _, id := range ent.Identities {
-		if id.Kind == knowledge.IdentityUser && !id.Rejected {
-			return true
+		if ent.SeenSignal(knowledge.SigAuthBoundary) {
+			hasAuthBoundary = true
+		}
+		if ent.SeenSignal(knowledge.SigObjectOwnership) {
+			hasOwnership = true
+		}
+
+		for _, p := range ent.Params {
+			if p == nil {
+				continue
+			}
+			if p.PossibleIDOR || p.SuspectIDOR || ent.SeenSignal(knowledge.SigPossibleIDOR) {
+				possibleIDOR++
+				break // count once per entity in summary
+			}
+		}
+
+		// crude admin surface (signal preferred, then URL heuristic)
+		if ent.SeenSignal(knowledge.SigAdminSurface) || strings.Contains(strings.ToLower(ent.URL), "admin") {
+			adminSurface++
+		}
+
+		jsLeakCount += len(ent.Content.JSLeaks)
+	}
+
+	// High risk highlights (short list)
+	high := buildHighRiskHighlights(k)
+
+	fmt.Fprintln(w, "========== cwrap Recon Summary ==========")
+	if k.Target != "" {
+		fmt.Fprintln(w, "Target:", k.Target)
+	} else if entityCount > 0 {
+		fmt.Fprintln(w, "Target:", urls[0])
+	} else {
+		fmt.Fprintln(w, "Target: (unknown)")
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Entities discovered: %d\n", entityCount)
+	fmt.Fprintf(w, "Edges discovered:    %d\n", edgeCount)
+	fmt.Fprintf(w, "Global parameters:   %d\n", globalParamCnt)
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Auth boundary:       %v\n", yesNo(hasAuthBoundary))
+	fmt.Fprintf(w, "Ownership boundary:  %v\n", yesNo(hasOwnership))
+	fmt.Fprintf(w, "IDOR surfaces:       %d\n", possibleIDOR)
+	fmt.Fprintf(w, "Admin surfaces:      %d\n", adminSurface)
+	fmt.Fprintf(w, "JS leaks:            %d\n", jsLeakCount)
+
+	if len(high) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "High Risk Findings:")
+		for _, s := range high {
+			fmt.Fprintln(w, " •", s)
 		}
 	}
-	return false
-}
 
-func reportEntity(ent *knowledge.Entity) {
-	fmt.Println(bold + "========== Recon Report ==========" + reset)
-	fmt.Println(cyan + "Target: " + reset + ent.URL)
-	fmt.Println()
-	validIdentity := hasValidIdentity(ent)
-	reportProtocol(ent)
-	reportSurface(ent, validIdentity)
-	reportSession(ent)
-	reportIdentities(ent)
-	reportBehavior(ent)
-	reportParameters(ent)
-	reportSecurityModel(ent)
-	reportFindings(ent)
-	reportJS(ent)
-	reportConclusion(ent, validIdentity)
-	reportNextSteps(ent)
-	fmt.Println(bold + "==================================" + reset)
-}
-
-func reportProtocol(ent *knowledge.Entity) {
-	section("Protocol")
-
-	has200 := false
-	hasAuth := false
-	hasOther := false
-
-	for code := range ent.Content.Statuses {
-		switch code {
-		case 200:
-			has200 = true
-		case 401, 403:
-			hasAuth = true
-		default:
-			hasOther = true
-		}
-	}
-
-	switch {
-	case hasAuth && !has200:
-		if ent.HTTP.AuthLikely {
-			info("Endpoint requires authentication")
+	fmt.Fprintln(w)
+	if fileErr == nil && path != "" {
+		fmt.Fprintln(w, "Full report saved at:")
+		fmt.Fprintln(w, " ", path)
+	} else {
+		fmt.Fprintln(w, "Full report save failed:")
+		if fileErr != nil {
+			fmt.Fprintln(w, " ", fileErr.Error())
 		} else {
-			info("Endpoint acts as an authentication gate")
-		}
-	case hasAuth && has200:
-		info("Endpoint behavior depends on identity")
-	case has200 && hasOther:
-		info("Endpoint returns variable response classes")
-	default:
-		info("Static response behavior")
-	}
-
-	switch {
-	case ent.Content.LooksLikeJSON:
-		info("Structured data responses detected")
-	case ent.Content.LooksLikeHTML:
-		info("Page-oriented responses detected")
-	default:
-		info("Unstructured or minimal responses")
-	}
-
-	if ent.SeenSignal(knowledge.SigStateChanging) {
-		warn("Response changes based on input values")
-	} else {
-		good("Response deterministic for same input")
-	}
-
-	fmt.Println()
-}
-func reportSurface(ent *knowledge.Entity, validIdentity bool) {
-	section("Surface")
-
-	if ent.Content.LooksLikeJSON {
-		info("API endpoint (JSON)")
-	} else if ent.Content.LooksLikeHTML {
-		info("HTML page")
-	} else {
-		info("Unknown content type")
-	}
-
-	if validIdentity {
-		good("Authenticated session active")
-	} else if ent.HTTP.AuthLikely {
-		warn("Authentication required or detected")
-
-	} else {
-		good("Public endpoint")
-	}
-
-	if ent.HTTP.CSRFPresent {
-		info("CSRF protection detected")
-	}
-
-	if ent.SeenSignal(knowledge.SigStateChanging) {
-		info("Stateful interaction detected")
-	}
-
-	fmt.Println()
-}
-
-func reportSession(ent *knowledge.Entity) {
-
-	if len(ent.SessionCookies) == 0 {
-		return
-	}
-
-	section("Session")
-
-	if ent.SessionUsed {
-		info("Reused stored session")
-	}
-
-	if ent.SessionIssued {
-		info("Server issued or rotated session")
-	}
-
-	for name := range ent.SessionCookies {
-		fmt.Println(" • Cookie:", name)
-	}
-
-	fmt.Println()
-}
-
-func reportIdentities(ent *knowledge.Entity) {
-	section("Identities")
-
-	if len(ent.IdentityIndex) == 0 {
-		info("No identity mechanisms observed")
-		fmt.Println()
-		return
-	}
-
-	// Detect if we have a valid primary identity
-	hasPrimary := false
-	for _, id := range ent.IdentityIndex {
-		if id.Kind == knowledge.IdentityUser && !id.Rejected {
-			hasPrimary = true
-			break
+			fmt.Fprintln(w, "  (unknown error)")
 		}
 	}
+	fmt.Fprintln(w, "========================================")
+}
 
-	printed := 0
+func yesNo(b bool) string {
+	if b {
+		return "yes"
+	}
+	return "no"
+}
 
-	for _, id := range ent.IdentityIndex {
+func buildHighRiskHighlights(k *knowledge.Knowledge) []string {
+	urls := sortedEntityURLs(k)
+	var out []string
 
-		//  If a valid primary exists, suppress rejected identities
-		if hasPrimary && id.Rejected {
+	for _, u := range urls {
+		ent := k.Entities[u]
+		if ent == nil {
 			continue
 		}
 
-		printed++
-
-		label := identityLabel(id)
-		fmt.Print(" " + bold + label + reset)
-
-		var traits []string
-
-		if id.IssuedByServer {
-			traits = append(traits, "issued")
-		}
-		if len(id.CookieNames) > 0 {
-			traits = append(traits, "cookies:"+strings.Join(id.CookieNames, ","))
-		}
-		if id.AuthScheme != "" {
-			traits = append(traits, id.AuthScheme)
-		}
-		if id.HasCSRF {
-			traits = append(traits, "csrf")
-		}
-		if id.Rotates {
-			traits = append(traits, "rotating")
-		}
-		if id.Role != "" {
-			traits = append(traits, "role:"+id.Role)
-		}
-
-		// If no primary exists, show rejected identities
-		if !hasPrimary && id.Rejected {
-			traits = []string{"rejected"}
-		}
-
-		if len(traits) > 0 {
-			fmt.Print(" " + gray + "[" + strings.Join(traits, ", ") + "]" + reset)
-		}
-
-		fmt.Println()
-	}
-
-	if printed == 0 {
-		info("No identity mechanisms observed")
-	}
-
-	fmt.Println()
-}
-
-func identityLabel(id *knowledge.Identity) string {
-	switch id.Kind {
-	case knowledge.IdentityNone:
-		return "no-credentials"
-	case knowledge.IdentityBootstrap:
-		return "bootstrap-session"
-	case knowledge.IdentityInvalid:
-		return "invalid-credentials"
-	case knowledge.IdentityUser:
-		if !id.Effective {
-			return "presented-credentials"
-		}
-		return "authenticated-user"
-	case knowledge.IdentityElevated:
-		return "elevated-user"
-	default:
-		return "identity"
-	}
-}
-func reportBehavior(ent *knowledge.Entity) {
-
-	var lines []func()
-
-	if ent.SeenSignal(knowledge.SigAuthBoundary) {
-		lines = append(lines, func() {
-			info("Access control boundary observed")
-		})
-	}
-
-	if ent.SeenSignal(knowledge.SigObjectOwnership) {
-		lines = append(lines, func() {
-			info("Server enforces per-object ownership")
-		})
-	}
-
-	for name, p := range ent.Params {
-
-		if p.InjectedOnly() {
-			continue
-		}
-
-		var noCredAccess int
-		var credDenied int
-
-		for idName, access := range p.IdentityAccess {
-			id := ent.Identities[idName]
-			if id == nil {
+		// Surface-level: confirmed-ish risks from ParamIntel
+		for name, p := range ent.Params {
+			if p == nil {
 				continue
 			}
-			if !id.SentCreds {
-				noCredAccess += access
+			if p.PossibleIDOR && p.OwnershipBoundary && p.IDLike {
+				out = append(out, fmt.Sprintf("Horizontal privilege escalation suspected: %s (param: %s)", ent.URL, name))
+				break
 			}
-		}
-
-		for idName, denied := range p.IdentityDenied {
-			id := ent.Identities[idName]
-			if id == nil {
-				continue
-			}
-			if id.SentCreds {
-				credDenied += denied
-			}
-		}
-
-		if noCredAccess > 0 && credDenied > 0 {
-			paramName := name
-			lines = append(lines, func() {
-				warn("Unauthenticated access possible via parameter: " + paramName)
-			})
-		}
-
-		for _, id := range ent.Identities {
-			if id.SentCreds && id.Effective {
-				paramName := name
-				lines = append(lines, func() {
-					info("Identity influences behavior on parameter: " + paramName)
-				})
+			if p.SuspectIDOR && p.IDLike {
+				out = append(out, fmt.Sprintf("Possible IDOR surface: %s (param: %s)", ent.URL, name))
 				break
 			}
 		}
-	}
 
-	if len(lines) == 0 {
-		return
-	}
-
-	section("Behavior")
-
-	for _, l := range lines {
-		l()
-	}
-
-	fmt.Println()
-}
-
-func reportParameters(ent *knowledge.Entity) {
-
-	// Collect printable params
-	names := make([]string, 0, len(ent.Params))
-	for name, p := range ent.Params {
-		if p.InjectedOnly() {
-			continue
-		}
-		names = append(names, name)
-	}
-
-	if len(names) == 0 {
-		return
-	}
-
-	sort.Strings(names)
-
-	section("Parameters")
-
-	for _, name := range names {
-		p := ent.Params[name]
-
-		if p.InjectedOnly() {
-			continue
-		}
-		fmt.Print(" " + bold + name + reset)
-
-		var tags []string
-
-		if p.IDLike {
-			tags = append(tags, "id")
-		}
-		if p.TokenLike {
-			tags = append(tags, "token")
-		}
-		if p.DebugLike {
-			tags = append(tags, "debug")
-		}
-		if p.LikelyReflection {
-			tags = append(tags, "reflection")
-		}
-		if p.LikelyObjectAccess {
-			tags = append(tags, "object")
-		}
-		if p.Enumerable {
-			tags = append(tags, "enumerable")
-		}
-		if p.AuthBoundary {
-			tags = append(tags, "auth")
-		}
-		if p.OwnershipBoundary {
-			tags = append(tags, "ownership")
-		}
-
-		if len(tags) > 0 {
-			fmt.Print(" " + gray + "[" + strings.Join(tags, ", ") + "]" + reset)
-		}
-
-		fmt.Println()
-	}
-
-	fmt.Println()
-}
-
-func reportConclusion(ent *knowledge.Entity, validIdentity bool) {
-	section("Conclusion")
-
-	hasBypass := false
-	hasIDOR := false
-
-	for _, p := range ent.Params {
-
-		for idName, access := range p.IdentityAccess {
-			id := ent.Identities[idName]
-			if id == nil {
+		// Auth bypass hint: any success without creds (identity named "anonymous" is common)
+		for _, p := range ent.Params {
+			if p == nil {
 				continue
 			}
-			if !id.SentCreds && access > 0 {
-				hasBypass = true
+			if p.IdentityAccess != nil && p.IdentityAccess["anonymous"] > 0 {
+				out = append(out, fmt.Sprintf("Unauthenticated access observed: %s (via param behavior)", ent.URL))
+				break
+			}
+		}
+
+		// JS leak evidence
+		if len(ent.Content.JSLeaks) > 0 {
+			out = append(out, fmt.Sprintf("Secrets/material found in JS: %s (%d leak(s))", ent.URL, len(ent.Content.JSLeaks)))
+		}
+	}
+
+	// Dedup + cap to keep summary readable
+	out = dedup(out)
+	if len(out) > 6 {
+		out = out[:6]
+	}
+	return out
+}
+
+func dedup(in []string) []string {
+	seen := make(map[string]bool, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if s == "" || seen[s] {
+			continue
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	return out
+}
+
+// ---- full report ----
+
+func writeFullReport(w io.Writer, k *knowledge.Knowledge) {
+	now := time.Now().Format("2006-01-02 15:04:05")
+
+	fmt.Fprintln(w, "========== CWRAP FULL RECON REPORT ==========")
+	if k.Target != "" {
+		fmt.Fprintln(w, "Target:   ", k.Target)
+	}
+	fmt.Fprintln(w, "Generated:", now)
+	fmt.Fprintln(w)
+
+	writeGlobalStats(w, k)
+	writeDiscoveryTree(w, k)
+	writeEntityDetails(w, k)
+
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "=============== END OF REPORT ===============")
+}
+
+func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
+	fmt.Fprintln(w, "------------------------------------------------")
+	fmt.Fprintln(w, "GLOBAL STATS")
+	fmt.Fprintln(w, "------------------------------------------------")
+
+	urls := sortedEntityURLs(k)
+	fmt.Fprintf(w, "Entities:          %d\n", len(urls))
+	fmt.Fprintf(w, "Edges:             %d\n", len(k.Edges))
+	fmt.Fprintf(w, "Global parameters: %d\n", len(k.Params))
+
+	// Signals rollup
+	sigCounts := make(map[string]int)
+	for _, u := range urls {
+		ent := k.Entities[u]
+		if ent == nil {
+			continue
+		}
+		for s, on := range ent.Signals.Tags {
+			if on {
+				sigCounts[s.String()]++
 			}
 		}
 	}
-	hasIdentityAuth := ent.HTTP.AuthLikely
-	hasBootstrap := false
-	hasElevated := false
-
-	for _, id := range ent.Identities {
-		if id.Kind == knowledge.IdentityBootstrap {
-			hasBootstrap = true
+	if len(sigCounts) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Signals (count of entities tagged):")
+		keys := make([]string, 0, len(sigCounts))
+		for k := range sigCounts {
+			keys = append(keys, k)
 		}
-		if id.Kind == knowledge.IdentityElevated {
-			hasElevated = true
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(w, "  - %s: %d\n", k, sigCounts[k])
 		}
-		if id.AuthScheme != "" || len(id.CookieNames) > 0 {
-			hasIdentityAuth = true
-		}
-	}
-	hasSuspect := false
-	for _, p := range ent.Params {
-		if p.SuspectIDOR {
-			hasSuspect = true
-			break
-		}
-	}
-	switch {
-	case hasIDOR:
-		bad("Broken object-level authorization confirmed")
-	case hasBypass:
-		bad("Authentication enforcement inconsistent")
-	case hasIDOR:
-		bad("Broken object-level authorization confirmed")
-	case hasSuspect:
-		warn("Possible broken object-level authorization (needs additional identities to confirm)")
-	case validIdentity && ent.SeenSignal(knowledge.SigAuthBoundary):
-		good("Authenticated and authorization enforced correctly")
-	case validIdentity:
-		good("Authenticated session established")
-	case hasBootstrap || hasElevated || hasIdentityAuth:
-		good("Authentication mechanisms detected")
-	default:
-		warn("No access control mechanisms detected")
 	}
 
-	fmt.Println()
+	fmt.Fprintln(w)
 }
 
-func reportSecurityModel(ent *knowledge.Entity) {
-	section("Security Model")
+func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
+	fmt.Fprintln(w, "------------------------------------------------")
+	fmt.Fprintln(w, "DISCOVERY TREE")
+	fmt.Fprintln(w, "------------------------------------------------")
 
-	hasOwnership := false
-	hasAuth := false
-	hasObjects := false
+	// Build adjacency from edges.
+	type child struct {
+		to    string
+		etype knowledge.EdgeType
+	}
+	adj := make(map[string][]child)
 
-	for _, p := range ent.Params {
-		if p.OwnershipBoundary {
-			hasOwnership = true
-		}
-		if p.AuthBoundary {
-			hasAuth = true
-		}
-		if p.LikelyObjectAccess {
-			hasObjects = true
+	// also ensure nodes exist even if no edges
+	for u := range k.Entities {
+		if _, ok := adj[u]; !ok {
+			adj[u] = nil
 		}
 	}
-	hasIdentityAuth := ent.HTTP.AuthLikely
-	hasBootstrap := false
-	hasElevated := false
 
-	for _, id := range ent.Identities {
-		if id.Kind == knowledge.IdentityBootstrap {
-			hasBootstrap = true
-		}
-		if id.Kind == knowledge.IdentityElevated {
-			hasElevated = true
-		}
-		if id.AuthScheme != "" || len(id.CookieNames) > 0 {
-			hasIdentityAuth = true
+	for _, e := range k.Edges {
+		adj[e.From] = append(adj[e.From], child{to: e.To, etype: e.Type})
+		// ensure target key exists
+		if _, ok := adj[e.To]; !ok {
+			adj[e.To] = nil
 		}
 	}
-	switch {
-	case hasBootstrap:
-		info("Authentication bootstrap endpoint")
 
-	case hasElevated:
-		warn("Privilege-bearing session issued (elevated role)")
+	// Sort children deterministically.
+	for from := range adj {
+		cs := adj[from]
+		sort.Slice(cs, func(i, j int) bool {
+			if cs[i].to == cs[j].to {
+				return cs[i].etype < cs[j].etype
+			}
+			return cs[i].to < cs[j].to
+		})
+		adj[from] = cs
+	}
 
-	case hasAuth || hasIdentityAuth:
-		if ent.SeenSignal(knowledge.SigAuthBoundary) {
-			info("Protected resource (authentication required)")
+	// Pick root:
+	// Prefer k.Target if it matches an entity key; otherwise use lexicographically first entity.
+	root := ""
+	if k.Target != "" {
+		if _, ok := k.Entities[k.Target]; ok {
+			root = k.Target
+		}
+	}
+	if root == "" {
+		urls := sortedEntityURLs(k)
+		if len(urls) > 0 {
+			root = urls[0]
+		}
+	}
+
+	if root == "" {
+		fmt.Fprintln(w, "(no entities)")
+		fmt.Fprintln(w)
+		return
+	}
+
+	fmt.Fprintln(w, root)
+
+	// DFS with cycle protection (graph can have cycles).
+	var walk func(node string, prefix string, isLast bool, stack map[string]bool)
+	walk = func(node string, prefix string, isLast bool, stack map[string]bool) {
+		children := adj[node]
+		for i, c := range children {
+			last := i == len(children)-1
+
+			branch := "├── "
+			nextPrefix := prefix + "│   "
+			if last {
+				branch = "└── "
+				nextPrefix = prefix + "    "
+			}
+
+			edgeTag := edgeTypeLabel(c.etype)
+			line := fmt.Sprintf("%s%s%s", prefix, branch, c.to)
+			if edgeTag != "" {
+				line += "  [" + edgeTag + "]"
+			}
+
+			// cycle marker
+			if stack[c.to] {
+				line += "  (cycle)"
+				fmt.Fprintln(w, line)
+				continue
+			}
+
+			fmt.Fprintln(w, line)
+
+			// recurse
+			stack2 := copySet(stack)
+			stack2[c.to] = true
+			walk(c.to, nextPrefix, last, stack2)
+		}
+	}
+
+	stack := map[string]bool{root: true}
+	walk(root, "", true, stack)
+
+	fmt.Fprintln(w)
+}
+
+func edgeTypeLabel(t knowledge.EdgeType) string {
+	switch t {
+	case knowledge.EdgeDiscoveredFromHTML:
+		return "html"
+	case knowledge.EdgeDiscoveredFromJS:
+		return "js"
+	case knowledge.EdgeFormAction:
+		return "form"
+	default:
+		return "edge"
+	}
+}
+
+func copySet(in map[string]bool) map[string]bool {
+	out := make(map[string]bool, len(in)+1)
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
+	fmt.Fprintln(w, "------------------------------------------------")
+	fmt.Fprintln(w, "ENTITY INTELLIGENCE (DETAILED)")
+	fmt.Fprintln(w, "------------------------------------------------")
+
+	urls := sortedEntityURLs(k)
+	for _, u := range urls {
+		ent := k.Entities[u]
+		if ent == nil {
+			continue
+		}
+
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "[ENTITY]", ent.URL)
+
+		// State
+		fmt.Fprintln(w, "State:")
+		fmt.Fprintf(w, "  Seen:       %v\n", ent.State.Seen)
+		fmt.Fprintf(w, "  ProbeCount: %d\n", ent.State.ProbeCount)
+
+		// HTTP
+		fmt.Fprintln(w, "HTTP:")
+		fmt.Fprintf(w, "  AuthLikely:  %v\n", ent.HTTP.AuthLikely)
+		fmt.Fprintf(w, "  CSRFPresent: %v\n", ent.HTTP.CSRFPresent)
+
+		methods := sortedKeys(ent.HTTP.Methods)
+		fmt.Fprintln(w, "  Methods:")
+		if len(methods) == 0 {
+			fmt.Fprintln(w, "    (none)")
 		} else {
-			info("Authentication gateway endpoint")
+			for _, m := range methods {
+				fmt.Fprintln(w, "    -", m)
+			}
 		}
-	case hasOwnership:
-		info("Per-object access control (user owns resources)")
-	case hasObjects && !hasOwnership:
-		warn("Shared object space (multi-user data)")
+
+		headers := sortedKeys(ent.HTTP.Headers)
+		fmt.Fprintln(w, "  Headers:")
+		if len(headers) == 0 {
+			fmt.Fprintln(w, "    (none)")
+		} else {
+			for _, h := range headers {
+				fmt.Fprintln(w, "    -", h)
+			}
+		}
+
+		// Content
+		fmt.Fprintln(w, "Content:")
+		fmt.Fprintf(w, "  LooksLikeHTML: %v\n", ent.Content.LooksLikeHTML)
+		fmt.Fprintf(w, "  LooksLikeJSON: %v\n", ent.Content.LooksLikeJSON)
+		fmt.Fprintf(w, "  LooksLikeXML:  %v\n", ent.Content.LooksLikeXML)
+
+		fmt.Fprintln(w, "  Statuses:")
+		if len(ent.Content.Statuses) == 0 {
+			fmt.Fprintln(w, "    (none)")
+		} else {
+			codes := make([]int, 0, len(ent.Content.Statuses))
+			for c := range ent.Content.Statuses {
+				codes = append(codes, c)
+			}
+			sort.Ints(codes)
+			for _, c := range codes {
+				fmt.Fprintf(w, "    %d: %d\n", c, ent.Content.Statuses[c])
+			}
+		}
+
+		fmt.Fprintln(w, "  MIMEs:")
+		if len(ent.Content.MIMEs) == 0 {
+			fmt.Fprintln(w, "    (none)")
+		} else {
+			mimes := make([]string, 0, len(ent.Content.MIMEs))
+			for m := range ent.Content.MIMEs {
+				mimes = append(mimes, m)
+			}
+			sort.Strings(mimes)
+			for _, m := range mimes {
+				fmt.Fprintf(w, "    %s: %d\n", m, ent.Content.MIMEs[m])
+			}
+		}
+
+		// Signals
+		fmt.Fprintln(w, "Signals:")
+		sigs := activeSignals(ent)
+		if len(sigs) == 0 {
+			fmt.Fprintln(w, "  (none)")
+		} else {
+			for _, s := range sigs {
+				fmt.Fprintln(w, "  -", s)
+			}
+		}
+
+		// Session (raw cookies/tokens)
+		fmt.Fprintln(w, "Session:")
+		fmt.Fprintf(w, "  Used:   %v\n", ent.SessionUsed)
+		fmt.Fprintf(w, "  Issued: %v\n", ent.SessionIssued)
+		fmt.Fprintln(w, "  Cookies:")
+		if len(ent.SessionCookies) == 0 {
+			fmt.Fprintln(w, "    (none)")
+		} else {
+			names := make([]string, 0, len(ent.SessionCookies))
+			for n := range ent.SessionCookies {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			for _, n := range names {
+				// Option A: raw value, no masking.
+				fmt.Fprintf(w, "    - %s=%s\n", n, ent.SessionCookies[n])
+			}
+		}
+
+		// Identities (no suppression, no filtering)
+		fmt.Fprintln(w, "Identities:")
+		if len(ent.Identities) == 0 && len(ent.IdentityIndex) == 0 {
+			fmt.Fprintln(w, "  (none)")
+		} else {
+			// Prefer stable list: union of names (ent.Identities is name->id).
+			names := make([]string, 0, len(ent.Identities))
+			for n := range ent.Identities {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+
+			for _, name := range names {
+				id := ent.Identities[name]
+				if id == nil {
+					continue
+				}
+				fmt.Fprintln(w, "  Name:", id.Name)
+				fmt.Fprintln(w, "    Kind:", identityKindLabel(id.Kind))
+				if id.Role != "" {
+					fmt.Fprintln(w, "    Role:", id.Role)
+				} else {
+					fmt.Fprintln(w, "    Role:", "(none)")
+				}
+				fmt.Fprintln(w, "    Effective:", id.Effective)
+				fmt.Fprintln(w, "    SentCreds:", id.SentCreds)
+				fmt.Fprintln(w, "    Rejected:", id.Rejected)
+				fmt.Fprintln(w, "    IssuedByServer:", id.IssuedByServer)
+				fmt.Fprintln(w, "    AuthScheme:", emptyAsNone(id.AuthScheme))
+				fmt.Fprintln(w, "    HasCSRF:", id.HasCSRF)
+				fmt.Fprintln(w, "    CookieNames:")
+				if len(id.CookieNames) == 0 {
+					fmt.Fprintln(w, "      (none)")
+				} else {
+					for _, cn := range id.CookieNames {
+						fmt.Fprintln(w, "      -", cn)
+					}
+				}
+			}
+		}
+
+		// Parameters (no injected-only exclusion)
+		fmt.Fprintln(w, "Parameters:")
+		if len(ent.Params) == 0 {
+			fmt.Fprintln(w, "  (none)")
+		} else {
+			pnames := make([]string, 0, len(ent.Params))
+			for n := range ent.Params {
+				pnames = append(pnames, n)
+			}
+			sort.Strings(pnames)
+
+			for _, name := range pnames {
+				p := ent.Params[name]
+				if p == nil {
+					continue
+				}
+				fmt.Fprintln(w, "  Name:", p.Name)
+
+				// Sources
+				fmt.Fprintln(w, "    Sources:")
+				if len(p.Sources) == 0 {
+					fmt.Fprintln(w, "      (none)")
+				} else {
+					srcs := make([]string, 0, len(p.Sources))
+					for s, on := range p.Sources {
+						if on {
+							srcs = append(srcs, s.String())
+						}
+					}
+					sort.Strings(srcs)
+					for _, s := range srcs {
+						fmt.Fprintln(w, "      -", s)
+					}
+				}
+
+				// Heuristics
+				fmt.Fprintln(w, "    Heuristics:")
+				fmt.Fprintln(w, "      IDLike:", p.IDLike)
+				fmt.Fprintln(w, "      TokenLike:", p.TokenLike)
+				fmt.Fprintln(w, "      DebugLike:", p.DebugLike)
+				fmt.Fprintln(w, "      LikelyReflection:", p.LikelyReflection)
+				fmt.Fprintln(w, "      LikelyObjectAccess:", p.LikelyObjectAccess)
+
+				// Evidence / boundaries
+				fmt.Fprintln(w, "    Evidence:")
+				fmt.Fprintln(w, "      Enumerable:", p.Enumerable)
+				fmt.Fprintln(w, "      AuthBoundary:", p.AuthBoundary)
+				fmt.Fprintln(w, "      OwnershipBoundary:", p.OwnershipBoundary)
+				fmt.Fprintln(w, "      PossibleIDOR:", p.PossibleIDOR)
+				fmt.Fprintln(w, "      SuspectIDOR:", p.SuspectIDOR)
+				fmt.Fprintln(w, "      Interest:", p.Interest)
+
+				// Observed changes
+				fmt.Fprintln(w, "    ObservedChanges:")
+				if len(p.ObservedChanges) == 0 {
+					fmt.Fprintln(w, "      (none)")
+				} else {
+					keys := make([]string, 0, len(p.ObservedChanges))
+					for k := range p.ObservedChanges {
+						keys = append(keys, k)
+					}
+					sort.Strings(keys)
+					for _, k := range keys {
+						fmt.Fprintln(w, "      -", k)
+					}
+				}
+
+				// Identity access/denied maps
+				fmt.Fprintln(w, "    IdentityAccess:")
+				writeStringIntMap(w, "      ", p.IdentityAccess)
+				fmt.Fprintln(w, "    IdentityDenied:")
+				writeStringIntMap(w, "      ", p.IdentityDenied)
+			}
+		}
+
+		// JS Intelligence (no trimming, no redaction)
+		fmt.Fprintln(w, "JS Intelligence:")
+		if len(ent.Content.JSFindings) == 0 && len(ent.Content.JSLeaks) == 0 {
+			fmt.Fprintln(w, "  (none)")
+		} else {
+			fmt.Fprintln(w, "  Findings:")
+			if len(ent.Content.JSFindings) == 0 {
+				fmt.Fprintln(w, "    (none)")
+			} else {
+				keys := make([]string, 0, len(ent.Content.JSFindings))
+				for k := range ent.Content.JSFindings {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					fmt.Fprintf(w, "    - %s: %d\n", k, ent.Content.JSFindings[k])
+				}
+			}
+
+			fmt.Fprintln(w, "  Leaks:")
+			if len(ent.Content.JSLeaks) == 0 {
+				fmt.Fprintln(w, "    (none)")
+			} else {
+				for _, leak := range ent.Content.JSLeaks {
+					fmt.Fprintln(w, "    - Kind:", leak.Kind)
+					fmt.Fprintln(w, "      Source:", leak.Source)
+					fmt.Fprintln(w, "      Key:", emptyAsNone(leak.Key))
+					// Option A: raw value, no masking.
+					fmt.Fprintln(w, "      Value:", leak.Value)
+				}
+			}
+		}
+
+		// Findings (in-file, no exclusions)
+		fmt.Fprintln(w, "Findings:")
+		findings := deriveFindings(ent)
+		if len(findings) == 0 {
+			fmt.Fprintln(w, "  (none)")
+		} else {
+			for _, f := range findings {
+				fmt.Fprintln(w, "  -", f)
+			}
+		}
+
+		// Next Steps (requested: do NOT exclude)
+		fmt.Fprintln(w, "Next Steps:")
+		steps := deriveNextSteps(ent)
+		if len(steps) == 0 {
+			fmt.Fprintln(w, "  (none)")
+		} else {
+			for _, s := range steps {
+				fmt.Fprintln(w, "  -", s)
+			}
+		}
+	}
+}
+
+// ---- derivation helpers ----
+
+func sortedEntityURLs(k *knowledge.Knowledge) []string {
+	urls := make([]string, 0, len(k.Entities))
+	for u := range k.Entities {
+		urls = append(urls, u)
+	}
+	sort.Strings(urls)
+	return urls
+}
+
+func sortedKeys(m map[string]bool) []string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(m))
+	for k, on := range m {
+		if on {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func activeSignals(ent *knowledge.Entity) []string {
+	if ent == nil || len(ent.Signals.Tags) == 0 {
+		return nil
+	}
+	var out []string
+	for s, on := range ent.Signals.Tags {
+		if on {
+			out = append(out, s.String())
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func identityKindLabel(k knowledge.IdentityKind) string {
+	switch k {
+	case knowledge.IdentityUnknown:
+		return "IdentityUnknown"
+	case knowledge.IdentityNone:
+		return "IdentityNone"
+	case knowledge.IdentityBootstrap:
+		return "IdentityBootstrap"
+	case knowledge.IdentityUser:
+		return "IdentityUser"
+	case knowledge.IdentityElevated:
+		return "IdentityElevated"
+	case knowledge.IdentityInvalid:
+		return "IdentityInvalid"
 	default:
-		good("Public endpoint")
+		return "IdentityKind(?)"
 	}
-
-	fmt.Println()
 }
 
-func reportFindings(ent *knowledge.Entity) {
-	section("Findings")
-
-	found := false
-
-	for name, p := range ent.Params {
-
-		if p.InjectedOnly() {
-			continue
-		}
-		if p.SuspectIDOR && p.IDLike {
-			warn("Possible object-level authorization risk via parameter: " + name + " (needs second user identity to confirm)")
-			found = true
-		}
-
-		if p.PossibleIDOR && p.OwnershipBoundary {
-			bad("Horizontal privilege escalation via parameter: " + name)
-			found = true
-		}
-
-		if p.IdentityAccess["anonymous"] > 0 {
-			bad("Authentication bypass possible via: " + name)
-			found = true
-		}
-
-		if p.Enumerable && p.LikelyObjectAccess {
-			warn("Object enumeration possible via: " + name)
-			found = true
-		}
-
-		if p.DebugLike {
-			warn("Debug functionality exposed via: " + name)
-			found = true
-		}
+func emptyAsNone(s string) string {
+	if s == "" {
+		return "(none)"
 	}
-
-	if !found {
-		good("No direct vulnerabilities confirmed")
-	}
-
-	fmt.Println()
-}
-func reportNextSteps(ent *knowledge.Entity) {
-	section("Suggested Attacks")
-
-	validIdentity := hasValidIdentity(ent)
-	printed := false
-
-	// ---- Parameter-driven attacks ----
-	for name, p := range ent.Params {
-
-		if p.InjectedOnly() {
-			continue
-		}
-
-		if p.Enumerable {
-			info("Enumerate " + name + " sequentially")
-			printed = true
-		}
-
-		if p.PossibleIDOR {
-			info("Attempt cross-user object access via " + name)
-			printed = true
-		}
-
-		if validIdentity && p.IDLike && p.OwnershipBoundary {
-			info("Test horizontal privilege escalation on " + name)
-			printed = true
-		}
-
-		if validIdentity && p.AuthBoundary && !p.OwnershipBoundary {
-			info("Attempt vertical privilege escalation using " + name)
-			printed = true
-		}
-
-		if p.TokenLike {
-			info("Attempt token reuse or swapping on " + name)
-			printed = true
-		}
-	}
-
-	// ---- Authentication phase attacks ----
-	if !validIdentity {
-
-		if ent.SeenSignal(knowledge.SigAuthBoundary) {
-			info("Test weak credentials")
-			info("Username enumeration")
-			info("Missing credential handling")
-			info("Auth bypass headers (X-Forwarded-For, X-Original-URL)")
-			printed = true
-		}
-
-	} else {
-
-		// Authenticated attack phase
-		if ent.SeenSignal(knowledge.SigAuthBoundary) {
-			info("Map privileged endpoints accessible with current session")
-			info("Attempt privilege escalation beyond current role")
-			printed = true
-		}
-
-		if ent.SeenSignal(knowledge.SigObjectOwnership) {
-			info("Attempt cross-user object access")
-			printed = true
-		}
-	}
-
-	if !printed {
-		info("No high-confidence attack paths identified, manual testing recommended")
-	}
-
-	fmt.Println()
+	return s
 }
 
-func reportGraph(ent *knowledge.Entity, k *knowledge.Knowledge) {
-
-	seenTo := make(map[string]bool)
-
-	for _, edge := range k.Edges {
-		if edge.From != ent.URL {
-			continue
-		}
-		seenTo[edge.To] = true
-	}
-
-	if len(seenTo) == 0 {
+func writeStringIntMap(w io.Writer, prefix string, m map[string]int) {
+	if len(m) == 0 {
+		fmt.Fprintln(w, prefix+"(none)")
 		return
 	}
-
-	section("Discovered Surface")
-
-	info(fmt.Sprintf("%d related endpoints discovered", len(seenTo)))
-
-	// ---- Sort for deterministic output ----
-	endpoints := make([]string, 0, len(seenTo))
-	for target := range seenTo {
-		endpoints = append(endpoints, target)
-	}
-	sort.Strings(endpoints)
-
-	max := 15
-	for i, target := range endpoints {
-
-		if i >= max {
-			info(fmt.Sprintf("... %d more truncated", len(endpoints)-max))
-			break
-		}
-
-		switch {
-		case strings.Contains(target, "admin"):
-			warn("Administrative surface: " + target)
-
-		case strings.Contains(target, "upload"):
-			warn("Upload surface: " + target)
-
-		case strings.Contains(target, "/api/"):
-			info("API endpoint: " + target)
-
-		default:
-			info("• " + target)
-		}
-	}
-
-	fmt.Println()
-}
-
-func reportJS(ent *knowledge.Entity) {
-
-	if len(ent.Content.JSFindings) == 0 && len(ent.Content.JSLeaks) == 0 {
-		return
-	}
-
-	section("JS Intelligence")
-
-	// ---- Sort findings keys ----
-	keys := make([]string, 0, len(ent.Content.JSFindings))
-	for k := range ent.Content.JSFindings {
+	keys := make([]string, 0, len(m))
+	for k := range m {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-
-	// ---- High-level summary ----
 	for _, k := range keys {
-		count := ent.Content.JSFindings[k]
+		fmt.Fprintf(w, "%s%s: %d\n", prefix, k, m[k])
+	}
+}
 
-		switch k {
+func deriveFindings(ent *knowledge.Entity) []string {
+	var out []string
+	if ent == nil {
+		return out
+	}
 
-		//  High severity
-		case "pem", "aws_key", "jwt", "keyword":
-			warn(fmt.Sprintf("%s: %d", k, count))
+	// Signals-based findings
+	if ent.SeenSignal(knowledge.SigAdminSurface) {
+		out = append(out, "Administrative surface detected")
+	}
+	if ent.SeenSignal(knowledge.SigFileUpload) {
+		out = append(out, "File upload surface detected")
+	}
+	if ent.SeenSignal(knowledge.SigSensitiveKeyword) {
+		out = append(out, "Sensitive keywords detected in content/JS")
+	}
+	if ent.SeenSignal(knowledge.SigAuthBoundary) {
+		out = append(out, "Authentication/authorization boundary observed")
+	}
+	if ent.SeenSignal(knowledge.SigObjectOwnership) {
+		out = append(out, "Object ownership enforcement observed")
+	}
 
-		//  Medium
-		case "endpoint", "role_check", "priv_flag", "priv_gate":
-			info(fmt.Sprintf("%s: %d", k, count))
+	// Param-based findings
+	pnames := make([]string, 0, len(ent.Params))
+	for n := range ent.Params {
+		pnames = append(pnames, n)
+	}
+	sort.Strings(pnames)
 
-		//  Low / structural
-		default:
-			info(fmt.Sprintf("%s: %d", k, count))
+	for _, name := range pnames {
+		p := ent.Params[name]
+		if p == nil {
+			continue
+		}
+
+		if p.PossibleIDOR && p.OwnershipBoundary && p.IDLike {
+			out = append(out, fmt.Sprintf("Horizontal privilege escalation possible via param: %s", name))
+		}
+		if p.SuspectIDOR && p.IDLike {
+			out = append(out, fmt.Sprintf("Suspect IDOR surface via param: %s", name))
+		}
+		if p.Enumerable && p.LikelyObjectAccess {
+			out = append(out, fmt.Sprintf("Object enumeration possible via param: %s", name))
+		}
+		if p.DebugLike {
+			out = append(out, fmt.Sprintf("Debug functionality exposed via param: %s", name))
+		}
+		if p.TokenLike {
+			out = append(out, fmt.Sprintf("Token-like parameter observed: %s", name))
+		}
+
+		// Unauthenticated access hint
+		if p.IdentityAccess != nil && p.IdentityAccess["anonymous"] > 0 {
+			out = append(out, fmt.Sprintf("Unauthenticated access observed (identity: anonymous) via param behavior: %s", name))
 		}
 	}
 
-	// ---- Leak Details (limited output) ----
-	maxLeaks := 10
+	// JS leaks are always findings in full report
 	if len(ent.Content.JSLeaks) > 0 {
+		out = append(out, fmt.Sprintf("JS leaks present: %d", len(ent.Content.JSLeaks)))
+	}
 
-		fmt.Println()
-		info("Evidence:")
+	out = dedup(out)
+	sort.Strings(out)
+	return out
+}
 
-		for i, leak := range ent.Content.JSLeaks {
+func deriveNextSteps(ent *knowledge.Entity) []string {
+	var out []string
+	if ent == nil {
+		return out
+	}
 
-			if i >= maxLeaks {
-				info(fmt.Sprintf("... %d more findings truncated", len(ent.Content.JSLeaks)-maxLeaks))
-				break
-			}
+	// Parameter-driven suggestions (no exclusions)
+	pnames := make([]string, 0, len(ent.Params))
+	for n := range ent.Params {
+		pnames = append(pnames, n)
+	}
+	sort.Strings(pnames)
 
-			value := leak.Value
+	for _, name := range pnames {
+		p := ent.Params[name]
+		if p == nil {
+			continue
+		}
 
-			// Defensive trimming
-			if len(value) > 120 {
-				value = value[:120] + "..."
-			}
-
-			// Classify display severity
-			switch leak.Kind {
-			case "pem", "aws_key", "jwt", "keyword":
-				warn(fmt.Sprintf("[%s] %s → %s = %s",
-					leak.Kind,
-					leak.Source,
-					leak.Key,
-					value,
-				))
-			default:
-				info(fmt.Sprintf("[%s] %s → %s = %s",
-					leak.Kind,
-					leak.Source,
-					leak.Key,
-					value,
-				))
-			}
+		if p.Enumerable {
+			out = append(out, "Enumerate "+name+" sequentially")
+		}
+		if p.PossibleIDOR || p.SuspectIDOR {
+			out = append(out, "Attempt cross-identity object access via "+name)
+		}
+		if p.IDLike && p.OwnershipBoundary {
+			out = append(out, "Test horizontal privilege escalation using "+name)
+		}
+		if p.AuthBoundary && !p.OwnershipBoundary {
+			out = append(out, "Test vertical privilege escalation / role boundary using "+name)
+		}
+		if p.TokenLike {
+			out = append(out, "Attempt token reuse / swapping / fixation using "+name)
+		}
+		if p.DebugLike {
+			out = append(out, "Probe debug flags / verbose errors using "+name)
 		}
 	}
 
-	fmt.Println()
+	// Auth-phase suggestions
+	if ent.SeenSignal(knowledge.SigAuthBoundary) {
+		out = append(out,
+			"Test weak credentials and default accounts",
+			"Attempt username enumeration",
+			"Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)",
+		)
+	}
+
+	// Ownership-phase suggestions
+	if ent.SeenSignal(knowledge.SigObjectOwnership) {
+		out = append(out, "Attempt cross-user object access (IDOR) across identities")
+	}
+
+	// JS leaks suggestions
+	if len(ent.Content.JSLeaks) > 0 || len(ent.Content.JSFindings) > 0 {
+		out = append(out, "Review JS findings for secrets, endpoints, role gates, and client-side auth assumptions")
+	}
+
+	out = dedup(out)
+	sort.Strings(out)
+	return out
 }

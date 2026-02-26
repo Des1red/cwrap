@@ -29,12 +29,20 @@ func Resolve(req model.Request) Handler {
 }
 
 func Parse(args []string) model.Request {
-	if len(args) < 3 {
+	if len(args) < 2 {
 		logger.PrintHelp()
 		os.Exit(1)
 	}
+
 	cmd := strings.ToLower(args[1])
-	url := args[2]
+
+	var url string
+
+	// If a third argument exists AND it is not a flag,
+	// treat it as URL
+	if len(args) >= 3 && !strings.HasPrefix(args[2], "-") {
+		url = args[2]
+	}
 
 	switch cmd {
 	case "fetch":

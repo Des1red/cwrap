@@ -49,6 +49,7 @@ func (e *Engine) handleJSEndpoints(
 		case "POST", "PUT", "PATCH", "DELETE":
 			priority = 70
 			ent.Tag(knowledge.SigStateChanging)
+			ent.AddMethod(ep.Method)
 		}
 
 		// Sensitive/admin paths get boost

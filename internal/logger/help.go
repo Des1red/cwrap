@@ -34,6 +34,15 @@ func PrintHelp() {
 		clihelp.F("bearer=TOKEN", "", "authorization bearer token"),
 	)
 
+	fmt.Println("\nRecon profiles (for recon command):")
+	clihelp.Print(
+		clihelp.F("http", "default", "general web recon (HTML, JS, headers)"),
+		clihelp.F("api", "", "API recon (JSON structure, auth)"),
+	)
+	fmt.Println("\n Recon commands:")
+	clihelp.Print(
+		clihelp.F("tfile", "string", "recon from a list of URLs in a file"),
+	)
 	fmt.Println("\nExamples:")
 	fmt.Println()
 
@@ -71,6 +80,11 @@ func PrintHelp() {
 		clihelp.F("-d '{...}'", "", "raw body"),
 		clihelp.F("--proxy URL", "", "proxy"),
 		clihelp.F("--run", "", "execute without prompt"),
+	)
+
+	fmt.Println("\n Recon examples:")
+	clihelp.Print(
+		clihelp.F("cwrap recon tfile urls.txt http", "", "recon from file with http profile"),
 	)
 
 	fmt.Println()

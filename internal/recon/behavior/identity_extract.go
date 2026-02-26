@@ -79,6 +79,9 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	case id.Rejected:
 		id.Kind = knowledge.IdentityInvalid
 
+	case id.Role != "" && isElevatedRole(id.Role):
+		id.Kind = knowledge.IdentityElevated
+
 	case id.IssuedByServer && resp.StatusCode >= 300 && resp.StatusCode < 400:
 		id.Kind = knowledge.IdentityBootstrap
 
@@ -87,7 +90,6 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 
 	case !sentAuth && !sentCookie:
 		id.Kind = knowledge.IdentityNone
-
 	default:
 		id.Kind = knowledge.IdentityUser
 	}
@@ -95,4 +97,18 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		id.Effective = true
 	}
 	ent.AddIdentity(id)
+}
+
+func isElevatedRole(role string) bool {
+	r := strings.ToLower(role)
+
+	switch {
+	case strings.Contains(r, "admin"),
+		strings.Contains(r, "root"),
+		strings.Contains(r, "super"),
+		strings.Contains(r, "staff"),
+		strings.Contains(r, "mod"):
+		return true
+	}
+	return false
 }

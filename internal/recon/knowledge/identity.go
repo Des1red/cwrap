@@ -6,7 +6,6 @@ const (
 	IdentityUnknown   IdentityKind = iota
 	IdentityNone                   // no credentials sent
 	IdentityBootstrap              // server issued a session
-	IdentityGuest                  // low privilege authenticated
 	IdentityUser                   // normal authenticated
 	IdentityElevated               // admin / role based
 	IdentityInvalid                // tampered / rejected
@@ -24,7 +23,6 @@ type Identity struct {
 
 	// Behavior evidence
 	IssuedByServer bool
-	Rotates        bool
 	Rejected       bool
 
 	Effective bool

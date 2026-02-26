@@ -29,6 +29,9 @@ func selectEngine(req model.Request) Engine {
 }
 func Run(req model.Request) error {
 	engine := selectEngine(req)
+	if req.Flags.Debug {
+		fmt.Printf("Selected recon engine: %T\n", engine)
+	}
 	if engine == nil {
 		return fmt.Errorf("no recon engine available")
 	}
@@ -38,6 +41,6 @@ func Run(req model.Request) error {
 		return err
 	}
 
-	report.Print(k)
+	report.CreateSummary(k)
 	return nil
 }

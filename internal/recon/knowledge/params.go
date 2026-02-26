@@ -3,12 +3,11 @@ package knowledge
 type ParamSource int
 
 const (
-	ParamQuery      ParamSource = iota // observed in baseline URL query or discovered URL
-	ParamDiscovered                    // discovered from behavior (server reaction), not directly observed
-	ParamInjected                      // added by scanner probes (e.g. _cwrap)
-	ParamForm                          // discovered from HTML form
-	ParamJSON                          // discovered from JSON keys
-	ParamPath                          // path segment param (future)
+	ParamQuery    ParamSource = iota // observed in baseline URL query or discovered URL
+	ParamInjected                    // added by scanner probes (e.g. _cwrap)
+	ParamForm                        // discovered from HTML form
+	ParamJSON                        // discovered from JSON keys
+	ParamPath                        // path segment param (future)
 )
 
 const (

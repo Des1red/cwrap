@@ -2,7 +2,6 @@ package knowledge
 
 import (
 	"fmt"
-	"sort"
 	"sync"
 )
 
@@ -67,19 +66,6 @@ func (k *Knowledge) AddParam(name string) {
 	k.mu.Lock()
 	k.Params[name] = true
 	k.mu.Unlock()
-}
-
-// Deterministic views (useful for stable output)
-func (k *Knowledge) URLsSorted() []string {
-	k.mu.RLock()
-	defer k.mu.RUnlock()
-
-	out := make([]string, 0, len(k.Entities))
-	for u := range k.Entities {
-		out = append(out, u)
-	}
-	sort.Strings(out)
-	return out
 }
 
 func (p *ParamIntel) InjectedOnly() bool {
