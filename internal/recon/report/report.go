@@ -25,12 +25,22 @@ func Print(k *knowledge.Knowledge) {
 	}
 }
 
+func hasValidIdentity(ent *knowledge.Entity) bool {
+	for _, id := range ent.Identities {
+		if id.Kind == knowledge.IdentityUser && !id.Rejected {
+			return true
+		}
+	}
+	return false
+}
+
 func reportEntity(ent *knowledge.Entity) {
 	fmt.Println(bold + "========== Recon Report ==========" + reset)
 	fmt.Println(cyan + "Target: " + reset + ent.URL)
 	fmt.Println()
+	validIdentity := hasValidIdentity(ent)
 	reportProtocol(ent)
-	reportSurface(ent)
+	reportSurface(ent, validIdentity)
 	reportSession(ent)
 	reportIdentities(ent)
 	reportBehavior(ent)
@@ -38,7 +48,7 @@ func reportEntity(ent *knowledge.Entity) {
 	reportSecurityModel(ent)
 	reportFindings(ent)
 	reportJS(ent)
-	reportConclusion(ent)
+	reportConclusion(ent, validIdentity)
 	reportNextSteps(ent)
 	fmt.Println(bold + "==================================" + reset)
 }
@@ -93,7 +103,7 @@ func reportProtocol(ent *knowledge.Entity) {
 
 	fmt.Println()
 }
-func reportSurface(ent *knowledge.Entity) {
+func reportSurface(ent *knowledge.Entity, validIdentity bool) {
 	section("Surface")
 
 	if ent.Content.LooksLikeJSON {
@@ -104,8 +114,11 @@ func reportSurface(ent *knowledge.Entity) {
 		info("Unknown content type")
 	}
 
-	if ent.HTTP.AuthLikely {
+	if validIdentity {
+		good("Authenticated session active")
+	} else if ent.HTTP.AuthLikely {
 		warn("Authentication required or detected")
+
 	} else {
 		good("Public endpoint")
 	}
@@ -153,14 +166,27 @@ func reportIdentities(ent *knowledge.Entity) {
 		return
 	}
 
+	// Detect if we have a valid primary identity
+	hasPrimary := false
+	for _, id := range ent.IdentityIndex {
+		if id.Kind == knowledge.IdentityUser && !id.Rejected {
+			hasPrimary = true
+			break
+		}
+	}
+
 	printed := 0
 
 	for _, id := range ent.IdentityIndex {
 
+		//  If a valid primary exists, suppress rejected identities
+		if hasPrimary && id.Rejected {
+			continue
+		}
+
 		printed++
 
 		label := identityLabel(id)
-
 		fmt.Print(" " + bold + label + reset)
 
 		var traits []string
@@ -183,8 +209,10 @@ func reportIdentities(ent *knowledge.Entity) {
 		if id.Role != "" {
 			traits = append(traits, "role:"+id.Role)
 		}
-		if id.Rejected {
-			traits = append(traits, "rejected")
+
+		// If no primary exists, show rejected identities
+		if !hasPrimary && id.Rejected {
+			traits = []string{"rejected"}
 		}
 
 		if len(traits) > 0 {
@@ -200,6 +228,7 @@ func reportIdentities(ent *knowledge.Entity) {
 
 	fmt.Println()
 }
+
 func identityLabel(id *knowledge.Identity) string {
 	switch id.Kind {
 	case knowledge.IdentityNone:
@@ -359,7 +388,7 @@ func reportParameters(ent *knowledge.Entity) {
 	fmt.Println()
 }
 
-func reportConclusion(ent *knowledge.Entity) {
+func reportConclusion(ent *knowledge.Entity, validIdentity bool) {
 	section("Conclusion")
 
 	hasBypass := false
@@ -408,8 +437,10 @@ func reportConclusion(ent *knowledge.Entity) {
 		bad("Broken object-level authorization confirmed")
 	case hasSuspect:
 		warn("Possible broken object-level authorization (needs additional identities to confirm)")
-	case ent.SeenSignal(knowledge.SigAuthBoundary):
-		good("Authorization enforced correctly")
+	case validIdentity && ent.SeenSignal(knowledge.SigAuthBoundary):
+		good("Authenticated and authorization enforced correctly")
+	case validIdentity:
+		good("Authenticated session established")
 	case hasBootstrap || hasElevated || hasIdentityAuth:
 		good("Authentication mechanisms detected")
 	default:
@@ -521,36 +552,70 @@ func reportFindings(ent *knowledge.Entity) {
 func reportNextSteps(ent *knowledge.Entity) {
 	section("Suggested Attacks")
 
+	validIdentity := hasValidIdentity(ent)
+	printed := false
+
+	// ---- Parameter-driven attacks ----
 	for name, p := range ent.Params {
+
+		if p.InjectedOnly() {
+			continue
+		}
 
 		if p.Enumerable {
 			info("Enumerate " + name + " sequentially")
+			printed = true
 		}
 
 		if p.PossibleIDOR {
 			info("Attempt cross-user object access via " + name)
+			printed = true
 		}
 
-		if p.IDLike && p.OwnershipBoundary {
+		if validIdentity && p.IDLike && p.OwnershipBoundary {
 			info("Test horizontal privilege escalation on " + name)
+			printed = true
 		}
 
-		if p.AuthBoundary && !p.OwnershipBoundary {
-			info("Attempt privilege escalation using " + name)
+		if validIdentity && p.AuthBoundary && !p.OwnershipBoundary {
+			info("Attempt vertical privilege escalation using " + name)
+			printed = true
 		}
 
 		if p.TokenLike {
 			info("Attempt token reuse or swapping on " + name)
+			printed = true
 		}
 	}
 
-	if ent.SeenSignal(knowledge.SigAuthBoundary) && !ent.SeenSignal(knowledge.SigObjectOwnership) {
-		info("Test weak credentials")
-		info("Username enumeration")
-		info("Missing credential handling")
-		info("Auth bypass headers (X-Forwarded-For, X-Original-URL)")
+	// ---- Authentication phase attacks ----
+	if !validIdentity {
+
+		if ent.SeenSignal(knowledge.SigAuthBoundary) {
+			info("Test weak credentials")
+			info("Username enumeration")
+			info("Missing credential handling")
+			info("Auth bypass headers (X-Forwarded-For, X-Original-URL)")
+			printed = true
+		}
+
 	} else {
-		info("No auth bypass or IDOR attack paths identified, but manual testing recommended to confirm")
+
+		// Authenticated attack phase
+		if ent.SeenSignal(knowledge.SigAuthBoundary) {
+			info("Map privileged endpoints accessible with current session")
+			info("Attempt privilege escalation beyond current role")
+			printed = true
+		}
+
+		if ent.SeenSignal(knowledge.SigObjectOwnership) {
+			info("Attempt cross-user object access")
+			printed = true
+		}
+	}
+
+	if !printed {
+		info("No high-confidence attack paths identified, manual testing recommended")
 	}
 
 	fmt.Println()

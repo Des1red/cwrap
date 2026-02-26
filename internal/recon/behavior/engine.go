@@ -18,6 +18,8 @@ type Engine struct {
 	baseBody   []byte
 	baseFP     fingerprint
 
+	authBoundaryConfirmed bool
+
 	debug bool
 }
 

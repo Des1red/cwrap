@@ -26,6 +26,8 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 	statuses := map[string]map[string]map[string]int{}
 
 	for ent.ProbeQueue.Len() > 0 {
+		identityStatuses := map[string]int{}
+
 		probe, _ := ent.ProbeQueue.PopBest()
 		key := probe.Key()
 
@@ -59,8 +61,16 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 
 		probeFP := map[string]string{}
 		baseFPStr := fpString(e.baseStatus, e.baseBody)
-
+		if e.debug {
+			println("== Running probe:", probe.Method, probe.URL)
+			println("   Baseline fingerprint:", baseFPStr)
+			println("authBoundaryConfirmed:", e.authBoundaryConfirmed)
+		}
 		for _, id := range e.identities {
+
+			if e.authBoundaryConfirmed && id.Synthetic {
+				continue
+			}
 			if e.debug {
 				println("[PROBE]", probe.URL, "as identity:", id.Name)
 			}
@@ -83,6 +93,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			if err != nil {
 				continue
 			}
+			identityStatuses[id.Name] = resp.StatusCode
 			if e.debug {
 				println("   -> status:", resp.StatusCode)
 			}
@@ -103,7 +114,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 
 			storeResponse(ent, responses, statuses, probe, id.Name, resp.StatusCode, body, e.baseStatus, e.baseBody, base.URL)
 		}
-
+		e.detectEndpointAuthGate(identityStatuses)
 		ref := ""
 		for name, fp := range probeFP {
 			kid := ent.Identities[name]
@@ -148,4 +159,18 @@ func upsertHeader(h []model.Header, name, value string) []model.Header {
 func fpString(status int, body []byte) string {
 	sum := sha256.Sum256(body)
 	return fmt.Sprintf("%d:%x", status, sum)
+}
+
+func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int) {
+	baseline, okB := identityStatuses["baseline"]
+	anonymous, okA := identityStatuses["anonymous"]
+
+	if okB && okA && baseline == 200 && (anonymous == 401 || anonymous == 403) {
+		if !e.authBoundaryConfirmed {
+			e.authBoundaryConfirmed = true
+			if e.debug {
+				println("== Auth boundary confirmed. Switching to authenticated exploration mode ==")
+			}
+		}
+	}
 }
