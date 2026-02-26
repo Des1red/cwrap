@@ -1,0 +1,264 @@
+========== CWRAP FULL RECON REPORT ==========
+Target:    http://localhost:8000/login
+Generated: 2026-02-26 18:19:23
+
+------------------------------------------------
+GLOBAL STATS
+------------------------------------------------
+Entities:          2
+Edges:             1
+Global parameters: 0
+
+Signals (count of entities tagged):
+  - HasForm: 1
+  - StateChanging: 1
+
+------------------------------------------------
+DISCOVERY TREE
+------------------------------------------------
+http://localhost:8000/login
+└── http://localhost:8000/login/submit  [form]
+
+------------------------------------------------
+ENTITY INTELLIGENCE (DETAILED)
+------------------------------------------------
+
+[ENTITY] http://localhost:8000/login
+State:
+  Seen:       true
+  ProbeCount: 6
+HTTP:
+  AuthLikely:  true
+  CSRFPresent: false
+  Methods:
+    - GET
+    - POST
+  Headers:
+    - Content-Length
+    - Content-Type
+    - Date
+Content:
+  LooksLikeHTML: true
+  LooksLikeJSON: false
+  LooksLikeXML:  false
+  Statuses:
+    200: 16
+  MIMEs:
+    text/html: 16
+Signals:
+  - HasForm
+  - StateChanging
+Session:
+  Used:   true
+  Issued: true
+  Cookies:
+    - auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiODUxMDRhYTAzMTg1NDJmOTQwMzY5Yzg2YmU4MTBlODIiLCJyb2xlIjoibWVtYmVyIiwiZXhwIjoxNzcyMTQ4MjYzLCJ0eXBlIjoiYWNjZXNzIiwianRpIjoiMjZiZDhiNjg4YWNkZDljZDkxNDAyMjRmMjQxODE5YWYiLCJ1c2VyX2lkIjoxfQ.aYl2aRg81mh2XwzSmZO8Vl8iYz6i7jlJR5DOajGBiIU
+    - csrf_token=f9857d78892f231879ee688d12627aa21ab06778fb7afe5f239d740c1fd6456e
+    - refresh_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiODUxMDRhYTAzMTg1NDJmOTQwMzY5Yzg2YmU4MTBlODIiLCJyb2xlIjoibWVtYmVyIiwiZXhwIjoxNzcyMTkxMTYzLCJ0eXBlIjoicmVmcmVzaCIsImp0aSI6IjFlYzk5MTU5YzgzYzZjZjYyNDNjMTFmMDM3MTZhZjIyIiwiYWNjZXNzX2p0aSI6IjI2YmQ4YjY4OGFjZGQ5Y2Q5MTQwMjI0ZjI0MTgxOWFmIiwidXNlcl9pZCI6MX0.Nl-rCZaR02ySKTeWG6l_KTzUO6hOY8xytuv3pov6H20
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityUser
+    Role: member
+    Effective: false
+    SentCreds: true
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  Name: id
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: false
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+  Name: login
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: false
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+  Name: page
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: false
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+  Name: q
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: false
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+  Name: user
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: false
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+JS Intelligence:
+  (none)
+Findings:
+  - Unauthenticated access observed (identity: anonymous) via param behavior: id
+  - Unauthenticated access observed (identity: anonymous) via param behavior: login
+  - Unauthenticated access observed (identity: anonymous) via param behavior: page
+  - Unauthenticated access observed (identity: anonymous) via param behavior: q
+  - Unauthenticated access observed (identity: anonymous) via param behavior: user
+Next Steps:
+  (none)
+
+[ENTITY] http://localhost:8000/login/submit
+State:
+  Seen:       false
+  ProbeCount: 0
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: true
+  Methods:
+    (none)
+  Headers:
+    - Content-Length
+    - Date
+    - Location
+    - Set-Cookie
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: false
+  LooksLikeXML:  false
+  Statuses:
+    303: 3
+  MIMEs:
+    (none)
+Signals:
+  (none)
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+=============== END OF REPORT ===============

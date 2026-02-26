@@ -58,7 +58,6 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 
 				method := "GET"
 				action := ""
-
 				for _, a := range n.Attr {
 					switch a.Key {
 					case "method":
@@ -67,7 +66,7 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 						action = a.Val
 					}
 				}
-
+				ent.AddMethod(method)
 				ent.Tag(knowledge.SigHasForm)
 
 				// Collect structural form intelligence

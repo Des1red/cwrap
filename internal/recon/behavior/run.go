@@ -63,7 +63,8 @@ func (e *Engine) Run(base model.Request, url string) error {
 	if err != nil {
 		return err
 	}
-
+	// Mark entity as seen
+	ent.State.Seen = true
 	if meta, ok := e.identityMeta("baseline"); ok {
 		extractIdentity(ent, meta.Name, resp)
 		e.captureSession(ent, meta, resp, base.URL)
@@ -72,7 +73,7 @@ func (e *Engine) Run(base model.Request, url string) error {
 	e.baseStatus = resp.StatusCode
 	e.baseBody = body
 	e.baseFP = makeFingerprint(resp.StatusCode, body)
-
+	ent.AddMethod(baseReq.Method)
 	e.int.Learn(baseReq.URL, resp, body)
 	e.Expand(ent)
 

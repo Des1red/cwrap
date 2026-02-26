@@ -66,6 +66,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			println("   Baseline fingerprint:", baseFPStr)
 			println("authBoundaryConfirmed:", e.authBoundaryConfirmed)
 		}
+		executed := false
 		for _, id := range e.identities {
 
 			if e.authBoundaryConfirmed && id.Synthetic {
@@ -92,6 +93,13 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			resp, err := transport.Do(reqID)
 			if err != nil {
 				continue
+			}
+			if !executed {
+				ent.State.ProbeCount++
+				executed = true
+			}
+			if resp.StatusCode != 405 && resp.StatusCode != 501 {
+				ent.AddMethod(probe.Method)
 			}
 			identityStatuses[id.Name] = resp.StatusCode
 			if e.debug {

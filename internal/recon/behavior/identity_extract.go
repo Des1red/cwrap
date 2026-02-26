@@ -15,7 +15,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	// ---- parse SENT cookies too (not only Set-Cookie) ----
 	if sentCookie {
 		for _, c := range resp.Request.Cookies() {
-			// optional: track sent cookie names (dedupe like you did for issued)
+			// optional: track sent cookie names
 			// id.SentCookieNames = append(...)
 
 			// try parse JWT-like cookies (auth_token / refresh_token)
