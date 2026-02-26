@@ -2,6 +2,7 @@ package behavior
 
 import (
 	"cwrap/internal/model"
+	"cwrap/internal/recon/session"
 	"cwrap/internal/recon/transport"
 )
 
@@ -10,6 +11,21 @@ func (e *Engine) Run(base model.Request, url string) error {
 
 	ent := e.k.Entity(url)
 	e.identities = deriveIdentities(base)
+
+	// ---- LOAD SESSION ----
+	store, _ := session.Load(base.URL)
+	for _, c := range store.Cookies {
+		ent.SessionCookies[c.Name] = c.Value
+		ent.SessionUsed = true
+	}
+	// inject stored cookies into baseline request
+	for name, value := range ent.SessionCookies {
+		base.Flags.Headers = upsertHeader(
+			base.Flags.Headers,
+			"Cookie",
+			name+"="+value,
+		)
+	}
 
 	// ---- TRUE BASELINE REQUEST ----
 	resp, err := transport.Do(base)
@@ -22,6 +38,8 @@ func (e *Engine) Run(base model.Request, url string) error {
 		return err
 	}
 
+	// capture newly issued cookies
+	captureSession(ent, resp, base.URL)
 	// store global baseline (used everywhere)
 	e.baseStatus = resp.StatusCode
 	e.baseBody = body

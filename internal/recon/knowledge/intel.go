@@ -58,10 +58,9 @@ type ParamIntel struct {
 	AuthBoundary      bool // access sometimes denied (auth wall exists)
 	OwnershipBoundary bool // different objects per identity (idor surface)
 	PossibleIDOR      bool
-	RiskScore         int
-	RiskLabel         string
 	IdentityAccess    map[string]int // identity -> success count (200s)
 	IdentityDenied    map[string]int // identity -> denied count (401/403)
+	Interest          int            // increases when mutations cause behavior diffs
 }
 
 type Signals struct {

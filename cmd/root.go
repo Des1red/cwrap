@@ -3,6 +3,7 @@ package cmd
 import (
 	"cwrap/internal/flags"
 	"cwrap/internal/intent"
+	"cwrap/internal/logger"
 	"cwrap/internal/runner"
 	"fmt"
 	"os"
@@ -14,7 +15,7 @@ func Execute() {
 		os.Args[1] == "help" ||
 		os.Args[1] == "-h" ||
 		os.Args[1] == "--help" {
-		printHelp()
+		logger.PrintHelp()
 		return
 	}
 

@@ -1,6 +1,9 @@
 package knowledge
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Entity is the ONLY primary object: intelligence about a URL.
 type Entity struct {
@@ -20,6 +23,13 @@ type Entity struct {
 	// For active probing: queue of candidate probes for this URL.
 	ProbeQueue ProbeQueue
 	SeenProbes map[string]bool
+
+	Identities    map[string]*Identity // name -> identity (for engine logic)
+	IdentityIndex map[string]*Identity // fp -> identity (for dedupe/printing)
+
+	SessionCookies map[string]string // name -> value
+	SessionUsed    bool              // session reused this run
+	SessionIssued  bool              // server issued new cookies
 }
 
 func (e *Entity) Tag(s Signal) {
@@ -50,9 +60,12 @@ func NewEntity(url string) *Entity {
 		Signals: Signals{
 			Tags: make(map[Signal]bool),
 		},
-		Params:     make(map[string]*ParamIntel),
-		ProbeQueue: ProbeQueue{},
-		SeenProbes: make(map[string]bool),
+		Params:         make(map[string]*ParamIntel),
+		ProbeQueue:     ProbeQueue{},
+		SeenProbes:     make(map[string]bool),
+		Identities:     make(map[string]*Identity),
+		IdentityIndex:  make(map[string]*Identity),
+		SessionCookies: make(map[string]string),
 	}
 }
 
@@ -101,11 +114,35 @@ func (e *Entity) AddParam(name string, src ParamSource) {
 		e.Params[name] = p
 	}
 
-	if !p.Sources[src] {
-		p.Sources[src] = true
-	}
+	p.Sources[src] = true
 }
 
 func (e *Entity) SeenSignal(s Signal) bool {
 	return e.Signals.Tags[s]
+}
+
+func (e *Entity) AddIdentity(id *Identity) {
+	if id == nil {
+		return
+	}
+
+	// always keep by name for engine comparisons
+	e.Identities[id.Name] = id
+
+	// dedupe index for printing / unique mechanism set
+	fp := identityFingerprint(id)
+	if _, exists := e.IdentityIndex[fp]; !exists {
+		e.IdentityIndex[fp] = id
+	}
+}
+
+func identityFingerprint(id *Identity) string {
+	return fmt.Sprintf(
+		"%d|%s|%v|%v|%v",
+		id.Kind,
+		id.AuthScheme,
+		id.CookieNames,
+		id.HasCSRF,
+		id.Rejected,
+	)
 }

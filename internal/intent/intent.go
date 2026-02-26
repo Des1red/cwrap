@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"cwrap/internal/logger"
 	"cwrap/internal/model"
 	"fmt"
 	"os"
@@ -28,6 +29,10 @@ func Resolve(req model.Request) Handler {
 }
 
 func Parse(args []string) model.Request {
+	if len(args) < 3 {
+		logger.PrintHelp()
+		os.Exit(1)
+	}
 	cmd := strings.ToLower(args[1])
 	url := args[2]
 

@@ -30,6 +30,8 @@ func reportEntity(ent *knowledge.Entity) {
 	fmt.Println()
 	reportProtocol(ent)
 	reportSurface(ent)
+	reportSession(ent)
+	reportIdentities(ent)
 	reportBehavior(ent)
 	reportParameters(ent)
 	reportSecurityModel(ent)
@@ -60,7 +62,11 @@ func reportProtocol(ent *knowledge.Entity) {
 
 	switch {
 	case hasAuth && !has200:
-		info("Endpoint acts as an authentication gate")
+		if ent.HTTP.AuthLikely {
+			info("Endpoint requires authentication")
+		} else {
+			info("Endpoint acts as an authentication gate")
+		}
 	case hasAuth && has200:
 		info("Endpoint behavior depends on identity")
 	case has200 && hasOther:
@@ -114,47 +120,205 @@ func reportSurface(ent *knowledge.Entity) {
 	fmt.Println()
 }
 
+func reportSession(ent *knowledge.Entity) {
+
+	if len(ent.SessionCookies) == 0 {
+		return
+	}
+
+	section("Session")
+
+	if ent.SessionUsed {
+		info("Reused stored session")
+	}
+
+	if ent.SessionIssued {
+		info("Server issued or rotated session")
+	}
+
+	for name := range ent.SessionCookies {
+		fmt.Println(" • Cookie:", name)
+	}
+
+	fmt.Println()
+}
+
+func reportIdentities(ent *knowledge.Entity) {
+	section("Identities")
+
+	if len(ent.IdentityIndex) == 0 {
+		info("No identity mechanisms observed")
+		fmt.Println()
+		return
+	}
+
+	printed := 0
+
+	for _, id := range ent.IdentityIndex {
+
+		printed++
+
+		label := identityLabel(id)
+
+		fmt.Print(" " + bold + label + reset)
+
+		var traits []string
+
+		if id.IssuedByServer {
+			traits = append(traits, "issued")
+		}
+		if len(id.CookieNames) > 0 {
+			traits = append(traits, "cookies:"+strings.Join(id.CookieNames, ","))
+		}
+		if id.AuthScheme != "" {
+			traits = append(traits, id.AuthScheme)
+		}
+		if id.HasCSRF {
+			traits = append(traits, "csrf")
+		}
+		if id.Rotates {
+			traits = append(traits, "rotating")
+		}
+		if id.Role != "" {
+			traits = append(traits, "role:"+id.Role)
+		}
+		if id.Rejected {
+			traits = append(traits, "rejected")
+		}
+
+		if len(traits) > 0 {
+			fmt.Print(" " + gray + "[" + strings.Join(traits, ", ") + "]" + reset)
+		}
+
+		fmt.Println()
+	}
+
+	if printed == 0 {
+		info("No identity mechanisms observed")
+	}
+
+	fmt.Println()
+}
+func identityLabel(id *knowledge.Identity) string {
+	switch id.Kind {
+	case knowledge.IdentityNone:
+		return "no-credentials"
+	case knowledge.IdentityBootstrap:
+		return "bootstrap-session"
+	case knowledge.IdentityInvalid:
+		return "invalid-credentials"
+	case knowledge.IdentityUser:
+		if !id.Effective {
+			return "presented-credentials"
+		}
+		return "authenticated-user"
+	case knowledge.IdentityElevated:
+		return "elevated-user"
+	default:
+		return "identity"
+	}
+}
 func reportBehavior(ent *knowledge.Entity) {
-	section("Behavior")
+
+	var lines []func()
 
 	if ent.SeenSignal(knowledge.SigAuthBoundary) {
-		info("Access control boundary observed")
+		lines = append(lines, func() {
+			info("Access control boundary observed")
+		})
 	}
 
 	if ent.SeenSignal(knowledge.SigObjectOwnership) {
-		info("Server enforces per-object ownership")
+		lines = append(lines, func() {
+			info("Server enforces per-object ownership")
+		})
 	}
 
 	for name, p := range ent.Params {
 
-		if p.IdentityAccess["anonymous"] > 0 && p.IdentityDenied["baseline"] == 0 {
-			warn("Unauthenticated access affects parameter: " + name)
+		if p.InjectedOnly() {
+			continue
 		}
 
-		if p.IdentityAccess["fake-admin"] > 0 && p.IdentityDenied["anonymous"] > 0 {
-			warn("Authorization influenced by client supplied role header: " + name)
+		var noCredAccess int
+		var credDenied int
+
+		for idName, access := range p.IdentityAccess {
+			id := ent.Identities[idName]
+			if id == nil {
+				continue
+			}
+			if !id.SentCreds {
+				noCredAccess += access
+			}
 		}
 
-		if p.IdentityAccess["corrupted-token"] > 0 {
-			warn("Token validation inconsistency detected on: " + name)
+		for idName, denied := range p.IdentityDenied {
+			id := ent.Identities[idName]
+			if id == nil {
+				continue
+			}
+			if id.SentCreds {
+				credDenied += denied
+			}
 		}
+
+		if noCredAccess > 0 && credDenied > 0 {
+			paramName := name
+			lines = append(lines, func() {
+				warn("Unauthenticated access possible via parameter: " + paramName)
+			})
+		}
+
+		for _, id := range ent.Identities {
+			if id.SentCreds && id.Effective {
+				paramName := name
+				lines = append(lines, func() {
+					info("Identity influences behavior on parameter: " + paramName)
+				})
+				break
+			}
+		}
+	}
+
+	if len(lines) == 0 {
+		return
+	}
+
+	section("Behavior")
+
+	for _, l := range lines {
+		l()
 	}
 
 	fmt.Println()
 }
 
 func reportParameters(ent *knowledge.Entity) {
-	section("Parameters")
 
+	// Collect printable params
 	names := make([]string, 0, len(ent.Params))
-	for n := range ent.Params {
-		names = append(names, n)
+	for name, p := range ent.Params {
+		if p.InjectedOnly() {
+			continue
+		}
+		names = append(names, name)
 	}
+
+	if len(names) == 0 {
+		return
+	}
+
 	sort.Strings(names)
+
+	section("Parameters")
 
 	for _, name := range names {
 		p := ent.Params[name]
 
+		if p.InjectedOnly() {
+			continue
+		}
 		fmt.Print(" " + bold + name + reset)
 
 		var tags []string
@@ -201,14 +365,32 @@ func reportConclusion(ent *knowledge.Entity) {
 	hasIDOR := false
 
 	for _, p := range ent.Params {
-		if p.IdentityAccess["anonymous"] > 0 {
-			hasBypass = true
-		}
-		if p.PossibleIDOR && p.OwnershipBoundary {
-			hasIDOR = true
+
+		for idName, access := range p.IdentityAccess {
+			id := ent.Identities[idName]
+			if id == nil {
+				continue
+			}
+			if !id.SentCreds && access > 0 {
+				hasBypass = true
+			}
 		}
 	}
+	hasIdentityAuth := ent.HTTP.AuthLikely
+	hasBootstrap := false
+	hasElevated := false
 
+	for _, id := range ent.Identities {
+		if id.Kind == knowledge.IdentityBootstrap {
+			hasBootstrap = true
+		}
+		if id.Kind == knowledge.IdentityElevated {
+			hasElevated = true
+		}
+		if id.AuthScheme != "" || len(id.CookieNames) > 0 {
+			hasIdentityAuth = true
+		}
+	}
 	switch {
 	case hasIDOR:
 		bad("Broken object-level authorization confirmed")
@@ -216,6 +398,8 @@ func reportConclusion(ent *knowledge.Entity) {
 		bad("Authentication enforcement inconsistent")
 	case ent.SeenSignal(knowledge.SigAuthBoundary):
 		good("Authorization enforced correctly")
+	case hasBootstrap || hasElevated || hasIdentityAuth:
+		good("Authentication mechanisms detected")
 	default:
 		warn("No access control mechanisms detected")
 	}
@@ -241,18 +425,40 @@ func reportSecurityModel(ent *knowledge.Entity) {
 			hasObjects = true
 		}
 	}
+	hasIdentityAuth := ent.HTTP.AuthLikely
+	hasBootstrap := false
+	hasElevated := false
 
+	for _, id := range ent.Identities {
+		if id.Kind == knowledge.IdentityBootstrap {
+			hasBootstrap = true
+		}
+		if id.Kind == knowledge.IdentityElevated {
+			hasElevated = true
+		}
+		if id.AuthScheme != "" || len(id.CookieNames) > 0 {
+			hasIdentityAuth = true
+		}
+	}
 	switch {
+	case hasBootstrap:
+		info("Authentication bootstrap endpoint")
+
+	case hasElevated:
+		warn("Privilege-bearing session issued (elevated role)")
+
+	case hasAuth || hasIdentityAuth:
+		if ent.SeenSignal(knowledge.SigAuthBoundary) {
+			info("Protected resource (authentication required)")
+		} else {
+			info("Authentication gateway endpoint")
+		}
 	case hasOwnership:
 		info("Per-object access control (user owns resources)")
-	case hasAuth && !hasObjects:
-		info("Authentication gateway endpoint")
 	case hasObjects && !hasOwnership:
 		warn("Shared object space (multi-user data)")
-	case !hasAuth && !hasObjects:
-		good("Public endpoint")
 	default:
-		warn("Mixed authorization model")
+		good("Public endpoint")
 	}
 
 	fmt.Println()
@@ -265,6 +471,9 @@ func reportFindings(ent *knowledge.Entity) {
 
 	for name, p := range ent.Params {
 
+		if p.InjectedOnly() {
+			continue
+		}
 		if p.PossibleIDOR && p.OwnershipBoundary {
 			bad("Horizontal privilege escalation via parameter: " + name)
 			found = true
@@ -323,6 +532,8 @@ func reportNextSteps(ent *knowledge.Entity) {
 		info("Username enumeration")
 		info("Missing credential handling")
 		info("Auth bypass headers (X-Forwarded-For, X-Original-URL)")
+	} else {
+		info("No auth bypass or IDOR attack paths identified, but manual testing recommended to confirm")
 	}
 
 	fmt.Println()

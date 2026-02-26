@@ -1,2 +1,0 @@
-detect multi-step auth workflows (login → session → object
-behavior pivot automatically when IDOR confirmed (multi-URL crawling).

@@ -1,6 +1,9 @@
 package behavior
 
-import "cwrap/internal/model"
+import (
+	"cwrap/internal/model"
+	"strings"
+)
 
 type Identity struct {
 	Name  string
@@ -56,9 +59,9 @@ func deriveIdentities(base model.Request) []Identity {
 }
 
 func removeAuthHeaders(h []model.Header) []model.Header {
-	out := h[:0]
+	out := make([]model.Header, 0, len(h))
 	for _, hdr := range h {
-		if hdr.Name == "Authorization" || hdr.Name == "Cookie" {
+		if strings.EqualFold(hdr.Name, "Authorization") || strings.EqualFold(hdr.Name, "Cookie") {
 			continue
 		}
 		out = append(out, hdr)

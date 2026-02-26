@@ -1,4 +1,4 @@
-package cmd
+package logger
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"github.com/Des1red/clihelp"
 )
 
-func printHelp() {
+func PrintHelp() {
 
 	fmt.Println("cwrap — human friendly HTTP client")
 	fmt.Println()

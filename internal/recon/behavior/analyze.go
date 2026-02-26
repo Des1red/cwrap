@@ -17,6 +17,7 @@ func stripNumbers(b []byte) []byte {
 	}
 	return out
 }
+
 func anyStatusIs(m map[string]int, want ...int) bool {
 	for _, s := range m {
 		for _, w := range want {
@@ -28,15 +29,80 @@ func anyStatusIs(m map[string]int, want ...int) bool {
 	return false
 }
 
-func countStatus(m map[string]int, want int) int {
+// ---------- identity-agnostic helpers ----------
+
+// pick a "credentialed" body for this value (prefer a cred identity that succeeded)
+func pickCredBody(ent *knowledge.Entity, bodies map[string][]byte, statuses map[string]int) ([]byte, bool) {
+	for idName, body := range bodies {
+		id := ent.Identities[idName]
+		if id == nil || !id.SentCreds {
+			continue
+		}
+		if statuses != nil && statuses[idName] != 200 {
+			continue
+		}
+		if len(body) == 0 {
+			continue
+		}
+		return body, true
+	}
+	// fallback: any cred body (even if status map missing)
+	for idName, body := range bodies {
+		id := ent.Identities[idName]
+		if id == nil || !id.SentCreds {
+			continue
+		}
+		if len(body) == 0 {
+			continue
+		}
+		return body, true
+	}
+	return nil, false
+}
+
+func anyNoCredDenied(ent *knowledge.Entity, byID map[string]int) bool {
+	for idName, s := range byID {
+		id := ent.Identities[idName]
+		if id == nil {
+			continue
+		}
+		if !id.SentCreds && (s == 401 || s == 403) {
+			return true
+		}
+	}
+	return false
+}
+
+func anyCredStatus(ent *knowledge.Entity, byID map[string]int, want ...int) bool {
+	for idName, s := range byID {
+		id := ent.Identities[idName]
+		if id == nil || !id.SentCreds {
+			continue
+		}
+		for _, w := range want {
+			if s == w {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func countCredStatus(ent *knowledge.Entity, byID map[string]int, want int) int {
 	n := 0
-	for _, s := range m {
+	for idName, s := range byID {
+		id := ent.Identities[idName]
+		if id == nil || !id.SentCreds {
+			continue
+		}
 		if s == want {
 			n++
 		}
 	}
 	return n
 }
+
+// ---------- analyzers ----------
 
 func (e *Engine) analyzeIDOR(
 	ent *knowledge.Entity,
@@ -46,26 +112,29 @@ func (e *Engine) analyzeIDOR(
 	for name, byVal := range responses {
 
 		p := ent.Params[name]
-		if p == nil || p.LikelyReflection {
+		if p == nil || p.InjectedOnly() || p.LikelyReflection {
 			continue
 		}
 
-		anonDenied := false
+		noCredDenied := false
 		var bodies [][]byte
 
 		for val, byIDBody := range byVal {
 
-			// baseline must succeed to consider this value
+			// need statuses for this param/value to reason about auth
 			if statuses[name] == nil || statuses[name][val] == nil {
 				continue
 			}
-			if statuses[name][val]["baseline"] != 200 {
+			byIDStatus := statuses[name][val]
+
+			// require at least one credentialed success for this value
+			if !anyCredStatus(ent, byIDStatus, 200) {
 				continue
 			}
 
-			// record baseline body
-			body := byIDBody["baseline"]
-			if len(body) == 0 {
+			// choose a credentialed body for structural comparison
+			body, ok := pickCredBody(ent, byIDBody, byIDStatus)
+			if !ok || len(body) == 0 {
 				continue
 			}
 
@@ -75,9 +144,9 @@ func (e *Engine) analyzeIDOR(
 			}
 			bodies = append(bodies, n)
 
-			// check anonymous denial for same value (stronger signal)
-			if s, ok := statuses[name][val]["anonymous"]; ok && (s == 401 || s == 403) {
-				anonDenied = true
+			// stronger signal: no-cred denied for same value
+			if anyNoCredDenied(ent, byIDStatus) {
+				noCredDenied = true
 			}
 		}
 
@@ -94,9 +163,14 @@ func (e *Engine) analyzeIDOR(
 			}
 		}
 
-		if different && anonDenied {
-			p.PossibleIDOR = true
-			ent.Tag(knowledge.SigPossibleIDOR)
+		if different {
+			p.ObservedChanges["idor-structure-diff"] = true
+
+			// escalate only if a no-cred identity is denied too
+			if noCredDenied {
+				p.PossibleIDOR = true
+				ent.Tag(knowledge.SigPossibleIDOR)
+			}
 		}
 	}
 }
@@ -109,7 +183,7 @@ func (e *Engine) analyzeParamBehavior(ent *knowledge.Entity, responses map[strin
 		}
 
 		p := ent.Params[name]
-		if p == nil {
+		if p == nil || p.InjectedOnly() {
 			continue
 		}
 		if p.ObservedChanges == nil {
@@ -124,7 +198,7 @@ func (e *Engine) analyzeParamBehavior(ent *knowledge.Entity, responses map[strin
 
 		for _, byID := range byVal {
 
-			body, ok := byID["baseline"]
+			body, ok := pickCredBody(ent, byID, nil)
 			if !ok || len(body) == 0 {
 				continue
 			}
@@ -175,42 +249,50 @@ func (e *Engine) analyzeOwnership(ent *knowledge.Entity, statuses map[string]map
 	for name, byVal := range statuses {
 
 		p := ent.Params[name]
-		if p == nil || !p.IDLike {
+		if p == nil || p.InjectedOnly() || !p.IDLike {
 			continue
 		}
-		if p.ObservedChanges == nil {
-			p.ObservedChanges = map[string]bool{}
+
+		authIdentities := []string{}
+
+		for idName, id := range ent.Identities {
+			if id != nil && id.SentCreds && !id.Rejected {
+				authIdentities = append(authIdentities, idName)
+			}
 		}
 
-		baseline200 := 0
-		anonDenied := false
+		// Need at least 2 authenticated identities to prove ownership
+		if len(authIdentities) < 2 {
+			continue
+		}
+
+		mixedAccess := false
 
 		for _, byID := range byVal {
-
-			if byID["baseline"] == 200 {
-				baseline200++
+			successCount := 0
+			for _, idName := range authIdentities {
+				if byID[idName] == 200 {
+					successCount++
+				}
 			}
-			if s, ok := byID["anonymous"]; ok && (s == 401 || s == 403) {
-				anonDenied = true
+			if successCount > 0 && successCount < len(authIdentities) {
+				mixedAccess = true
+				break
 			}
 		}
 
-		if baseline200 >= 2 && anonDenied {
+		if mixedAccess {
 			p.OwnershipBoundary = true
-			p.ObservedChanges["ownership-mixed-access"] = true
-
-			// ownership contradicts reflection, but it does NOT contradict object-access
-			p.LikelyReflection = false
-
 			ent.Tag(knowledge.SigObjectOwnership)
 		}
 	}
 }
+
 func (e *Engine) analyzeAuthBoundary(ent *knowledge.Entity, statuses map[string]map[string]map[string]int) {
 	for name, byVal := range statuses {
 
 		p := ent.Params[name]
-		if p == nil || p.LikelyReflection {
+		if p == nil || p.InjectedOnly() || p.LikelyReflection {
 			continue
 		}
 		if p.ObservedChanges == nil {

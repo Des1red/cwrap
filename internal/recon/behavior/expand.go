@@ -4,72 +4,23 @@ import (
 	"cwrap/internal/recon/knowledge"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 func (e *Engine) Expand(ent *knowledge.Entity) {
 
-	// no params → discovery probe
-	if !ent.SeenSignal(knowledge.SigHasQueryParams) {
-
-		ent.ProbeQueue.Push(knowledge.Probe{
-			URL:    ent.URL,
-			Method: "GET",
-			AddQuery: map[string]string{
-				"_cwrap": "1",
-			},
-			Reason:   knowledge.ReasonParamDiscovery,
-			Priority: 50,
-		})
+	if ent.State.ProbeCount > 50 {
 		return
 	}
 
-	// mutate known params
-	for name, p := range ent.Params {
-
-		if p.IDLike && p.Sources[knowledge.ParamQuery] {
-
-			baseVal := extractNumericValue(ent.URL, name)
-			if baseVal >= 0 {
-
-				// adjacency (behavior detection)
-				try := []int{
-					baseVal - 1,
-					baseVal + 1,
-				}
-
-				for _, v := range try {
-					if v < 0 {
-						continue
-					}
-
-					ent.ProbeQueue.Push(knowledge.Probe{
-						URL:      ent.URL,
-						Method:   "GET",
-						AddQuery: map[string]string{name: strconv.Itoa(v)},
-						Reason:   knowledge.ReasonIDAdjacency,
-						Priority: 95,
-					})
-				}
-			}
-		}
+	if !ent.SeenSignal(knowledge.SigHasQueryParams) {
+		e.expandDiscovery(ent)
+		return
 	}
 
-	// identity probes should run early when auth/idor is plausible
-	shouldTryIdentities := ent.SeenSignal(knowledge.SigAuthBoundary) || ent.HTTP.AuthLikely
-
-	// also run identities on id-like params (ownership detection needs it)
-	for _, p := range ent.Params {
-		if p.IDLike {
-			shouldTryIdentities = true
-			break
-		}
-	}
-
-	if shouldTryIdentities {
-		e.expandIdentityProbes(ent)
-	}
-	// enumeration is a separate strategy
-	e.expandIDEnumeration(ent)
+	e.expandMutation(ent)
+	e.expandIdentity(ent)
+	e.expandEnumeration(ent)
 }
 
 func extractNumericValue(raw, key string) int {
@@ -92,7 +43,164 @@ func extractNumericValue(raw, key string) int {
 	return n
 }
 
-func (e *Engine) expandIDEnumeration(ent *knowledge.Entity) {
+func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
+
+	u, err := url.Parse(ent.URL)
+	if err != nil {
+		return
+	}
+
+	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+
+	for _, s := range segments {
+		if len(s) < 3 {
+			continue
+		}
+		if _, err := strconv.Atoi(s); err == nil {
+			continue // skip numeric path parts
+		}
+
+		e.pushProbe(ent, knowledge.Probe{
+			URL:    ent.URL,
+			Method: "GET",
+			AddQuery: map[string]string{
+				s: "1",
+			},
+			Reason:   knowledge.ReasonParamDiscovery,
+			Priority: 50,
+		})
+	}
+
+	// small universal fallback
+	common := []string{"id", "user", "page", "q"}
+
+	for _, p := range common {
+		e.pushProbe(ent, knowledge.Probe{
+			URL:    ent.URL,
+			Method: "GET",
+			AddQuery: map[string]string{
+				p: "1",
+			},
+			Reason:   knowledge.ReasonParamDiscovery,
+			Priority: 40,
+		})
+	}
+}
+
+func (e *Engine) expandMutation(ent *knowledge.Entity) {
+
+	for name, p := range ent.Params {
+
+		if !p.IDLike || !p.Sources[knowledge.ParamQuery] {
+			continue
+		}
+
+		baseVal := extractNumericValue(ent.URL, name)
+		if baseVal < 0 {
+			continue
+		}
+
+		// Base mutations (always)
+		tests := []string{
+			strconv.Itoa(baseVal - 1),
+			strconv.Itoa(baseVal + 1),
+			"0",
+			"1",
+			"-1",
+		}
+
+		// Adaptive: if param is "hot", expand more (still controlled)
+		if p.Interest >= 1 {
+			tests = append(tests, "999999", "", "null", "undefined")
+		}
+		if p.Interest >= 3 {
+			tests = append(tests,
+				strconv.Itoa(baseVal+2),
+				strconv.Itoa(baseVal+5),
+				"2147483647", // int32 max
+				"4294967295", // uint32 max
+			)
+		}
+
+		priority := 100
+		if p.Interest >= 1 {
+			priority = 120
+		}
+		if p.Interest >= 3 {
+			priority = 140
+		}
+
+		for _, v := range tests {
+			e.pushProbe(ent, knowledge.Probe{
+				URL:    ent.URL,
+				Method: "GET",
+				AddQuery: map[string]string{
+					name: v,
+				},
+				Reason:   knowledge.ReasonIDAdjacency,
+				Priority: priority,
+			})
+		}
+	}
+}
+func (e *Engine) expandIdentity(ent *knowledge.Entity) {
+
+	should := false
+
+	if ent.SeenSignal(knowledge.SigAuthBoundary) ||
+		ent.SeenSignal(knowledge.SigObjectOwnership) ||
+		len(ent.Identities) > 0 {
+		should = true
+	}
+
+	for _, p := range ent.Params {
+		if p.IDLike {
+			should = true
+			break
+		}
+	}
+
+	if !should {
+		return
+	}
+
+	// baseline (no auth hints)
+	e.pushProbe(ent, knowledge.Probe{
+		URL:      ent.URL,
+		Method:   "GET",
+		Headers:  map[string]string{},
+		Reason:   knowledge.ReasonIdentityProbe,
+		Priority: 150,
+	})
+
+	// invalid bearer
+	e.pushProbe(ent, knowledge.Probe{
+		URL:    ent.URL,
+		Method: "GET",
+		Headers: map[string]string{
+			"Authorization": "Bearer invalid",
+		},
+		Reason:   knowledge.ReasonIdentityProbe,
+		Priority: 150,
+	})
+
+	// role confusion attempts
+	roleHeaders := []string{"X-User-Role", "X-Forwarded-User"}
+
+	for _, h := range roleHeaders {
+		e.pushProbe(ent, knowledge.Probe{
+			URL:    ent.URL,
+			Method: "GET",
+			Headers: map[string]string{
+				h: "admin",
+			},
+			Reason:   knowledge.ReasonIdentityProbe,
+			Priority: 150,
+		})
+	}
+}
+
+func (e *Engine) expandEnumeration(ent *knowledge.Entity) {
 
 	for name, p := range ent.Params {
 
@@ -100,7 +208,6 @@ func (e *Engine) expandIDEnumeration(ent *knowledge.Entity) {
 			continue
 		}
 
-		// extract current value from URL
 		baseVal := extractCurrentValue(ent.URL, name)
 		if baseVal == "" {
 			continue
@@ -111,64 +218,45 @@ func (e *Engine) expandIDEnumeration(ent *knowledge.Entity) {
 			continue
 		}
 
-		// probe nearby objects
-		tests := []int{id + 1, id + 2, id + 3}
+		tests := []int{id + 1, id + 2}
+
+		// Adaptive depth
+		if p.Interest >= 1 {
+			tests = append(tests, id+5, id+10)
+		}
+		if p.Interest >= 3 {
+			tests = append(tests, id+25, id+50)
+		}
+
+		priority := 80
+		if p.Interest >= 1 {
+			priority = 100
+		}
+		if p.Interest >= 3 {
+			priority = 120
+		}
 
 		for _, v := range tests {
-
-			ent.ProbeQueue.Push(knowledge.Probe{
+			e.pushProbe(ent, knowledge.Probe{
 				URL:    ent.URL,
 				Method: "GET",
 				AddQuery: map[string]string{
 					name: strconv.Itoa(v),
 				},
 				Reason:   knowledge.ReasonIDEnum,
-				Priority: 90,
+				Priority: priority,
 			})
 		}
 	}
 }
 
-func (e *Engine) expandIdentityProbes(ent *knowledge.Entity) {
+func (e *Engine) pushProbe(ent *knowledge.Entity, p knowledge.Probe) {
 
-	// baseline request but without auth hints
-	ent.ProbeQueue.Push(knowledge.Probe{
-		URL:      ent.URL,
-		Method:   "GET",
-		Headers:  map[string]string{},
-		Reason:   knowledge.ReasonIdentityProbe,
-		Priority: 120,
-	})
+	key := p.Key()
 
-	// fake auth header
-	ent.ProbeQueue.Push(knowledge.Probe{
-		URL:    ent.URL,
-		Method: "GET",
-		Headers: map[string]string{
-			"Authorization": "Bearer invalid",
-		},
-		Reason:   knowledge.ReasonIdentityProbe,
-		Priority: 120,
-	})
+	if ent.SeenProbes[key] {
+		return
+	}
 
-	// role confusion attempts
-	ent.ProbeQueue.Push(knowledge.Probe{
-		URL:    ent.URL,
-		Method: "GET",
-		Headers: map[string]string{
-			"X-User-Role": "admin",
-		},
-		Reason:   knowledge.ReasonIdentityProbe,
-		Priority: 120,
-	})
-
-	ent.ProbeQueue.Push(knowledge.Probe{
-		URL:    ent.URL,
-		Method: "GET",
-		Headers: map[string]string{
-			"X-Forwarded-User": "admin",
-		},
-		Reason:   knowledge.ReasonIdentityProbe,
-		Priority: 120,
-	})
+	ent.ProbeQueue.Push(p)
 }

@@ -72,3 +72,10 @@ func (k *Knowledge) URLsSorted() []string {
 	sort.Strings(out)
 	return out
 }
+
+func (p *ParamIntel) InjectedOnly() bool {
+	if len(p.Sources) == 1 && p.Sources[ParamInjected] {
+		return true
+	}
+	return false
+}
