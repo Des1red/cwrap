@@ -5,9 +5,19 @@ import (
 	"cwrap/internal/recon/jsintel"
 	"cwrap/internal/recon/knowledge"
 	"strings"
+	"time"
 
 	"golang.org/x/net/html"
 )
+
+type formIntel struct {
+	HasUpload     bool
+	HasPassword   bool
+	HasUserField  bool
+	IsDestructive bool
+	SubmitHints   []string
+	HiddenPairs   map[string]string
+}
 
 func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 
@@ -34,7 +44,6 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 
 							e.k.AddEdge(ent.URL, link, knowledge.EdgeDiscoveredFromHTML)
 
-							// surface tagging
 							if isSensitivePath(link) {
 								ent.Tag(knowledge.SigAdminSurface)
 							}
@@ -59,22 +68,66 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 					}
 				}
 
-				if method == "POST" {
+				ent.Tag(knowledge.SigHasForm)
+
+				// Collect structural form intelligence
+				fi := extractFormInputsAndIntel(e, ent, n)
+
+				// Mark state-changing behavior
+				if method == "POST" || fi.IsDestructive {
 					ent.Tag(knowledge.SigStateChanging)
 				}
 
+				// HTML spec: empty action submits to current URL
+				if action == "" {
+					action = ent.URL
+				}
+
 				if link, ok := e.normalizeLink(ent.URL, action); ok {
+
 					e.k.AddEdge(ent.URL, link, knowledge.EdgeFormAction)
 
 					if isSensitivePath(link) {
 						ent.Tag(knowledge.SigAdminSurface)
 					}
+
+					// ----------------------------
+					// FORM EXECUTION POLICY
+					// ----------------------------
+					if !fi.HasUpload && !fi.IsDestructive {
+
+						priority := 30
+
+						// Bootstrap detection (structural only)
+						isBootstrap := false
+						if fi.HasPassword || containsAny(
+							strings.ToLower(strings.Join(fi.SubmitHints, " ")),
+							[]string{"login", "sign in", "signin", "authenticate"},
+						) {
+							isBootstrap = true
+						}
+
+						if isBootstrap {
+							priority = 90
+						} else if method == "POST" {
+							priority = 60
+						}
+
+						// Respect CSRF presence detected by httpintel
+						if method == "POST" && ent.HTTP.CSRFPresent && !isBootstrap {
+							priority = 20
+						}
+
+						ent.ProbeQueue.Push(knowledge.Probe{
+							URL:      link,
+							Method:   method,
+							AddQuery: fi.HiddenPairs, // differentiate distinct forms
+							Reason:   "form-action",
+							Priority: priority,
+							Created:  time.Now(),
+						})
+					}
 				}
-
-				ent.Tag(knowledge.SigHasForm)
-
-				// Extract form inputs
-				extractFormInputs(e, ent, n)
 
 			// ----------------------------
 			// SCRIPT
@@ -93,7 +146,6 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 						e.k.AddEdge(ent.URL, link, knowledge.EdgeDiscoveredFromJS)
 					}
 				} else {
-					// inline JS (collect full text content)
 					var code strings.Builder
 					for c := n.FirstChild; c != nil; c = c.NextSibling {
 						if c.Type == html.TextNode {
@@ -108,7 +160,6 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 			}
 		}
 
-		// ALWAYS recurse
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			walk(c)
 		}
@@ -116,38 +167,139 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 
 	walk(doc)
 }
+func extractFormInputsAndIntel(e *Engine, ent *knowledge.Entity, formNode *html.Node) formIntel {
+	fi := formIntel{
+		HiddenPairs: make(map[string]string),
+	}
 
-func extractFormInputs(e *Engine, ent *knowledge.Entity, formNode *html.Node) {
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
 
-	for c := formNode.FirstChild; c != nil; c = c.NextSibling {
+		if n.Type == html.ElementNode {
+			switch n.Data {
 
-		if c.Type != html.ElementNode {
-			continue
-		}
+			case "input":
+				var name, inputType, value string
 
-		if c.Data == "input" {
+				for _, a := range n.Attr {
+					switch a.Key {
+					case "name":
+						name = a.Val
+					case "type":
+						inputType = strings.ToLower(a.Val)
+					case "value":
+						value = a.Val
+					}
+				}
 
-			var name, inputType string
+				// param extraction (existing behavior)
+				if name != "" {
+					ent.AddParam(name, knowledge.ParamForm)
+					e.k.AddParam(name)
+				}
 
-			for _, a := range c.Attr {
-				switch a.Key {
-				case "name":
-					name = a.Val
-				case "type":
-					inputType = strings.ToLower(a.Val)
+				switch inputType {
+
+				case "file":
+					fi.HasUpload = true
+					ent.Tag(knowledge.SigFileUpload)
+
+				case "password":
+					fi.HasPassword = true
+
+				case "hidden":
+					if name != "" {
+						fi.HiddenPairs[strings.ToLower(name)] = value
+					}
+
+				case "submit":
+					if value != "" {
+						fi.SubmitHints = append(fi.SubmitHints, value)
+					}
+				}
+
+				ln := strings.ToLower(name)
+				lv := strings.ToLower(value)
+
+				// user-ish detection
+				if containsAny(ln, []string{"user", "username", "email", "login"}) {
+					fi.HasUserField = true
+				}
+
+				// destructive detection
+				if isDestructiveToken(ln) || isDestructiveToken(lv) {
+					fi.IsDestructive = true
+				}
+				if ln == "action" && isDestructiveToken(lv) {
+					fi.IsDestructive = true
+				}
+
+			case "button":
+				btnType := ""
+				for _, a := range n.Attr {
+					if a.Key == "type" {
+						btnType = strings.ToLower(a.Val)
+					}
+				}
+				if btnType == "" || btnType == "submit" {
+					txt := strings.TrimSpace(nodeText(n))
+					if txt != "" {
+						fi.SubmitHints = append(fi.SubmitHints, txt)
+						if isDestructiveToken(strings.ToLower(txt)) {
+							fi.IsDestructive = true
+						}
+					}
 				}
 			}
+		}
 
-			if name != "" {
-				ent.AddParam(name, knowledge.ParamForm)
-				e.k.AddParam(name)
-			}
-
-			if inputType == "file" {
-				ent.Tag(knowledge.SigFileUpload)
-			}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
 		}
 	}
+
+	walk(formNode)
+
+	return fi
+}
+
+func nodeText(n *html.Node) string {
+	var b strings.Builder
+	var walk func(*html.Node)
+	walk = func(x *html.Node) {
+		if x.Type == html.TextNode {
+			b.WriteString(x.Data)
+		}
+		for c := x.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(n)
+	return b.String()
+}
+
+func containsAny(s string, keys []string) bool {
+	for _, k := range keys {
+		if strings.Contains(s, k) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDestructiveToken(s string) bool {
+	s = strings.ToLower(s)
+	destructive := []string{
+		"logout", "log out", "signout", "sign out",
+		"delete", "remove", "destroy", "kill", "terminate",
+		"deactivate", "disable", "revoke", "invalidate",
+	}
+	for _, k := range destructive {
+		if strings.Contains(s, k) {
+			return true
+		}
+	}
+	return false
 }
 
 func isSensitivePath(link string) bool {
