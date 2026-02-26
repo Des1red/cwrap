@@ -1,8 +1,7 @@
-package api
+package http
 
 import (
 	"cwrap/internal/recon/knowledge"
-	"cwrap/internal/recon/paramintel"
 	"net/http"
 )
 
@@ -15,9 +14,9 @@ func (i interpreter) Learn(url string, resp *http.Response, body []byte) {
 }
 
 func (i interpreter) Canonicalize(body []byte, param string) ([]byte, error) {
-	return normalizeJSONWithParam(body, param)
+	return body, nil // no JSON normalization
 }
 
-func (i interpreter) ClassifyParam(ent *knowledge.Entity, name string) {
-	paramintel.ClassifyParam(ent, ent.Params[name])
+func (i interpreter) Classify(ent *knowledge.Entity, name string) {
+	i.ClassifyParam(ent, name)
 }

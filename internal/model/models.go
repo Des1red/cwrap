@@ -33,7 +33,8 @@ type Flags struct {
 
 	ContentProfile string
 
-	Debug bool
+	Target string
+	Debug  bool
 }
 
 type Header struct {

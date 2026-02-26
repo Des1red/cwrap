@@ -3,6 +3,7 @@ package recon
 import (
 	"cwrap/internal/model"
 	"cwrap/internal/recon/api"
+	"cwrap/internal/recon/http"
 	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/recon/report"
 	"fmt"
@@ -19,12 +20,13 @@ func selectEngine(req model.Request) Engine {
 	case "api":
 		return api.New()
 
+	case "http", "web":
+		return http.New()
+
 	default:
-		//return web.New()
-		return nil
+		return http.New()
 	}
 }
-
 func Run(req model.Request) error {
 	engine := selectEngine(req)
 	if engine == nil {

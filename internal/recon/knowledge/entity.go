@@ -54,8 +54,10 @@ func NewEntity(url string) *Entity {
 			Headers: make(map[string]bool),
 		},
 		Content: ContentIntel{
-			MIMEs:    make(map[string]int),
-			Statuses: make(map[int]int),
+			MIMEs:      make(map[string]int),
+			Statuses:   make(map[int]int),
+			JSFindings: make(map[string]int),
+			JSLeaks:    []JSLeak{},
 		},
 		Signals: Signals{
 			Tags: make(map[Signal]bool),

@@ -2,6 +2,7 @@ package api
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/recon/paramintel"
 	"net/url"
 )
 
@@ -16,7 +17,7 @@ func (e *Engine) learnURLParams(raw string) {
 	for key := range u.Query() {
 		ent.AddParam(key, knowledge.ParamQuery)
 		e.k.AddParam(key)
-		classifyParam(ent, ent.Params[key])
+		paramintel.ClassifyParam(ent, ent.Params[key])
 		ent.Tag(knowledge.SigHasQueryParams)
 	}
 }

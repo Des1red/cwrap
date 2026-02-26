@@ -36,6 +36,16 @@ type ContentIntel struct {
 	LooksLikeHTML bool
 	LooksLikeJSON bool
 	LooksLikeXML  bool
+
+	JSFindings map[string]int // kind -> count (jwt/aws_key/pem/firebase/keyword)
+	JSLeaks    []JSLeak       // optional evidence (redacted unless enabled)
+}
+
+type JSLeak struct {
+	Kind   string // "jwt", "aws_key", "pem", "firebase", "keyword"
+	Source string // URL of JS or page
+	Key    string // e.g. "apiKey" or "client_secret" if known
+	Value  string // redacted by default; full only if enabled
 }
 
 type ParamIntel struct {

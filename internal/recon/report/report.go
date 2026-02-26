@@ -21,6 +21,7 @@ func Print(k *knowledge.Knowledge) {
 			continue
 		}
 		reportEntity(ent)
+		reportGraph(ent, k)
 	}
 }
 
@@ -36,9 +37,9 @@ func reportEntity(ent *knowledge.Entity) {
 	reportParameters(ent)
 	reportSecurityModel(ent)
 	reportFindings(ent)
+	reportJS(ent)
 	reportConclusion(ent)
 	reportNextSteps(ent)
-
 	fmt.Println(bold + "==================================" + reset)
 }
 
@@ -550,6 +551,76 @@ func reportNextSteps(ent *knowledge.Entity) {
 		info("Auth bypass headers (X-Forwarded-For, X-Original-URL)")
 	} else {
 		info("No auth bypass or IDOR attack paths identified, but manual testing recommended to confirm")
+	}
+
+	fmt.Println()
+}
+
+func reportGraph(ent *knowledge.Entity, k *knowledge.Knowledge) {
+
+	var lines []func()
+
+	count := 0
+
+	for _, edge := range k.Edges {
+		if edge.From != ent.URL {
+			continue
+		}
+
+		count++
+
+		if strings.Contains(edge.To, "admin") {
+			target := edge.To
+			lines = append(lines, func() {
+				warn("Administrative surface discovered: " + target)
+			})
+		}
+
+		if strings.Contains(edge.To, "upload") {
+			target := edge.To
+			lines = append(lines, func() {
+				warn("Upload endpoint discovered: " + target)
+			})
+		}
+	}
+
+	// If nothing meaningful → hide section
+	if len(lines) == 0 && count == 0 {
+		return
+	}
+
+	section("Discovered Surface")
+
+	if count > 0 {
+		info(fmt.Sprintf("%d related endpoints discovered", count))
+	}
+
+	for _, l := range lines {
+		l()
+	}
+
+	fmt.Println()
+}
+
+func reportJS(ent *knowledge.Entity) {
+
+	if len(ent.Content.JSFindings) == 0 {
+		return
+	}
+
+	section("JS Intelligence")
+
+	for kind, count := range ent.Content.JSFindings {
+		info(fmt.Sprintf("%s: %d", kind, count))
+	}
+
+	for _, leak := range ent.Content.JSLeaks {
+		warn(fmt.Sprintf("[%s] %s -> %s = %s",
+			leak.Kind,
+			leak.Source,
+			leak.Key,
+			leak.Value,
+		))
 	}
 
 	fmt.Println()

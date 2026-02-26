@@ -1,11 +1,11 @@
-package api
+package paramintel
 
 import (
 	"cwrap/internal/recon/knowledge"
 	"strings"
 )
 
-func classifyParam(ent *knowledge.Entity, p *knowledge.ParamIntel) {
+func ClassifyParam(ent *knowledge.Entity, p *knowledge.ParamIntel) {
 
 	name := strings.ToLower(p.Name)
 
