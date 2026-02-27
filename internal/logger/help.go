@@ -19,6 +19,7 @@ func PrintHelp() {
 		clihelp.F("fetch  <url>", "", "retrieve resource (follows redirects)"),
 		clihelp.F("send   <url>", "", "submit structured data (POST)"),
 		clihelp.F("upload <url>", "", "upload files (multipart POST)"),
+		clihelp.F("recon <url>", "", "reconnaissance web page or api"),
 	)
 
 	fmt.Println("\nSemantic words (order doesn't matter):")
@@ -32,6 +33,7 @@ func PrintHelp() {
 		clihelp.F("file=@path", "", "file field (upload only)"),
 		clihelp.F("cookie:name=value", "", "add cookie"),
 		clihelp.F("bearer=TOKEN", "", "authorization bearer token"),
+		clihelp.F("tfile", "string", "recon from a list of URLs in a file"),
 	)
 
 	fmt.Println("\nRecon profiles (for recon command):")
@@ -39,10 +41,7 @@ func PrintHelp() {
 		clihelp.F("http", "default", "general web recon (HTML, JS, headers)"),
 		clihelp.F("api", "", "API recon (JSON structure, auth)"),
 	)
-	fmt.Println("\n Recon commands:")
-	clihelp.Print(
-		clihelp.F("tfile", "string", "recon from a list of URLs in a file"),
-	)
+
 	fmt.Println("\nExamples:")
 	fmt.Println()
 
@@ -68,6 +67,10 @@ func PrintHelp() {
 		clihelp.F("cwrap upload https://site/post title=hello file=@a.jpg", "", "file + fields"),
 		clihelp.F("cwrap upload https://api.site/import browser file=@dump.zip", "", "browser style upload"),
 	)
+	fmt.Println("\n Recon examples:")
+	clihelp.Print(
+		clihelp.F("cwrap recon --tfile urls.txt http", "", "recon from file with http profile"),
+	)
 
 	fmt.Println("\nAuthentication:")
 	clihelp.Print(
@@ -80,11 +83,6 @@ func PrintHelp() {
 		clihelp.F("-d '{...}'", "", "raw body"),
 		clihelp.F("--proxy URL", "", "proxy"),
 		clihelp.F("--run", "", "execute without prompt"),
-	)
-
-	fmt.Println("\n Recon examples:")
-	clihelp.Print(
-		clihelp.F("cwrap recon tfile urls.txt http", "", "recon from file with http profile"),
 	)
 
 	fmt.Println()

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type sendState struct {
@@ -35,6 +36,14 @@ func (SendHandler) Translate(args []string) []string {
 		switch t.Type {
 
 		case TokenFlag:
+			if t.Raw == "--as-json" {
+				s.content = "json"
+				continue
+			}
+			if t.Raw == "--as-form" {
+				s.content = "form"
+				continue
+			}
 			out = append(out, t)
 
 		case TokenKeyValue:
@@ -102,12 +111,17 @@ func emitSendBody(out *[]Token, s *sendState) {
 
 	default:
 
+		var parts []string
 		for _, p := range s.data {
-			*out = append(*out, Token{
-				Type: TokenFlag,
-				Raw:  "-d\x00" + p.Key + "=" + stringify(p.Value),
-			})
+			parts = append(parts, p.Key+"="+stringify(p.Value))
 		}
+
+		formBody := strings.Join(parts, "&")
+
+		*out = append(*out, Token{
+			Type: TokenFlag,
+			Raw:  "-d\x00" + formBody,
+		})
 
 		*out = append(*out, Token{Type: TokenFlag, Raw: "--as-form"})
 	}
