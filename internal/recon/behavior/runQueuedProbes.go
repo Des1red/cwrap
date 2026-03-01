@@ -153,7 +153,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			}
 			if fp != "" && ref != "" && fp != ref {
 				kid.Effective = true
-				// if you want to tag "state changing" per probe, this is a better place:
+				// tag "state changing" per probe
 				target.Tag(knowledge.SigStateChanging)
 			}
 		}
