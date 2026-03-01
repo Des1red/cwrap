@@ -1,0 +1,1669 @@
+========== CWRAP FULL RECON REPORT ==========
+Target:    https://demo.owasp-juice.shop/main.js
+Generated: 2026-03-01 06:46:56
+
+------------------------------------------------
+GLOBAL STATS
+------------------------------------------------
+Entities:          17
+Edges:             20
+Global parameters: 0
+
+Signals (count of entities tagged):
+  - AuthBoundary: 6
+  - HasJSONBody: 11
+  - IDLikeParam: 1
+  - SensitiveKeyword: 1
+
+------------------------------------------------
+DISCOVERY TREE
+------------------------------------------------
+https://demo.owasp-juice.shop/main.js
+├── https://demo.owasp-juice.shop/api/Addresss  [js]
+├── https://demo.owasp-juice.shop/api/BasketItems  [js]
+├── https://demo.owasp-juice.shop/api/Cards  [js]
+├── https://demo.owasp-juice.shop/api/Challenges  [js]
+├── https://demo.owasp-juice.shop/api/Challenges/?key=nftMintChallenge  [js]
+├── https://demo.owasp-juice.shop/api/Complaints  [js]
+├── https://demo.owasp-juice.shop/api/Deliverys  [js]
+├── https://demo.owasp-juice.shop/api/Feedbacks  [js]
+├── https://demo.owasp-juice.shop/api/Hints  [js]
+├── https://demo.owasp-juice.shop/api/Products  [js]
+├── https://demo.owasp-juice.shop/api/Quantitys  [js]
+├── https://demo.owasp-juice.shop/api/Recycles  [js]
+├── https://demo.owasp-juice.shop/api/SecurityAnswers  [js]
+├── https://demo.owasp-juice.shop/api/SecurityQuestions  [js]
+├── https://demo.owasp-juice.shop/api/Users  [js]
+└── https://demo.owasp-juice.shop/login  [js]
+    ├── https://demo.owasp-juice.shop/main.js  [js]  (cycle)
+    ├── https://demo.owasp-juice.shop/polyfills.js  [js]
+    ├── https://demo.owasp-juice.shop/runtime.js  [js]
+    └── https://demo.owasp-juice.shop/vendor.js  [js]
+
+------------------------------------------------
+ENTITY INTELLIGENCE (DETAILED)
+------------------------------------------------
+
+[ENTITY] https://demo.owasp-juice.shop/api/Addresss
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  true
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Length
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    401: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - AuthBoundary
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  - Authentication/authorization boundary observed
+Next Steps:
+  - Attempt username enumeration
+  - Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+  - Test weak credentials and default accounts
+
+[ENTITY] https://demo.owasp-juice.shop/api/BasketItems
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  true
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Length
+    - Content-Type
+    - Date
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: true
+  LooksLikeJSON: false
+  LooksLikeXML:  false
+  Statuses:
+    401: 3
+  MIMEs:
+    text/html: 3
+Signals:
+  - AuthBoundary
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  - Authentication/authorization boundary observed
+Next Steps:
+  - Attempt username enumeration
+  - Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+  - Test weak credentials and default accounts
+
+[ENTITY] https://demo.owasp-juice.shop/api/Cards
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  true
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Length
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    401: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - AuthBoundary
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  - Authentication/authorization boundary observed
+Next Steps:
+  - Attempt username enumeration
+  - Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+  - Test weak credentials and default accounts
+
+[ENTITY] https://demo.owasp-juice.shop/api/Challenges
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+[ENTITY] https://demo.owasp-juice.shop/api/Challenges/?key=nftMintChallenge
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Length
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+[ENTITY] https://demo.owasp-juice.shop/api/Complaints
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  true
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Length
+    - Content-Type
+    - Date
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: true
+  LooksLikeJSON: false
+  LooksLikeXML:  false
+  Statuses:
+    401: 3
+  MIMEs:
+    text/html: 3
+Signals:
+  - AuthBoundary
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  - Authentication/authorization boundary observed
+Next Steps:
+  - Attempt username enumeration
+  - Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+  - Test weak credentials and default accounts
+
+[ENTITY] https://demo.owasp-juice.shop/api/Deliverys
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Length
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+[ENTITY] https://demo.owasp-juice.shop/api/Feedbacks
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+[ENTITY] https://demo.owasp-juice.shop/api/Hints
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+[ENTITY] https://demo.owasp-juice.shop/api/Products
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+[ENTITY] https://demo.owasp-juice.shop/api/Quantitys
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+[ENTITY] https://demo.owasp-juice.shop/api/Recycles
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Length
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+[ENTITY] https://demo.owasp-juice.shop/api/SecurityAnswers
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  true
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Length
+    - Content-Type
+    - Date
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: true
+  LooksLikeJSON: false
+  LooksLikeXML:  false
+  Statuses:
+    401: 3
+  MIMEs:
+    text/html: 3
+Signals:
+  - AuthBoundary
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  - Authentication/authorization boundary observed
+Next Steps:
+  - Attempt username enumeration
+  - Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+  - Test weak credentials and default accounts
+
+[ENTITY] https://demo.owasp-juice.shop/api/SecurityQuestions
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: true
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    application/json: 3
+Signals:
+  - HasJSONBody
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  (none)
+Next Steps:
+  (none)
+
+[ENTITY] https://demo.owasp-juice.shop/api/Users
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  true
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Access-Control-Allow-Origin
+    - Content-Length
+    - Content-Type
+    - Date
+    - Feature-Policy
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: true
+  LooksLikeJSON: false
+  LooksLikeXML:  false
+  Statuses:
+    401: 3
+  MIMEs:
+    text/html: 3
+Signals:
+  - AuthBoundary
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityInvalid
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: true
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  (none)
+Findings:
+  - Authentication/authorization boundary observed
+Next Steps:
+  - Attempt username enumeration
+  - Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+  - Test weak credentials and default accounts
+
+[ENTITY] https://demo.owasp-juice.shop/login
+State:
+  Seen:       true
+  ProbeCount: 1
+HTTP:
+  AuthLikely:  false
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Accept-Ranges
+    - Access-Control-Allow-Origin
+    - Cache-Control
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Last-Modified
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: true
+  LooksLikeJSON: false
+  LooksLikeXML:  false
+  Statuses:
+    200: 3
+  MIMEs:
+    text/html: 3
+Signals:
+  (none)
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  (none)
+JS Intelligence:
+  Findings:
+    - host_url: 3
+  Leaks:
+    - Kind: host_url
+      Source: https://demo.owasp-juice.shop/login#inline
+      Key: url
+      Value: https://www.youtube.com/watch?v=9PnbKL3wuH4
+Findings:
+  - JS leaks present: 1
+Next Steps:
+  - Review JS findings for secrets, endpoints, role gates, and client-side auth assumptions
+
+[ENTITY] https://demo.owasp-juice.shop/main.js
+State:
+  Seen:       true
+  ProbeCount: 9
+HTTP:
+  AuthLikely:  true
+  CSRFPresent: false
+  Methods:
+    - GET
+  Headers:
+    - Accept-Ranges
+    - Access-Control-Allow-Origin
+    - Cache-Control
+    - Content-Type
+    - Date
+    - Etag
+    - Feature-Policy
+    - Last-Modified
+    - Nel
+    - Report-To
+    - Reporting-Endpoints
+    - Server
+    - Vary
+    - Via
+    - X-Content-Type-Options
+    - X-Frame-Options
+    - X-Recruiting
+Content:
+  LooksLikeHTML: false
+  LooksLikeJSON: false
+  LooksLikeXML:  false
+  Statuses:
+    200: 28
+  MIMEs:
+    application/javascript: 28
+Signals:
+  - IDLikeParam
+  - SensitiveKeyword
+Session:
+  Used:   false
+  Issued: false
+  Cookies:
+    (none)
+Identities:
+  Name: anonymous
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: baseline
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+  Name: fake-admin
+    Kind: IdentityNone
+    Role: (none)
+    Effective: false
+    SentCreds: false
+    Rejected: false
+    IssuedByServer: false
+    AuthScheme: (none)
+    HasCSRF: false
+    CookieNames:
+      (none)
+Parameters:
+  Name: id
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: true
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+  Name: main.js
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: false
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+  Name: page
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: false
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+  Name: q
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: false
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+  Name: user
+    Sources:
+      - unknown
+    Heuristics:
+      IDLike: true
+      TokenLike: false
+      DebugLike: false
+      LikelyReflection: false
+      LikelyObjectAccess: false
+    Evidence:
+      Enumerable: false
+      AuthBoundary: false
+      OwnershipBoundary: false
+      PossibleIDOR: false
+      SuspectIDOR: false
+      Interest: 0
+    ObservedChanges:
+      (none)
+    IdentityAccess:
+      anonymous: 1
+      baseline: 1
+      fake-admin: 1
+    IdentityDenied:
+      (none)
+JS Intelligence:
+  Findings:
+    - endpoint: 448
+    - feature_toggle: 784
+    - feature_token: 28
+    - host_url: 896
+    - jwt: 252
+    - keyword: 28
+  Leaks:
+    - Kind: jwt
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: (none)
+      Value: application.welcomeBanner.showOnFirstStart
+    - Kind: jwt
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: (none)
+      Value: application.googleOauth.authorizedRedirects
+    - Kind: jwt
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: (none)
+      Value: application.recyclePage.topProductImage
+    - Kind: keyword
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: password
+      Value: password
+    - Kind: feature_token
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: flag
+      Value: flag_outline
+    - Kind: feature_toggle
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: disable
+      Value: Close
+    - Kind: feature_toggle
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: enable
+      Value: ScoreInfo
+    - Kind: feature_toggle
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: disable
+      Value: title
+    - Kind: feature_toggle
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: disable
+      Value: TwoFactorAuth
+    - Kind: host_url
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: url
+      Value: https://owasp.org
+    - Kind: host_url
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: url
+      Value: https://owasp-juice.shop
+    - Kind: host_url
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: url
+      Value: https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=
+    - Kind: host_url
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: url
+      Value: https://github.com/juice-shop/juice-shop
+    - Kind: host_url
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: url
+      Value: https://ponzico.win/ponzico.pdf
+    - Kind: host_url
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: url
+      Value: https://www.sec.gov/investor/alerts/ia_virtualcurrencies.pdf
+    - Kind: host_url
+      Source: https://demo.owasp-juice.shop/main.js
+      Key: url
+      Value: https://accounts.google.com/o/oauth2/v2/auth?client_id=${this.clientId}&response_type=token&scope=email&redirect_uri=${this.redirectUri}`)}static
+Findings:
+  - JS leaks present: 16
+  - Sensitive keywords detected in content/JS
+  - Unauthenticated access observed (identity: anonymous) via param behavior: id
+  - Unauthenticated access observed (identity: anonymous) via param behavior: main.js
+  - Unauthenticated access observed (identity: anonymous) via param behavior: page
+  - Unauthenticated access observed (identity: anonymous) via param behavior: q
+  - Unauthenticated access observed (identity: anonymous) via param behavior: user
+Next Steps:
+  - Review JS findings for secrets, endpoints, role gates, and client-side auth assumptions
+
+=============== END OF REPORT ===============

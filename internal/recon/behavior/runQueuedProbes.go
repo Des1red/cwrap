@@ -11,30 +11,37 @@ import (
 
 func cloneRequest(r model.Request) model.Request {
 	nr := r
-
 	nr.Flags.Query = append([]model.QueryParam{}, r.Flags.Query...)
 	nr.Flags.Headers = append([]model.Header{}, r.Flags.Headers...)
-
 	return nr
 }
 
 func (e *Engine) runQueuedProbes(base model.Request, url string) error {
-	ent := e.k.Entity(url)
-	basefp := makeFingerprint(e.baseStatus, e.baseBody)
+	// Root entity owns the scheduler queue
+	root := e.k.Entity(url)
 
-	responses := map[string]map[string]map[string][]byte{}
-	statuses := map[string]map[string]map[string]int{}
+	for root.ProbeQueue.Len() > 0 {
+		probe, ok := root.ProbeQueue.PopBest()
+		if !ok {
+			break
+		}
 
-	for ent.ProbeQueue.Len() > 0 {
-		identityStatuses := map[string]int{}
-
-		probe, _ := ent.ProbeQueue.PopBest()
+		// Dedupe at scheduler level (root), because the queue lives here
 		key := probe.Key()
-
-		if ent.SeenProbes[key] {
+		if root.SeenProbes[key] {
 			continue
 		}
-		ent.SeenProbes[key] = true
+		root.SeenProbes[key] = true
+
+		// Target entity is where state MUST be attributed
+		target := e.k.Entity(probe.URL)
+
+		// Mark target as seen the first time we actually execute something against it
+		target.State.Seen = true
+
+		// Per-probe maps (so analyzers don't mix endpoints)
+		responses := map[string]map[string]map[string][]byte{}
+		statuses := map[string]map[string]map[string]int{}
 
 		req := cloneRequest(base)
 		req.Method = probe.Method
@@ -45,30 +52,33 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			req.Flags.Headers = upsertHeader(req.Flags.Headers, k, v)
 		}
 
-		// add probe query params
+		// add probe query params (attribute params to TARGET, not root)
 		for k, v := range probe.AddQuery {
 			req.Flags.Query = append(req.Flags.Query, model.QueryParam{Key: k, Value: v})
 
-			if extractCurrentValue(base.URL, k) != "" {
-				ent.AddParam(k, knowledge.ParamQuery)
+			// IMPORTANT: decide source relative to the target URL, not base.URL
+			if extractCurrentValue(probe.URL, k) != "" {
+				target.AddParam(k, knowledge.ParamQuery)
 				e.k.AddParam(k)
-				e.int.ClassifyParam(ent, k)
-				ent.Tag(knowledge.SigHasQueryParams)
+				e.int.ClassifyParam(target, k)
+				target.Tag(knowledge.SigHasQueryParams)
 			} else {
-				ent.AddParam(k, knowledge.ParamInjected)
+				target.AddParam(k, knowledge.ParamInjected)
+				e.int.ClassifyParam(target, k)
 			}
 		}
 
+		identityStatuses := map[string]int{}
 		probeFP := map[string]string{}
-		baseFPStr := fpString(e.baseStatus, e.baseBody)
+
 		if e.debug {
 			println("== Running probe:", probe.Method, probe.URL)
-			println("   Baseline fingerprint:", baseFPStr)
 			println("authBoundaryConfirmed:", e.authBoundaryConfirmed)
 		}
-		executed := false
-		for _, id := range e.identities {
 
+		executed := false
+
+		for _, id := range e.identities {
 			if e.authBoundaryConfirmed && id.Synthetic {
 				continue
 			}
@@ -76,85 +86,92 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 				println("[PROBE]", probe.URL, "as identity:", id.Name)
 			}
 
-			// Start from clean clone
 			reqID := cloneRequest(req)
 			if id.Synthetic {
 				reqID.Flags.Headers = removeAuthHeaders(reqID.Flags.Headers)
 			}
-			// Apply identity mutation
 			reqID = id.Apply(reqID)
-			if e.debug {
-				println("Headers for", id.Name)
-				for _, h := range reqID.Flags.Headers {
-					println("   ", h.Name+":", h.Value)
-				}
-			}
 
 			resp, err := transport.Do(reqID)
 			if err != nil {
 				continue
 			}
+
+			// ProbeCount belongs to TARGET endpoint
 			if !executed {
-				ent.State.ProbeCount++
+				target.State.ProbeCount++
 				executed = true
 			}
+
 			if resp.StatusCode != 405 && resp.StatusCode != 501 {
-				ent.AddMethod(probe.Method)
+				target.AddMethod(probe.Method)
 			}
 			identityStatuses[id.Name] = resp.StatusCode
-			if e.debug {
-				println("   -> status:", resp.StatusCode)
-			}
 
 			body, err := transport.ReadBody(resp)
 			if err != nil {
 				continue
 			}
-			extractIdentity(ent, id.Name, resp)
-			e.captureSession(ent, id, resp, base.URL)
-			probeFP[id.Name] = fpString(resp.StatusCode, body)
 
+			// Identity/session attribution TARGET-scoped
+			extractIdentity(target, id.Name, resp)
+			e.captureSession(target, id, resp, base.URL)
+
+			probeFP[id.Name] = fpString(resp.StatusCode, body)
 			e.int.Learn(reqID.URL, resp, body)
 
-			if makeFingerprint(resp.StatusCode, body) != basefp {
-				ent.Tag(knowledge.SigStateChanging)
-			}
-
-			storeResponse(ent, responses, statuses, probe, id.Name, resp.StatusCode, body, e.baseStatus, e.baseBody, base.URL)
+			storeResponse(target, responses, statuses, probe, id.Name, resp.StatusCode, body, e.baseStatus, e.baseBody, base.URL)
 		}
+
+		// auth gate detection is GLOBAL behavior mode, keep it as-is
 		e.detectEndpointAuthGate(identityStatuses)
+
+		// Choose a reference fingerprint (prefer a no-creds identity if available)
 		ref := ""
 		for name, fp := range probeFP {
-			kid := ent.Identities[name]
+			kid := target.Identities[name]
 			if kid != nil && !kid.SentCreds && fp != "" {
 				ref = fp
 				break
 			}
 		}
 		if ref == "" {
-			ref = baseFPStr
+			// fallback: pick any fp
+			for _, fp := range probeFP {
+				if fp != "" {
+					ref = fp
+					break
+				}
+			}
 		}
 
+		// Mark effective identities for THIS TARGET endpoint
 		for name, fp := range probeFP {
-			kid := ent.Identities[name]
+			kid := target.Identities[name]
 			if kid == nil {
 				continue
 			}
 			if fp != "" && ref != "" && fp != ref {
 				kid.Effective = true
+				// if you want to tag "state changing" per probe, this is a better place:
+				target.Tag(knowledge.SigStateChanging)
 			}
 		}
 
-		e.analyzeParamBehavior(ent, responses)
-		e.analyzeAuthBoundary(ent, statuses)
-		e.analyzeOwnership(ent, statuses)
-		e.analyzeIDOR(ent, responses, statuses)
-		e.learnProbeImpact(ent, probe, probeFP, ref)
-		e.Expand(ent)
+		// Run analyzers on TARGET endpoint only (per-probe maps)
+		e.analyzeParamBehavior(target, responses)
+		e.analyzeAuthBoundary(target, statuses)
+		e.analyzeOwnership(target, statuses)
+		e.analyzeIDOR(target, responses, statuses)
+
+		// Learn + expand TARGET (not root)
+		e.learnProbeImpact(target, probe, probeFP, ref)
+		e.Expand(target)
 	}
 
 	return nil
 }
+
 func upsertHeader(h []model.Header, name, value string) []model.Header {
 	for i := range h {
 		if strings.EqualFold(h[i].Name, name) {
@@ -164,6 +181,7 @@ func upsertHeader(h []model.Header, name, value string) []model.Header {
 	}
 	return append(h, model.Header{Name: name, Value: value})
 }
+
 func fpString(status int, body []byte) string {
 	sum := sha256.Sum256(body)
 	return fmt.Sprintf("%d:%x", status, sum)

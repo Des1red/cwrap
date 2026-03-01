@@ -13,9 +13,16 @@ func (e *Engine) Expand(ent *knowledge.Entity) {
 		return
 	}
 
-	if !ent.SeenSignal(knowledge.SigHasQueryParams) {
+	meaningful := false
+	for _, p := range ent.Params {
+		if p.LikelyObjectAccess || p.Enumerable || p.AuthBoundary || p.OwnershipBoundary {
+			meaningful = true
+			break
+		}
+	}
+
+	if !meaningful {
 		e.expandDiscovery(ent)
-		return
 	}
 
 	e.expandMutation(ent)
@@ -90,8 +97,11 @@ func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
 func (e *Engine) expandMutation(ent *knowledge.Entity) {
 
 	for name, p := range ent.Params {
+		if !p.IDLike {
+			continue
+		}
 
-		if !p.IDLike || !p.Sources[knowledge.ParamQuery] {
+		if !p.Sources[knowledge.ParamQuery] && !p.LikelyObjectAccess && !p.Enumerable {
 			continue
 		}
 
@@ -149,7 +159,7 @@ func (e *Engine) expandIdentity(ent *knowledge.Entity) {
 
 	if ent.SeenSignal(knowledge.SigAuthBoundary) ||
 		ent.SeenSignal(knowledge.SigObjectOwnership) ||
-		len(ent.Identities) > 0 {
+		ent.SeenSignal(knowledge.SigPossibleIDOR) {
 		should = true
 	}
 
@@ -204,7 +214,7 @@ func (e *Engine) expandEnumeration(ent *knowledge.Entity) {
 
 	for name, p := range ent.Params {
 
-		if !p.IDLike {
+		if !p.IDLike || !p.Enumerable {
 			continue
 		}
 

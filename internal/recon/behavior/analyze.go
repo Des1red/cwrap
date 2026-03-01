@@ -242,6 +242,11 @@ func (e *Engine) analyzeParamBehavior(ent *knowledge.Entity, responses map[strin
 		if allSame {
 			p.LikelyReflection = true
 			p.ObservedChanges["stable-structure"] = true
+
+			p.Interest += 1
+			if p.Interest > 5 {
+				p.Interest = 5
+			}
 			continue
 		}
 
@@ -255,6 +260,25 @@ func (e *Engine) analyzeParamBehavior(ent *knowledge.Entity, responses map[strin
 		if len(uniq) >= 3 {
 			p.Enumerable = true
 			p.ObservedChanges["enumerable-structure-space"] = true
+		}
+		added := false
+		if p.LikelyObjectAccess && !p.ObservedChanges["interest+object"] {
+			p.Interest += 2
+			p.ObservedChanges["interest+object"] = true
+			added = true
+		}
+		if p.Enumerable && !p.ObservedChanges["interest+enum"] {
+			p.Interest += 2
+			p.ObservedChanges["interest+enum"] = true
+			added = true
+		}
+		if p.LikelyReflection && !p.ObservedChanges["interest+reflect"] {
+			p.Interest += 1
+			p.ObservedChanges["interest+reflect"] = true
+			added = true
+		}
+		if added && p.Interest > 5 {
+			p.Interest = 5
 		}
 	}
 }
