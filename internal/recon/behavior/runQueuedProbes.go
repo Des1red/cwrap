@@ -64,6 +64,10 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 				target.Tag(knowledge.SigHasQueryParams)
 			} else {
 				target.AddParam(k, knowledge.ParamInjected)
+				p := target.Params[k]
+				if p != nil && p.DiscoveryReason == "" {
+					p.DiscoveryReason = probe.Reason
+				}
 				e.int.ClassifyParam(target, k)
 			}
 		}
@@ -103,7 +107,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 				executed = true
 			}
 
-			if resp.StatusCode != 405 && resp.StatusCode != 501 {
+			if methodAllowed(resp.StatusCode) {
 				target.AddMethod(probe.Method)
 			}
 			identityStatuses[id.Name] = resp.StatusCode
@@ -163,7 +167,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		e.analyzeAuthBoundary(target, statuses)
 		e.analyzeOwnership(target, statuses)
 		e.analyzeIDOR(target, responses, statuses)
-
+		e.analyzeMethods(target)
 		// Learn + expand TARGET (not root)
 		e.learnProbeImpact(target, probe, probeFP, ref)
 		e.Expand(target)
@@ -198,5 +202,22 @@ func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int) {
 				println("== Auth boundary confirmed. Switching to authenticated exploration mode ==")
 			}
 		}
+	}
+}
+
+func methodAllowed(status int) bool {
+
+	switch status {
+
+	case 405, 501:
+		return false
+
+	case 200, 201, 202, 204,
+		301, 302,
+		400, 401, 403:
+		return true
+
+	default:
+		return false
 	}
 }

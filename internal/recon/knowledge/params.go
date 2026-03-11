@@ -15,6 +15,7 @@ const (
 	ReasonIDAdjacency    = "id adjacency"
 	ReasonIDEnum         = "id enumeration"
 	ReasonIdentityProbe  = "identity probe"
+	ReasonMethodProbe    = "method probe"
 )
 
 func (p ParamSource) String() string {

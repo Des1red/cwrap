@@ -13,6 +13,8 @@ func (e *Engine) Expand(ent *knowledge.Entity) {
 		return
 	}
 
+	e.expandMethods(ent)
+
 	meaningful := false
 	for _, p := range ent.Params {
 		if p.LikelyObjectAccess || p.Enumerable || p.AuthBoundary || p.OwnershipBoundary {
@@ -269,4 +271,39 @@ func (e *Engine) pushProbe(ent *knowledge.Entity, p knowledge.Probe) {
 	}
 
 	ent.ProbeQueue.Push(p)
+}
+
+func (e *Engine) expandMethods(ent *knowledge.Entity) {
+
+	if ent.State.ProbeCount > 3 {
+		return
+	}
+
+	if len(ent.HTTP.Methods) > 1 {
+		return
+	}
+
+	methods := []string{
+		"GET",
+		"POST",
+		"PUT",
+		"PATCH",
+		"DELETE",
+		"OPTIONS",
+		"HEAD",
+	}
+
+	for _, m := range methods {
+
+		if ent.HTTP.Methods[m] {
+			continue
+		}
+
+		e.pushProbe(ent, knowledge.Probe{
+			URL:      ent.URL,
+			Method:   m,
+			Reason:   knowledge.ReasonMethodProbe,
+			Priority: 60,
+		})
+	}
 }

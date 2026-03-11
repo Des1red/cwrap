@@ -356,3 +356,44 @@ func (e *Engine) analyzeAuthBoundary(ent *knowledge.Entity, statuses map[string]
 		}
 	}
 }
+
+func (e *Engine) analyzeMethods(ent *knowledge.Entity) {
+
+	if len(ent.HTTP.Methods) == 0 {
+		return
+	}
+
+	methods := ent.HTTP.Methods
+
+	// ---------------------------------
+	// STATE CHANGING ENDPOINT
+	// ---------------------------------
+	if methods["POST"] ||
+		methods["PUT"] ||
+		methods["PATCH"] ||
+		methods["DELETE"] {
+
+		ent.Tag(knowledge.SigStateChanging)
+	}
+
+	// ---------------------------------
+	// JSON API SURFACE
+	// ---------------------------------
+	if ent.Content.LooksLikeJSON &&
+		(methods["POST"] ||
+			methods["PUT"] ||
+			methods["PATCH"]) {
+
+		ent.Tag(knowledge.SigHasJSONBody)
+	}
+
+	// ---------------------------------
+	// AUTH BOUNDARY SIGNAL
+	// ---------------------------------
+	// If endpoint allows mutation and identities differ
+	if ent.SeenSignal(knowledge.SigStateChanging) &&
+		len(ent.Identities) > 1 {
+
+		ent.Tag(knowledge.SigAuthBoundary)
+	}
+}

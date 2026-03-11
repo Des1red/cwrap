@@ -45,8 +45,8 @@ type ParamIntel struct {
 	Name string
 
 	// Where we saw it.
-	Sources map[ParamSource]bool
-
+	Sources         map[ParamSource]bool
+	DiscoveryReason string
 	// Optional heuristics:
 	IDLike    bool
 	TokenLike bool

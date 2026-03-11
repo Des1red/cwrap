@@ -362,19 +362,20 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 
 				// Sources
 				fmt.Fprintln(w, "    Sources:")
-				if len(p.Sources) == 0 {
-					fmt.Fprintln(w, "      (none)")
-				} else {
-					srcs := make([]string, 0, len(p.Sources))
-					for s, on := range p.Sources {
-						if on {
-							srcs = append(srcs, s.String())
-						}
+
+				srcs := make([]string, 0)
+				for s, on := range p.Sources {
+					if on {
+						srcs = append(srcs, paramSourceLabel(p, s))
 					}
-					sort.Strings(srcs)
-					for _, s := range srcs {
-						fmt.Fprintln(w, "      -", s)
-					}
+				}
+				// If no source recorded, treat as scanner injected
+				if len(srcs) == 0 {
+					srcs = append(srcs, paramSourceLabel(p, knowledge.ParamInjected))
+				}
+				sort.Strings(srcs)
+				for _, s := range srcs {
+					fmt.Fprintln(w, "      -", s)
 				}
 
 				// Heuristics
@@ -471,5 +472,34 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 				fmt.Fprintln(w, "  -", s)
 			}
 		}
+	}
+}
+
+func paramSourceLabel(p *knowledge.ParamIntel, src knowledge.ParamSource) string {
+
+	switch src {
+
+	case knowledge.ParamInjected:
+
+		if p.DiscoveryReason != "" {
+			return "injected (scanner discovery: " + p.DiscoveryReason + ")"
+		}
+
+		return "injected (scanner discovery)"
+
+	case knowledge.ParamQuery:
+		return "query"
+
+	case knowledge.ParamForm:
+		return "form"
+
+	case knowledge.ParamJSON:
+		return "json"
+
+	case knowledge.ParamPath:
+		return "path"
+
+	default:
+		return "unknown"
 	}
 }
