@@ -34,14 +34,18 @@ func (UploadHandler) Translate(args []string) []string {
 			})
 
 		case TokenWord:
-			if p, ok := IsProfile(t.Value); ok {
+			if p, ok := isProfile(t.Value); ok {
 				s.profile = p
 				continue
 			}
 			// content modifiers forbidden
-			if _, ok := IsContent(t.Value); ok {
+			if _, ok := isContent(t.Value); ok {
 				println("cwrap: upload only supports multipart form — remove 'json/form/xml'")
 				os.Exit(1)
+			}
+			if tok, ok := resolveSemanticWord(t.Value); ok {
+				out = append(out, tok)
+				continue
 			}
 			out = append(out, t)
 

@@ -14,6 +14,7 @@ type Flags struct {
 	Headers []Header
 	Cookies []Cookie
 	Bearer  string
+	CSRF    bool
 
 	Body string
 	JSON bool
@@ -33,8 +34,9 @@ type Flags struct {
 
 	ContentProfile string
 
-	Target string
-	Debug  bool
+	Target     string
+	Debug      bool
+	AutoCookie bool
 }
 
 type Header struct {

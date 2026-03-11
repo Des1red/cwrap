@@ -21,6 +21,8 @@ func Build(req model.Request) Result {
 	args = buildMultipart(args, req)
 
 	headers := httpcore.BuildHeaders(req)
+
+	headers = applyCSRFHeader(req, headers)
 	args = appendHeaderArgs(args, headers)
 
 	args = buildOptions(args, req)

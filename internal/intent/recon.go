@@ -18,7 +18,7 @@ func (h *ReconHandler) Translate(args []string) []string {
 		switch t.Type {
 
 		case TokenWord:
-			if p, ok := IsProfile(t.Value); ok {
+			if p, ok := isProfile(t.Value); ok {
 				h.profile = p
 				continue
 			}

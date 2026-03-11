@@ -34,7 +34,8 @@ func register(fs *flag.FlagSet, f *model.Flags) *rawInput {
 	fs.BoolVar(&f.Head, "head", false, "send HEAD request")
 	fs.StringVar(&f.Proxy, "proxy", "", "proxy url")
 	fs.Var(&r.query, "q", "query parameter key=value")
-
+	fs.BoolVar(&f.AutoCookie, "auto-cookie", false, "capture and reuse cookies automatically")
+	fs.BoolVar(&f.CSRF, "csrf", false, "include CSRF token from cookie jar")
 	fs.BoolVar(&r.asJSON, "as-json", false, "json content profile")
 	fs.BoolVar(&r.asForm, "as-form", false, "form content profile")
 	fs.BoolVar(&r.asXML, "as-xml", false, "xml content profile")

@@ -1,6 +1,6 @@
 package intent
 
-func IsProfile(word string) (string, bool) {
+func isProfile(word string) (string, bool) {
 	switch word {
 	case "browser":
 		return "firefox", true
@@ -10,7 +10,7 @@ func IsProfile(word string) (string, bool) {
 	return "", false
 }
 
-func IsContent(word string) (string, bool) {
+func isContent(word string) (string, bool) {
 	switch word {
 	case "json", "xml", "form":
 		return word, true
@@ -18,12 +18,28 @@ func IsContent(word string) (string, bool) {
 	return "", false
 }
 
-func IsBooleanWord(word string) (bool, bool) {
+func isBooleanWord(word string) (string, bool) {
 	switch word {
 	case "follow":
-		return true, true
+		return "follow", true
 	case "nofollow":
-		return false, true
+		return "nofollow", true
+	case "csrf":
+		return "csrf", true
+	case "auto-cookie":
+		return "auto-cookie", true
 	}
-	return false, false
+	return "", false
+}
+
+func resolveSemanticWord(word string) (Token, bool) {
+
+	if name, ok := isBooleanWord(word); ok {
+		return Token{
+			Type: TokenFlag,
+			Raw:  "--" + name,
+		}, true
+	}
+
+	return Token{}, false
 }

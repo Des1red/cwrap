@@ -59,12 +59,16 @@ func (SendHandler) Translate(args []string) []string {
 			s.data = append(s.data, kv{t.Key, v})
 
 		case TokenWord:
-			if p, ok := IsProfile(t.Value); ok {
+			if p, ok := isProfile(t.Value); ok {
 				s.profile = p
 				continue
 			}
-			if c, ok := IsContent(t.Value); ok {
+			if c, ok := isContent(t.Value); ok {
 				s.content = c
+				continue
+			}
+			if tok, ok := resolveSemanticWord(t.Value); ok {
+				out = append(out, tok)
 				continue
 			}
 			out = append(out, t)

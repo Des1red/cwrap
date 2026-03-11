@@ -39,7 +39,7 @@ func (FetchHandler) Translate(args []string) []string {
 				s.follow = &v
 
 			case "as", "profile":
-				if p, ok := IsProfile(t.Value); ok {
+				if p, ok := isProfile(t.Value); ok {
 					s.profile = p
 				}
 
@@ -51,17 +51,17 @@ func (FetchHandler) Translate(args []string) []string {
 			}
 
 		case TokenWord:
-			if p, ok := IsProfile(t.Value); ok {
+			if p, ok := isProfile(t.Value); ok {
 				s.profile = p
 				continue
 			}
-			if _, ok := IsContent(t.Value); ok {
+			if _, ok := isContent(t.Value); ok {
 				println("cwrap: fetch cannot use json/form/xml — use send")
 				os.Exit(1)
 			}
 
-			if v, ok := IsBooleanWord(t.Value); ok {
-				s.follow = &v
+			if tok, ok := resolveSemanticWord(t.Value); ok {
+				out = append(out, tok)
 				continue
 			}
 

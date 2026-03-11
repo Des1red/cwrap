@@ -34,6 +34,8 @@ func PrintHelp() {
 		clihelp.F("cookie:name=value", "", "add cookie"),
 		clihelp.F("bearer=TOKEN", "", "authorization bearer token"),
 		clihelp.F("tfile", "string", "recon from a list of URLs in a file"),
+		clihelp.F("auto-cookie", "", "capture and reuse cookies automatically"),
+		clihelp.F("csrf", "", "include csrf header from saved cookies"),
 	)
 
 	fmt.Println("\nRecon profiles (for recon command):")
