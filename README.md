@@ -185,8 +185,4 @@ cwrap fetch https://api.site/me bearer=TOKEN
 cwrap send https://api.site json filter.name=your_name filter.age=30 tag=a tag=b
 ```
 
-License
-MIT
-
-
 ---
