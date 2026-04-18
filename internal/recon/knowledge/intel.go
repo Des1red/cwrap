@@ -1,8 +1,9 @@
 package knowledge
 
 type EntityState struct {
-	Seen       bool
-	ProbeCount int
+	Seen         bool
+	ProbeCount   int
+	MethodProbed bool
 }
 
 type HTTPIntel struct {

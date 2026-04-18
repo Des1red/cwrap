@@ -19,15 +19,16 @@ type Engine struct {
 	baseFP     fingerprint
 
 	authBoundaryConfirmed bool
+	authConfidence        int
 
 	debug bool
 }
 
-func New(k *knowledge.Knowledge, i Interpreter) *Engine {
+func New(k *knowledge.Knowledge, i Interpreter, debug bool) *Engine {
 	return &Engine{
 		k:   k,
 		int: i,
 
-		debug: false, // toggle here
+		debug: debug, // toggle here
 	}
 }

@@ -19,7 +19,7 @@ func (e *Engine) Run(req model.Request) (*knowledge.Knowledge, error) {
 	e.k = knowledge.New(req.URL)
 	e.learnURLParams(req.URL)
 
-	b := behavior.New(e.k, interpreter{e})
+	b := behavior.New(e.k, interpreter{e}, req.Flags.Debug)
 
 	err := b.Run(req, req.URL)
 	if err != nil {

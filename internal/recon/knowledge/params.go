@@ -16,6 +16,7 @@ const (
 	ReasonIDEnum         = "id enumeration"
 	ReasonIdentityProbe  = "identity probe"
 	ReasonMethodProbe    = "method probe"
+	ReasonPathIDProbe    = "path-id-probe"
 )
 
 func (p ParamSource) String() string {

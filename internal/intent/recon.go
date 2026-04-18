@@ -18,7 +18,7 @@ func (h *ReconHandler) Translate(args []string) []string {
 		switch t.Type {
 
 		case TokenWord:
-			if p, ok := isProfile(t.Value); ok {
+			if p, ok := isReconProfile(t.Value); ok {
 				h.profile = p
 				continue
 			}
@@ -37,9 +37,6 @@ func (h *ReconHandler) Translate(args []string) []string {
 			out = append(out, t)
 		}
 	}
-
-	// recon always debug
-	out = append(out, Token{Type: TokenFlag, Raw: "--debug"})
 
 	return TokensToArgs(out)
 }

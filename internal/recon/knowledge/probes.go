@@ -9,8 +9,10 @@ type Probe struct {
 	URL    string
 	Method string
 
-	AddQuery map[string]string
-	Headers  map[string]string
+	AddQuery      map[string]string
+	PathParams    map[string]string // path segment param name -> substituted value
+	PathParamBase map[string]string // path segment param name -> original value (for base seeding)
+	Headers       map[string]string
 
 	Reason   string
 	Priority int
@@ -68,6 +70,17 @@ func (p Probe) Key() string {
 
 		for _, k := range keys {
 			key += "|" + k + "=" + p.AddQuery[k]
+		}
+	}
+
+	if len(p.PathParams) > 0 {
+		keys := make([]string, 0, len(p.PathParams))
+		for k := range p.PathParams {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			key += "|pp:" + k + "=" + p.PathParams[k]
 		}
 	}
 

@@ -71,6 +71,15 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 				e.int.ClassifyParam(target, k)
 			}
 		}
+		for k := range probe.PathParams {
+			target.AddParam(k, knowledge.ParamPath)
+			e.k.AddParam(k)
+			e.int.ClassifyParam(target, k)
+			p := target.Params[k]
+			if p != nil && p.DiscoveryReason == "" {
+				p.DiscoveryReason = probe.Reason
+			}
+		}
 
 		identityStatuses := map[string]int{}
 		probeFP := map[string]string{}
@@ -128,7 +137,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		}
 
 		// auth gate detection is GLOBAL behavior mode, keep it as-is
-		e.detectEndpointAuthGate(identityStatuses)
+		e.detectEndpointAuthGate(identityStatuses, probeFP)
 
 		// Choose a reference fingerprint (prefer a no-creds identity if available)
 		ref := ""
@@ -171,6 +180,13 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		// Learn + expand TARGET (not root)
 		e.learnProbeImpact(target, probe, probeFP, ref)
 		e.Expand(target)
+		// propagate any probes target generated back to root so they actually run
+		for target.ProbeQueue.Len() > 0 {
+			p, ok := target.ProbeQueue.PopBest()
+			if ok && !root.SeenProbes[p.Key()] {
+				root.ProbeQueue.Push(p)
+			}
+		}
 	}
 
 	return nil
@@ -189,20 +205,6 @@ func upsertHeader(h []model.Header, name, value string) []model.Header {
 func fpString(status int, body []byte) string {
 	sum := sha256.Sum256(body)
 	return fmt.Sprintf("%d:%x", status, sum)
-}
-
-func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int) {
-	baseline, okB := identityStatuses["baseline"]
-	anonymous, okA := identityStatuses["anonymous"]
-
-	if okB && okA && baseline == 200 && (anonymous == 401 || anonymous == 403) {
-		if !e.authBoundaryConfirmed {
-			e.authBoundaryConfirmed = true
-			if e.debug {
-				println("== Auth boundary confirmed. Switching to authenticated exploration mode ==")
-			}
-		}
-	}
 }
 
 func methodAllowed(status int) bool {

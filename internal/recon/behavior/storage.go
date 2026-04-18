@@ -1,7 +1,12 @@
-// behavior/store.go
 package behavior
 
 import "cwrap/internal/recon/knowledge"
+
+type paramEntry struct {
+	name    string
+	value   string
+	baseVal string
+}
 
 func storeResponse(
 	ent *knowledge.Entity,
@@ -15,7 +20,17 @@ func storeResponse(
 	baseBody []byte,
 	baseURL string,
 ) {
+	entries := make([]paramEntry, 0, len(probe.AddQuery)+len(probe.PathParams))
+
 	for k, v := range probe.AddQuery {
+		entries = append(entries, paramEntry{k, v, extractCurrentValue(baseURL, k)})
+	}
+	for k, v := range probe.PathParams {
+		entries = append(entries, paramEntry{k, v, probe.PathParamBase[k]})
+	}
+
+	for _, e := range entries {
+		k, v, baseVal := e.name, e.value, e.baseVal
 
 		if responses[k] == nil {
 			responses[k] = map[string]map[string][]byte{}
@@ -26,8 +41,6 @@ func storeResponse(
 			statuses[k][v] = map[string]int{}
 		}
 
-		// baseline seeding
-		baseVal := extractCurrentValue(baseURL, k)
 		if baseVal != "" {
 			if responses[k][baseVal] == nil {
 				responses[k][baseVal] = map[string][]byte{}
@@ -42,7 +55,6 @@ func storeResponse(
 		responses[k][v][identity] = body
 		statuses[k][v][identity] = status
 
-		// ---- identity intelligence ----
 		p := ent.Params[k]
 		if p != nil {
 			if status == 200 {

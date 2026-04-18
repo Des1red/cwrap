@@ -3,8 +3,10 @@ package behavior
 import (
 	"cwrap/internal/recon/knowledge"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func (e *Engine) Expand(ent *knowledge.Entity) {
@@ -14,6 +16,7 @@ func (e *Engine) Expand(ent *knowledge.Entity) {
 	}
 
 	e.expandMethods(ent)
+	e.expandPathIDs(ent)
 
 	meaningful := false
 	for _, p := range ent.Params {
@@ -155,24 +158,21 @@ func (e *Engine) expandMutation(ent *knowledge.Entity) {
 		}
 	}
 }
+
 func (e *Engine) expandIdentity(ent *knowledge.Entity) {
 
-	should := false
-
-	if ent.SeenSignal(knowledge.SigAuthBoundary) ||
+	// auth signals on this specific entity
+	hasAuthSignal := ent.SeenSignal(knowledge.SigAuthBoundary) ||
 		ent.SeenSignal(knowledge.SigObjectOwnership) ||
-		ent.SeenSignal(knowledge.SigPossibleIDOR) {
-		should = true
-	}
+		ent.SeenSignal(knowledge.SigPossibleIDOR)
 
-	for _, p := range ent.Params {
-		if p.IDLike {
-			should = true
-			break
-		}
-	}
+	// entity has seen auth-like behavior (server issued cookies, auth header observed)
+	hasAuthBehavior := ent.HTTP.AuthLikely
 
-	if !should {
+	// engine confirmed a boundary globally (any endpoint required auth)
+	globalBoundary := e.authBoundaryConfirmed
+
+	if !hasAuthSignal && !hasAuthBehavior && !globalBoundary {
 		return
 	}
 
@@ -270,19 +270,17 @@ func (e *Engine) pushProbe(ent *knowledge.Entity, p knowledge.Probe) {
 		return
 	}
 
+	ent.SeenProbes[key] = true
 	ent.ProbeQueue.Push(p)
 }
 
 func (e *Engine) expandMethods(ent *knowledge.Entity) {
-
-	if ent.State.ProbeCount > 3 {
+	// only skip if we've already done a full method sweep
+	if ent.State.MethodProbed {
 		return
 	}
 
-	if len(ent.HTTP.Methods) > 1 {
-		return
-	}
-
+	// don't re-probe methods we already know about
 	methods := []string{
 		"GET",
 		"POST",
@@ -294,16 +292,132 @@ func (e *Engine) expandMethods(ent *knowledge.Entity) {
 	}
 
 	for _, m := range methods {
-
 		if ent.HTTP.Methods[m] {
 			continue
 		}
-
 		e.pushProbe(ent, knowledge.Probe{
 			URL:      ent.URL,
 			Method:   m,
 			Reason:   knowledge.ReasonMethodProbe,
 			Priority: 60,
 		})
+	}
+
+	ent.State.MethodProbed = true
+}
+
+var uuidRe = regexp.MustCompile(
+	`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
+)
+
+func looksLikePathID(s string) bool {
+	if s == "" || len(s) > 40 {
+		return false
+	}
+	if _, err := strconv.Atoi(s); err == nil {
+		return true
+	}
+	return uuidRe.MatchString(strings.ToLower(s))
+}
+
+func replacePathSegment(u *url.URL, idx int, val string) string {
+	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if idx < 0 || idx >= len(segments) {
+		return u.String()
+	}
+	newSegs := make([]string, len(segments))
+	copy(newSegs, segments)
+	newSegs[idx] = val
+	newU := *u
+	newU.Path = "/" + strings.Join(newSegs, "/")
+	return newU.String()
+}
+
+func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
+	if ent.State.ProbeCount > 50 {
+		return
+	}
+
+	u, err := url.Parse(ent.URL)
+	if err != nil {
+		return
+	}
+
+	rawPath := strings.Trim(u.Path, "/")
+	if rawPath == "" {
+		return
+	}
+
+	segments := strings.Split(rawPath, "/")
+
+	for i, seg := range segments {
+		if !looksLikePathID(seg) {
+			continue
+		}
+
+		// derive a meaningful param name from the parent segment
+		name := "id"
+		if i > 0 {
+			parent := strings.ToLower(segments[i-1])
+			// naive singularize: strip trailing 's' (users -> user)
+			if strings.HasSuffix(parent, "s") && len(parent) > 2 {
+				parent = parent[:len(parent)-1]
+			}
+			name = parent + "_id"
+		}
+
+		// register param
+		ent.AddParam(name, knowledge.ParamPath)
+		e.k.AddParam(name)
+		e.int.ClassifyParam(ent, name)
+		ent.Tag(knowledge.SigIDLikeParam)
+
+		// base mutations
+		tests := []string{"0", "1", "-1"}
+		if id, err := strconv.Atoi(seg); err == nil {
+			tests = append(tests,
+				strconv.Itoa(id-1),
+				strconv.Itoa(id+1),
+			)
+		} else {
+			// UUID: probe a null UUID
+			tests = append(tests, "00000000-0000-0000-0000-000000000000")
+		}
+
+		// adaptive depth based on Interest
+		p := ent.Params[name]
+		if p != nil && p.Interest >= 1 {
+			tests = append(tests, "999999", "null")
+		}
+		if p != nil && p.Interest >= 3 {
+			if id, err := strconv.Atoi(seg); err == nil {
+				tests = append(tests,
+					strconv.Itoa(id+2),
+					strconv.Itoa(id+5),
+					"2147483647",
+				)
+			}
+		}
+
+		priority := 100
+		if p != nil && p.Interest >= 1 {
+			priority = 120
+		}
+		if p != nil && p.Interest >= 3 {
+			priority = 140
+		}
+
+		for _, v := range tests {
+			newURL := replacePathSegment(u, i, v)
+			e.pushProbe(ent, knowledge.Probe{
+				URL:           newURL,
+				Method:        "GET",
+				PathParams:    map[string]string{name: v},
+				PathParamBase: map[string]string{name: seg},
+				Reason:        knowledge.ReasonPathIDProbe,
+				Priority:      priority,
+				Created:       time.Now(),
+			})
+		}
 	}
 }
