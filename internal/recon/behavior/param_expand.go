@@ -9,9 +9,23 @@ import (
 	"time"
 )
 
+func isJSEntity(ent *knowledge.Entity) bool {
+	u := strings.ToLower(ent.URL)
+	return strings.HasSuffix(u, ".js") ||
+		strings.Contains(u, ".js?") ||
+		strings.Contains(u, ".js#")
+}
+
 func (e *Engine) Expand(ent *knowledge.Entity) {
 
 	if ent.State.ProbeCount > 50 {
+		return
+	}
+
+	// skip param discovery and mutation on static JS files
+	if isJSEntity(ent) {
+		e.expandMethods(ent)
+		e.expandIdentity(ent)
 		return
 	}
 

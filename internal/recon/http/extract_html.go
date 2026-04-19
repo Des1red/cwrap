@@ -143,6 +143,14 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 				if src != "" {
 					if link, ok := e.normalizeLink(ent.URL, src); ok {
 						e.k.AddEdge(ent.URL, link, knowledge.EdgeDiscoveredFromJS)
+						// fetch the JS file so jsintel can analyze its content
+						e.k.PushProbe(e.k.Entity(ent.URL), knowledge.Probe{
+							URL:      link,
+							Method:   "GET",
+							Reason:   knowledge.ReasonJSFetch,
+							Priority: 70,
+							Created:  time.Now(),
+						})
 					}
 				} else {
 					var code strings.Builder

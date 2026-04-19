@@ -32,6 +32,35 @@ func sortedKeys(m map[string]bool) []string {
 	return out
 }
 
+func entityURLsBySignalCount(k *knowledge.Knowledge) []string {
+	urls := make([]string, 0, len(k.Entities))
+	for u := range k.Entities {
+		urls = append(urls, u)
+	}
+	sort.Slice(urls, func(i, j int) bool {
+		si := signalCount(k.Entities[urls[i]])
+		sj := signalCount(k.Entities[urls[j]])
+		if si != sj {
+			return si > sj // more signals first
+		}
+		return urls[i] < urls[j] // stable alpha fallback
+	})
+	return urls
+}
+
+func signalCount(ent *knowledge.Entity) int {
+	if ent == nil {
+		return 0
+	}
+	n := 0
+	for _, on := range ent.Signals.Tags {
+		if on {
+			n++
+		}
+	}
+	return n
+}
+
 func activeSignals(ent *knowledge.Entity) []string {
 	if ent == nil || len(ent.Signals.Tags) == 0 {
 		return nil

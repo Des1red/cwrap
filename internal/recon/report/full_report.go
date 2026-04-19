@@ -86,14 +86,16 @@ func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
 		}
 	}
 	for from := range adj {
-		cs := adj[from]
-		sort.Slice(cs, func(i, j int) bool {
-			if cs[i].to == cs[j].to {
-				return cs[i].etype < cs[j].etype
+		seen := map[string]bool{}
+		deduped := make([]child, 0, len(adj[from]))
+		for _, c := range adj[from] {
+			key := c.to + "|" + edgeTypeLabel(c.etype)
+			if !seen[key] {
+				seen[key] = true
+				deduped = append(deduped, c)
 			}
-			return cs[i].to < cs[j].to
-		})
-		adj[from] = cs
+		}
+		adj[from] = deduped
 	}
 
 	root := ""
@@ -115,8 +117,9 @@ func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
 	}
 
 	fmt.Fprintln(w, root)
-	var walk func(node string, prefix string, stack map[string]bool)
-	walk = func(node string, prefix string, stack map[string]bool) {
+	visited := map[string]bool{root: true}
+	var walk func(node string, prefix string)
+	walk = func(node string, prefix string) {
 		children := adj[node]
 		for i, c := range children {
 			last := i == len(children)-1
@@ -130,18 +133,17 @@ func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
 			if tag := edgeTypeLabel(c.etype); tag != "" {
 				line += "  [" + tag + "]"
 			}
-			if stack[c.to] {
-				line += "  (cycle)"
+			if visited[c.to] {
+				line += "  (seen)"
 				fmt.Fprintln(w, line)
 				continue
 			}
 			fmt.Fprintln(w, line)
-			stack2 := copySet(stack)
-			stack2[c.to] = true
-			walk(c.to, nextPrefix, stack2)
+			visited[c.to] = true
+			walk(c.to, nextPrefix)
 		}
 	}
-	walk(root, "", map[string]bool{root: true})
+	walk(root, "")
 	fmt.Fprintln(w)
 }
 
@@ -171,7 +173,7 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 	fmt.Fprintln(w, "ENTITY INTELLIGENCE")
 	fmt.Fprintln(w, "------------------------------------------------")
 
-	for _, u := range sortedEntityURLs(k) {
+	for _, u := range entityURLsBySignalCount(k) {
 		ent := k.Entities[u]
 		if ent == nil {
 			continue

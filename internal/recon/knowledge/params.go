@@ -18,6 +18,7 @@ const (
 	ReasonMethodProbe    = "method probe"
 	ReasonPathIDProbe    = "path-id-probe"
 	ReasonRedirect       = "redirect"
+	ReasonJSFetch        = "js-fetch"
 )
 
 func (p ParamSource) String() string {
