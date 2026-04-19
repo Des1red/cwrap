@@ -12,9 +12,12 @@ const (
 )
 
 type Identity struct {
-	Name string
-	Kind IdentityKind
-	Role string
+	Name     string
+	Kind     IdentityKind
+	Role     string
+	UserID   string
+	Expiry   string
+	TokenJTI string
 
 	// Mechanism fingerprint
 	CookieNames []string
@@ -24,7 +27,6 @@ type Identity struct {
 	// Behavior evidence
 	IssuedByServer bool
 	Rejected       bool
-
-	Effective bool
-	SentCreds bool
+	Effective      bool
+	SentCreds      bool
 }

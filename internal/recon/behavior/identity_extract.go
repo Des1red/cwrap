@@ -12,22 +12,15 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	// ---- what client SENT ----
 	sentAuth := resp.Request.Header.Get("Authorization") != ""
 	sentCookie := resp.Request.Header.Get("Cookie") != ""
-	// ---- parse SENT cookies too (not only Set-Cookie) ----
+	// ---- parse SENT cookies ----
 	if sentCookie {
 		for _, c := range resp.Request.Cookies() {
-			// optional: track sent cookie names
-			// id.SentCookieNames = append(...)
-
-			// try parse JWT-like cookies (auth_token / refresh_token)
 			if strings.Count(c.Value, ".") == 2 {
-				claims := parseJWT(c.Value)
-				role := extractRoleFromClaims(claims)
-				if role != "" {
-					id.Role = role
-				}
+				extractJWTIntel(id, parseJWT(c.Value))
 			}
 		}
 	}
+
 	id.SentCreds = sentAuth || sentCookie
 	seen := map[string]bool{}
 	// ---- cookies ISSUED by server (Set-Cookie) ----
@@ -39,11 +32,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		id.IssuedByServer = true
 		// try parse cookie as JWT
 		if strings.Count(c.Value, ".") == 2 {
-			claims := parseJWT(c.Value)
-			role := extractRoleFromClaims(claims)
-			if role != "" {
-				id.Role = role
-			}
+			extractJWTIntel(id, parseJWT(c.Value))
 		}
 	}
 
@@ -52,12 +41,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	if strings.HasPrefix(auth, "Bearer ") {
 		id.AuthScheme = "bearer"
 
-		token := strings.TrimPrefix(auth, "Bearer ")
-		claims := parseJWT(token)
-		role := extractRoleFromClaims(claims)
-		if role != "" {
-			id.Role = role
-		}
+		extractJWTIntel(id, parseJWT(strings.TrimPrefix(auth, "Bearer ")))
 	} else if strings.HasPrefix(auth, "Basic ") {
 		id.AuthScheme = "basic"
 	}
@@ -66,7 +50,6 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	if resp.Header.Get("X-CSRF-Token") != "" || resp.Header.Get("X-XSRF-Token") != "" {
 		id.HasCSRF = true
 	}
-
 	// ---- rejection ----
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		id.Rejected = true
@@ -74,26 +57,24 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	if id.IssuedByServer || id.AuthScheme != "" {
 		ent.HTTP.AuthLikely = true
 	}
+
 	// ---- classify kind (simple + useful) ----
 	switch {
 	case id.Rejected:
 		id.Kind = knowledge.IdentityInvalid
-
 	case id.Role != "" && isElevatedRole(id.Role):
 		id.Kind = knowledge.IdentityElevated
-
 	case id.IssuedByServer && resp.StatusCode >= 300 && resp.StatusCode < 400:
 		id.Kind = knowledge.IdentityBootstrap
-
 	case id.IssuedByServer:
 		id.Kind = knowledge.IdentityUser
-
 	case !sentAuth && !sentCookie:
 		id.Kind = knowledge.IdentityNone
 	default:
 		id.Kind = knowledge.IdentityUser
 	}
 
+	// ---- preserve across probes ----
 	if prev, ok := ent.Identities[name]; ok && prev != nil {
 		if prev.Effective {
 			id.Effective = true
@@ -103,6 +84,15 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		}
 		if id.Role == "" && prev.Role != "" {
 			id.Role = prev.Role
+		}
+		if id.UserID == "" && prev.UserID != "" {
+			id.UserID = prev.UserID
+		}
+		if id.Expiry == "" && prev.Expiry != "" {
+			id.Expiry = prev.Expiry
+		}
+		if id.TokenJTI == "" && prev.TokenJTI != "" {
+			id.TokenJTI = prev.TokenJTI
 		}
 	}
 	ent.AddIdentity(id)
@@ -116,7 +106,8 @@ func isElevatedRole(role string) bool {
 		strings.Contains(r, "root"),
 		strings.Contains(r, "super"),
 		strings.Contains(r, "staff"),
-		strings.Contains(r, "mod"):
+		strings.Contains(r, "mod"),
+		strings.Contains(r, "owner"):
 		return true
 	}
 	return false

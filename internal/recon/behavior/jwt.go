@@ -1,9 +1,12 @@
 package behavior
 
 import (
+	"cwrap/internal/recon/knowledge"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
+	"time"
 )
 
 type jwtClaims map[string]any
@@ -41,10 +44,27 @@ func extractRoleFromClaims(c jwtClaims) string {
 	if c == nil {
 		return ""
 	}
-
 	if r, ok := c["role"].(string); ok {
 		return strings.ToLower(r)
 	}
-
 	return ""
+}
+
+func extractJWTIntel(id *knowledge.Identity, claims jwtClaims) {
+	if claims == nil {
+		return
+	}
+	if r, ok := claims["role"].(string); ok {
+		id.Role = strings.ToLower(r)
+	}
+	if uid, ok := claims["user_id"]; ok {
+		id.UserID = fmt.Sprintf("%v", uid)
+	}
+	if exp, ok := claims["exp"].(float64); ok {
+		t := time.Unix(int64(exp), 0)
+		id.Expiry = t.UTC().Format("2006-01-02 15:04")
+	}
+	if jti, ok := claims["jti"].(string); ok {
+		id.TokenJTI = jti
+	}
 }

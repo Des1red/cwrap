@@ -272,6 +272,12 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 				if id.Role != "" {
 					tags = append(tags, "role="+id.Role)
 				}
+				if id.UserID != "" {
+					tags = append(tags, "uid="+id.UserID)
+				}
+				if id.Expiry != "" {
+					tags = append(tags, "exp="+id.Expiry)
+				}
 				if id.AuthScheme != "" {
 					tags = append(tags, "scheme="+id.AuthScheme)
 				}
