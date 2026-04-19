@@ -1,5 +1,7 @@
 package behavior
 
+import "cwrap/internal/recon/knowledge"
+
 func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int, probeFP map[string]string) {
 	baseline, okB := identityStatuses["baseline"]
 	if !okB {
@@ -33,6 +35,27 @@ func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int, probeFP
 			if idFP != "" && idFP != baseFP {
 				e.raiseAuthConfidence(3)
 			}
+		}
+	}
+}
+
+func (e *Engine) detectRoleBoundary(ent *knowledge.Entity, identityStatuses map[string]int) {
+	for idName, status := range identityStatuses {
+		id := ent.Identities[idName]
+		if e.debug {
+			println("[RB DEBUG]", idName, "status:", status)
+			if id != nil {
+				println("[RB DEBUG]", idName, "SentCreds:", id.SentCreds)
+			} else {
+				println("[RB DEBUG]", idName, "identity is nil")
+			}
+		}
+		if status != 403 {
+			continue
+		}
+		if id != nil && id.SentCreds {
+			ent.Tag(knowledge.SigRoleBoundary)
+			return
 		}
 	}
 }

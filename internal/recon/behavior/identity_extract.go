@@ -93,8 +93,17 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	default:
 		id.Kind = knowledge.IdentityUser
 	}
-	if prev, ok := ent.Identities[name]; ok && prev != nil && prev.Effective {
-		id.Effective = true
+
+	if prev, ok := ent.Identities[name]; ok && prev != nil {
+		if prev.Effective {
+			id.Effective = true
+		}
+		if prev.SentCreds {
+			id.SentCreds = true
+		}
+		if id.Role == "" && prev.Role != "" {
+			id.Role = prev.Role
+		}
 	}
 	ent.AddIdentity(id)
 }

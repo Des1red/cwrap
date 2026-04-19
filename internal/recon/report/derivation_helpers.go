@@ -97,15 +97,22 @@ func deriveFindings(ent *knowledge.Entity) []string {
 	if ent.SeenSignal(knowledge.SigAdminSurface) {
 		out = append(out, "Administrative surface detected")
 	}
+
 	if ent.SeenSignal(knowledge.SigFileUpload) {
 		out = append(out, "File upload surface detected")
 	}
+
 	if ent.SeenSignal(knowledge.SigSensitiveKeyword) {
 		out = append(out, "Sensitive keywords detected in content/JS")
 	}
+
 	if ent.SeenSignal(knowledge.SigAuthBoundary) {
 		out = append(out, "Authentication/authorization boundary observed")
 	}
+	if ent.SeenSignal(knowledge.SigRoleBoundary) {
+		out = append(out, "Role/permission boundary observed — authenticated identity denied access")
+	}
+
 	if ent.SeenSignal(knowledge.SigObjectOwnership) {
 		out = append(out, "Object ownership enforcement observed")
 	}
@@ -203,6 +210,14 @@ func deriveNextSteps(ent *knowledge.Entity) []string {
 			"Test weak credentials and default accounts",
 			"Attempt username enumeration",
 			"Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)",
+		)
+	}
+
+	if ent.SeenSignal(knowledge.SigRoleBoundary) {
+		out = append(out,
+			"Test vertical privilege escalation — attempt access with lower-privilege token",
+			"Probe role confusion via header injection (X-User-Role, X-Forwarded-User)",
+			"Check if role is encoded in JWT claims and attempt tampering",
 		)
 	}
 

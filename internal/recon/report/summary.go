@@ -18,6 +18,7 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 		edgeCount       = len(k.Edges)
 		globalParamCnt  = len(k.Params)
 		hasAuthBoundary = false
+		hasRoleBoundary = false
 		hasOwnership    = false
 		possibleIDOR    = 0
 		adminSurface    = 0
@@ -37,6 +38,9 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 			hasOwnership = true
 		}
 
+		if ent.SeenSignal(knowledge.SigRoleBoundary) {
+			hasRoleBoundary = true
+		}
 		for _, p := range ent.Params {
 			if p == nil {
 				continue
@@ -72,6 +76,7 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 	fmt.Fprintf(w, "Global parameters:   %d\n", globalParamCnt)
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "Auth boundary:       %v\n", yesNo(hasAuthBoundary))
+	fmt.Fprintf(w, "Role boundary:       %v\n", yesNo(hasRoleBoundary))
 	fmt.Fprintf(w, "Ownership boundary:  %v\n", yesNo(hasOwnership))
 	fmt.Fprintf(w, "IDOR surfaces:       %d\n", possibleIDOR)
 	fmt.Fprintf(w, "Admin surfaces:      %d\n", adminSurface)

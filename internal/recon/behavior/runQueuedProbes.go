@@ -138,6 +138,9 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 
 		// auth gate detection is GLOBAL behavior mode, keep it as-is
 		e.detectEndpointAuthGate(identityStatuses, probeFP)
+		// entity-level role boundary detection
+		// runs directly off identity statuses, not param maps
+		e.detectRoleBoundary(target, identityStatuses)
 
 		// Choose a reference fingerprint (prefer a no-creds identity if available)
 		ref := ""

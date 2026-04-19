@@ -358,25 +358,46 @@ func (e *Engine) analyzeAuthBoundary(ent *knowledge.Entity, statuses map[string]
 		}
 
 		has200 := false
-		hasDenied := false
+		has401 := false
+		has403Anon := false   // 403 from unauthenticated identity
+		has403Authed := false // 403 from authenticated identity
 
 		for _, byID := range byVal {
-			if anyStatusIs(byID, 200) {
-				has200 = true
-			}
-			if anyStatusIs(byID, 401, 403) {
-				hasDenied = true
+			for idName, status := range byID {
+				id := ent.Identities[idName]
+				switch status {
+				case 200:
+					has200 = true
+				case 401:
+					has401 = true
+				case 403:
+					if id != nil && id.SentCreds {
+						if e.debug {
+							println("[DEBUG] 403 authed:", idName, "SentCreds:", id.SentCreds)
+						}
+						has403Authed = true
+					} else {
+						has403Anon = true
+					}
+				}
 			}
 		}
 
-		if has200 && hasDenied {
+		// auth boundary: endpoint sometimes allows access (200) and sometimes denies
+		if has200 && (has401 || has403Anon) {
 			p.AuthBoundary = true
 			p.ObservedChanges["auth-wall-mixed-status"] = true
 			ent.Tag(knowledge.SigAuthBoundary)
 		}
+
+		// role boundary: authenticated identity was denied — permission wall beyond auth
+		if has403Authed {
+			p.AuthBoundary = true
+			p.ObservedChanges["role-wall-403-authenticated"] = true
+			ent.Tag(knowledge.SigRoleBoundary)
+		}
 	}
 }
-
 func (e *Engine) analyzeMethods(ent *knowledge.Entity) {
 
 	if len(ent.HTTP.Methods) == 0 {

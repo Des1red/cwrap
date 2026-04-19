@@ -9,6 +9,7 @@ const (
 	SigHasJSONBody
 	SigStateChanging
 	SigAuthBoundary
+	SigRoleBoundary
 	SigTokenLike
 	SigIDLikeParam
 	SigDebugFlag
@@ -32,6 +33,8 @@ func (s Signal) String() string {
 		return "StateChanging"
 	case SigAuthBoundary:
 		return "AuthBoundary"
+	case SigRoleBoundary:
+		return "RoleBoundary"
 	case SigTokenLike:
 		return "TokenLike"
 	case SigIDLikeParam:
