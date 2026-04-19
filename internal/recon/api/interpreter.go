@@ -19,5 +19,9 @@ func (i interpreter) Canonicalize(body []byte, param string) ([]byte, error) {
 }
 
 func (i interpreter) ClassifyParam(ent *knowledge.Entity, name string) {
-	paramintel.ClassifyParam(ent, ent.Params[name])
+	p, ok := ent.Params[name]
+	if !ok {
+		return
+	}
+	paramintel.ClassifyParam(ent, p)
 }

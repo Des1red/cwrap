@@ -2,6 +2,7 @@ package http
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/recon/paramintel"
 	"net/http"
 )
 
@@ -17,6 +18,12 @@ func (i interpreter) Canonicalize(body []byte, param string) ([]byte, error) {
 	return body, nil // no JSON normalization
 }
 
-func (i interpreter) Classify(ent *knowledge.Entity, name string) {
-	i.ClassifyParam(ent, name)
+func (i interpreter) ClassifyParam(ent *knowledge.Entity, name string) {
+
+	p, ok := ent.Params[name]
+	if !ok {
+		return
+	}
+
+	paramintel.ClassifyParam(ent, p)
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/recon/paramintel"
 	"encoding/json"
 )
 
@@ -40,6 +41,7 @@ func walkJSON(e *Engine, ent *knowledge.Entity, v any) {
 
 			ent.AddParam(k, knowledge.ParamJSON)
 			e.k.AddParam(k)
+			paramintel.ClassifyParam(ent, ent.Params[k])
 			walkJSON(e, ent, sub)
 		}
 

@@ -67,6 +67,5 @@ func Learn(ent *knowledge.Entity, resp *http.Response) {
 	// ---- auth boundary ----
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		ent.HTTP.AuthLikely = true
-		ent.Tag(knowledge.SigAuthBoundary)
 	}
 }

@@ -30,21 +30,15 @@ func (e *Engine) handleJSEndpoints(
 	sourceURL string,
 	endpoints []jsintel.JSEndpoint,
 ) {
-
 	for _, ep := range endpoints {
-
 		link, ok := e.normalizeLink(sourceURL, ep.Path)
 		if !ok {
 			continue
 		}
 
-		// Graph edge
 		e.k.AddEdge(sourceURL, link, knowledge.EdgeDiscoveredFromJS)
 
-		// Priority base
 		priority := 50
-
-		// State-changing methods get higher priority
 		switch ep.Method {
 		case "POST", "PUT", "PATCH", "DELETE":
 			priority = 70
@@ -52,13 +46,12 @@ func (e *Engine) handleJSEndpoints(
 			ent.AddMethod(ep.Method)
 		}
 
-		// Sensitive/admin paths get boost
 		if isSensitivePath(link) {
 			priority += 20
 			ent.Tag(knowledge.SigAdminSurface)
 		}
 
-		ent.ProbeQueue.Push(knowledge.Probe{
+		e.k.PushProbe(ent, knowledge.Probe{
 			URL:      link,
 			Method:   ep.Method,
 			Reason:   "js-" + ep.Kind,

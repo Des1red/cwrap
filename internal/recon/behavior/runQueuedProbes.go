@@ -189,8 +189,8 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		if target != root {
 			for target.ProbeQueue.Len() > 0 {
 				p, ok := target.ProbeQueue.PopBest()
-				if ok && !root.SeenProbes[p.Key()] {
-					root.ProbeQueue.Push(p)
+				if ok {
+					e.k.PushProbe(root, p)
 				}
 			}
 		}

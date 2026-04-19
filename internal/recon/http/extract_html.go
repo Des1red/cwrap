@@ -117,10 +117,10 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 							priority = 20
 						}
 
-						ent.ProbeQueue.Push(knowledge.Probe{
+						e.k.PushProbe(ent, knowledge.Probe{
 							URL:      link,
 							Method:   method,
-							AddQuery: fi.HiddenPairs, // differentiate distinct forms
+							AddQuery: fi.HiddenPairs,
 							Reason:   "form-action",
 							Priority: priority,
 							Created:  time.Now(),

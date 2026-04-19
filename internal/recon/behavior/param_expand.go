@@ -266,20 +266,7 @@ func (e *Engine) expandEnumeration(ent *knowledge.Entity) {
 }
 
 func (e *Engine) pushProbe(ent *knowledge.Entity, p knowledge.Probe) {
-
-	key := p.Key()
-
-	if ent.SeenProbes[key] {
-		return
-	}
-
-	// Only mark immediately for non-root entities.
-	// Root's SeenProbes is owned by the scheduler in runQueuedProbes.
-	root := e.k.Entity(e.k.Target)
-	if ent != root {
-		ent.SeenProbes[key] = true
-	}
-	ent.ProbeQueue.Push(p)
+	e.k.PushProbe(ent, p)
 }
 
 func (e *Engine) expandMethods(ent *knowledge.Entity) {

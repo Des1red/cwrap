@@ -30,19 +30,33 @@ func (q *ProbeQueue) Len() int {
 
 // Push dedupes by Probe.Key() (method|url|reason + sorted query + sorted headers)
 // to avoid probe spam while still allowing distinct variations.
-func (q *ProbeQueue) Push(p Probe) {
+func (q *ProbeQueue) push(p Probe) {
 	if p.URL == "" || p.Method == "" {
 		return
 	}
-	for i := range q.items {
-		if q.items[i].Key() == p.Key() {
-			if p.Priority > q.items[i].Priority {
-				q.items[i].Priority = p.Priority
-			}
+	q.items = append(q.items, p)
+}
+
+func (k *Knowledge) PushProbe(target *Entity, p Probe) {
+	if p.URL == "" || p.Method == "" {
+		return
+	}
+
+	root := k.Entity(k.Target)
+	key := p.Key()
+
+	if root.SeenProbes[key] {
+		return
+	}
+
+	if target != root {
+		if target.SeenProbes[key] {
 			return
 		}
+		target.SeenProbes[key] = true
 	}
-	q.items = append(q.items, p)
+
+	target.ProbeQueue.push(p)
 }
 
 func (q *ProbeQueue) PopBest() (Probe, bool) {

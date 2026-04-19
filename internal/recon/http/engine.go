@@ -4,12 +4,10 @@ import (
 	"cwrap/internal/model"
 	"cwrap/internal/recon/behavior"
 	"cwrap/internal/recon/knowledge"
-	"time"
 )
 
 type Engine struct {
-	k           *knowledge.Knowledge
-	dumpSecrets bool
+	k *knowledge.Knowledge
 }
 
 func New() *Engine {
@@ -28,17 +26,4 @@ func (e *Engine) Run(req model.Request) (*knowledge.Knowledge, error) {
 	}
 
 	return e.k, nil
-}
-
-func (e *Engine) enqueueFormProbe(ent *knowledge.Entity, url string, method string) {
-
-	p := knowledge.Probe{
-		URL:      url,
-		Method:   method,
-		Reason:   "form-action",
-		Priority: 60, // higher than generic links
-		Created:  time.Now(),
-	}
-
-	ent.ProbeQueue.Push(p)
 }
