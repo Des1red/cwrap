@@ -150,7 +150,7 @@ func deriveFindings(ent *knowledge.Entity) []string {
 		}
 
 		// Unauthenticated access hint
-		if p.IdentityAccess != nil && p.IdentityAccess["anonymous"] > 0 {
+		if p.IdentityAccess != nil && p.IdentityAccess["anonymous"] > 0 && len(p.IdentityDenied) > 0 {
 			out = append(out, fmt.Sprintf("Unauthenticated access observed (identity: anonymous) via param behavior: %s", name))
 		}
 	}

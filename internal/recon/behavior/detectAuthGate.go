@@ -41,6 +41,10 @@ func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int, probeFP
 
 func (e *Engine) detectRoleBoundary(ent *knowledge.Entity, identityStatuses map[string]int) {
 	for idName, status := range identityStatuses {
+		if status != 401 && status != 403 {
+			continue
+		}
+
 		id := ent.Identities[idName]
 		if e.debug {
 			println("[RB DEBUG]", idName, "status:", status)
@@ -50,9 +54,7 @@ func (e *Engine) detectRoleBoundary(ent *knowledge.Entity, identityStatuses map[
 				println("[RB DEBUG]", idName, "identity is nil")
 			}
 		}
-		if status != 403 {
-			continue
-		}
+
 		if id != nil && id.SentCreds {
 			ent.Tag(knowledge.SigRoleBoundary)
 			return

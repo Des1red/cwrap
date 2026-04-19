@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-// ---- full report ----
-
 func writeFullReport(w io.Writer, k *knowledge.Knowledge) {
 	now := time.Now().Format("2006-01-02 15:04:05")
 
@@ -38,7 +36,6 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 	fmt.Fprintf(w, "Edges:             %d\n", len(k.Edges))
 	fmt.Fprintf(w, "Global parameters: %d\n", len(k.Params))
 
-	// Signals rollup
 	sigCounts := make(map[string]int)
 	for _, u := range urls {
 		ent := k.Entities[u]
@@ -72,29 +69,22 @@ func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
 	fmt.Fprintln(w, "DISCOVERY TREE")
 	fmt.Fprintln(w, "------------------------------------------------")
 
-	// Build adjacency from edges.
 	type child struct {
 		to    string
 		etype knowledge.EdgeType
 	}
 	adj := make(map[string][]child)
-
-	// also ensure nodes exist even if no edges
 	for u := range k.Entities {
 		if _, ok := adj[u]; !ok {
 			adj[u] = nil
 		}
 	}
-
 	for _, e := range k.Edges {
 		adj[e.From] = append(adj[e.From], child{to: e.To, etype: e.Type})
-		// ensure target key exists
 		if _, ok := adj[e.To]; !ok {
 			adj[e.To] = nil
 		}
 	}
-
-	// Sort children deterministically.
 	for from := range adj {
 		cs := adj[from]
 		sort.Slice(cs, func(i, j int) bool {
@@ -106,8 +96,6 @@ func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
 		adj[from] = cs
 	}
 
-	// Pick root:
-	// Prefer k.Target if it matches an entity key; otherwise use lexicographically first entity.
 	root := ""
 	if k.Target != "" {
 		if _, ok := k.Entities[k.Target]; ok {
@@ -120,7 +108,6 @@ func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
 			root = urls[0]
 		}
 	}
-
 	if root == "" {
 		fmt.Fprintln(w, "(no entities)")
 		fmt.Fprintln(w)
@@ -128,46 +115,33 @@ func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
 	}
 
 	fmt.Fprintln(w, root)
-
-	// DFS with cycle protection (graph can have cycles).
 	var walk func(node string, prefix string, stack map[string]bool)
 	walk = func(node string, prefix string, stack map[string]bool) {
 		children := adj[node]
 		for i, c := range children {
 			last := i == len(children)-1
-
 			branch := "├── "
 			nextPrefix := prefix + "│   "
 			if last {
 				branch = "└── "
 				nextPrefix = prefix + "    "
 			}
-
-			edgeTag := edgeTypeLabel(c.etype)
 			line := fmt.Sprintf("%s%s%s", prefix, branch, c.to)
-			if edgeTag != "" {
-				line += "  [" + edgeTag + "]"
+			if tag := edgeTypeLabel(c.etype); tag != "" {
+				line += "  [" + tag + "]"
 			}
-
-			// cycle marker
 			if stack[c.to] {
 				line += "  (cycle)"
 				fmt.Fprintln(w, line)
 				continue
 			}
-
 			fmt.Fprintln(w, line)
-
-			// recurse
 			stack2 := copySet(stack)
 			stack2[c.to] = true
 			walk(c.to, nextPrefix, stack2)
 		}
 	}
-
-	stack := map[string]bool{root: true}
-	walk(root, "", stack)
-
+	walk(root, "", map[string]bool{root: true})
 	fmt.Fprintln(w)
 }
 
@@ -194,11 +168,10 @@ func copySet(in map[string]bool) map[string]bool {
 
 func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 	fmt.Fprintln(w, "------------------------------------------------")
-	fmt.Fprintln(w, "ENTITY INTELLIGENCE (DETAILED)")
+	fmt.Fprintln(w, "ENTITY INTELLIGENCE")
 	fmt.Fprintln(w, "------------------------------------------------")
 
-	urls := sortedEntityURLs(k)
-	for _, u := range urls {
+	for _, u := range sortedEntityURLs(k) {
 		ent := k.Entities[u]
 		if ent == nil {
 			continue
@@ -206,147 +179,126 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "[ENTITY]", ent.URL)
+		fmt.Fprintf(w, "  Probes: %d\n", ent.State.ProbeCount)
 
-		// State
-		fmt.Fprintln(w, "State:")
-		fmt.Fprintf(w, "  Seen:       %v\n", ent.State.Seen)
-		fmt.Fprintf(w, "  ProbeCount: %d\n", ent.State.ProbeCount)
-
-		// HTTP
-		fmt.Fprintln(w, "HTTP:")
-		fmt.Fprintf(w, "  AuthLikely:  %v\n", ent.HTTP.AuthLikely)
-		fmt.Fprintf(w, "  CSRFPresent: %v\n", ent.HTTP.CSRFPresent)
-
+		// HTTP — only print non-empty/true fields
 		methods := sortedKeys(ent.HTTP.Methods)
-		fmt.Fprintln(w, "  Methods:")
-		if len(methods) == 0 {
-			fmt.Fprintln(w, "    (none)")
-		} else {
-			for _, m := range methods {
-				fmt.Fprintln(w, "    -", m)
-			}
+		if len(methods) > 0 {
+			fmt.Fprintf(w, "  Methods: %v\n", methods)
+		}
+		if ent.HTTP.AuthLikely {
+			fmt.Fprintln(w, "  AuthLikely: true")
+		}
+		if ent.HTTP.CSRFPresent {
+			fmt.Fprintln(w, "  CSRFPresent: true")
 		}
 
-		headers := sortedKeys(ent.HTTP.Headers)
-		fmt.Fprintln(w, "  Headers:")
-		if len(headers) == 0 {
-			fmt.Fprintln(w, "    (none)")
-		} else {
-			for _, h := range headers {
-				fmt.Fprintln(w, "    -", h)
-			}
+		// Content — only print true content type
+		if ent.Content.LooksLikeHTML {
+			fmt.Fprintln(w, "  Content: HTML")
+		} else if ent.Content.LooksLikeJSON {
+			fmt.Fprintln(w, "  Content: JSON")
+		} else if ent.Content.LooksLikeXML {
+			fmt.Fprintln(w, "  Content: XML")
 		}
 
-		// Content
-		fmt.Fprintln(w, "Content:")
-		fmt.Fprintf(w, "  LooksLikeHTML: %v\n", ent.Content.LooksLikeHTML)
-		fmt.Fprintf(w, "  LooksLikeJSON: %v\n", ent.Content.LooksLikeJSON)
-		fmt.Fprintf(w, "  LooksLikeXML:  %v\n", ent.Content.LooksLikeXML)
-
-		fmt.Fprintln(w, "  Statuses:")
-		if len(ent.Content.Statuses) == 0 {
-			fmt.Fprintln(w, "    (none)")
-		} else {
+		// Statuses
+		if len(ent.Content.Statuses) > 0 {
 			codes := make([]int, 0, len(ent.Content.Statuses))
 			for c := range ent.Content.Statuses {
 				codes = append(codes, c)
 			}
 			sort.Ints(codes)
+			fmt.Fprint(w, "  Statuses:")
 			for _, c := range codes {
-				fmt.Fprintf(w, "    %d: %d\n", c, ent.Content.Statuses[c])
+				fmt.Fprintf(w, " %d×%d", c, ent.Content.Statuses[c])
 			}
-		}
-
-		fmt.Fprintln(w, "  MIMEs:")
-		if len(ent.Content.MIMEs) == 0 {
-			fmt.Fprintln(w, "    (none)")
-		} else {
-			mimes := make([]string, 0, len(ent.Content.MIMEs))
-			for m := range ent.Content.MIMEs {
-				mimes = append(mimes, m)
-			}
-			sort.Strings(mimes)
-			for _, m := range mimes {
-				fmt.Fprintf(w, "    %s: %d\n", m, ent.Content.MIMEs[m])
-			}
+			fmt.Fprintln(w)
 		}
 
 		// Signals
-		fmt.Fprintln(w, "Signals:")
-		sigs := activeSignals(ent)
-		if len(sigs) == 0 {
-			fmt.Fprintln(w, "  (none)")
-		} else {
-			for _, s := range sigs {
-				fmt.Fprintln(w, "  -", s)
+		if sigs := activeSignals(ent); len(sigs) > 0 {
+			fmt.Fprintf(w, "  Signals: %v\n", sigs)
+		}
+
+		// Session — only if something happened
+		if ent.SessionUsed || ent.SessionIssued || len(ent.SessionCookies) > 0 {
+			fmt.Fprintln(w, "  Session:")
+			if ent.SessionUsed {
+				fmt.Fprintln(w, "    Used: true")
+			}
+			if ent.SessionIssued {
+				fmt.Fprintln(w, "    Issued: true")
+			}
+			if len(ent.SessionCookies) > 0 {
+				names := make([]string, 0, len(ent.SessionCookies))
+				for n := range ent.SessionCookies {
+					names = append(names, n)
+				}
+				sort.Strings(names)
+				for _, n := range names {
+					fmt.Fprintf(w, "    - %s=%s\n", n, ent.SessionCookies[n])
+				}
 			}
 		}
 
-		// Session (raw cookies/tokens)
-		fmt.Fprintln(w, "Session:")
-		fmt.Fprintf(w, "  Used:   %v\n", ent.SessionUsed)
-		fmt.Fprintf(w, "  Issued: %v\n", ent.SessionIssued)
-		fmt.Fprintln(w, "  Cookies:")
-		if len(ent.SessionCookies) == 0 {
-			fmt.Fprintln(w, "    (none)")
-		} else {
-			names := make([]string, 0, len(ent.SessionCookies))
-			for n := range ent.SessionCookies {
-				names = append(names, n)
-			}
-			sort.Strings(names)
-			for _, n := range names {
-				// Option A: raw value, no masking.
-				fmt.Fprintf(w, "    - %s=%s\n", n, ent.SessionCookies[n])
-			}
-		}
-
-		// Identities
-		fmt.Fprintln(w, "Identities:")
-		if len(ent.Identities) == 0 && len(ent.IdentityIndex) == 0 {
-			fmt.Fprintln(w, "  (none)")
-		} else {
-			// Prefer stable list: union of names (ent.Identities is name->id).
+		// Identities — only print fields that carry information
+		if len(ent.Identities) > 0 {
+			fmt.Fprintln(w, "  Identities:")
 			names := make([]string, 0, len(ent.Identities))
 			for n := range ent.Identities {
 				names = append(names, n)
 			}
 			sort.Strings(names)
-
 			for _, name := range names {
 				id := ent.Identities[name]
 				if id == nil {
 					continue
 				}
-				fmt.Fprintln(w, "  Name:", id.Name)
-				fmt.Fprintln(w, "    Kind:", identityKindLabel(id.Kind))
-				if id.Role != "" {
-					fmt.Fprintln(w, "    Role:", id.Role)
-				} else {
-					fmt.Fprintln(w, "    Role:", "(none)")
+				tags := []string{}
+				tags = append(tags, identityKindLabel(id.Kind))
+				if id.SentCreds {
+					tags = append(tags, "creds")
 				}
-				fmt.Fprintln(w, "    Effective:", id.Effective)
-				fmt.Fprintln(w, "    SentCreds:", id.SentCreds)
-				fmt.Fprintln(w, "    Rejected:", id.Rejected)
-				fmt.Fprintln(w, "    IssuedByServer:", id.IssuedByServer)
-				fmt.Fprintln(w, "    AuthScheme:", emptyAsNone(id.AuthScheme))
-				fmt.Fprintln(w, "    HasCSRF:", id.HasCSRF)
-				fmt.Fprintln(w, "    CookieNames:")
-				if len(id.CookieNames) == 0 {
-					fmt.Fprintln(w, "      (none)")
-				} else {
-					for _, cn := range id.CookieNames {
-						fmt.Fprintln(w, "      -", cn)
-					}
+				if id.Rejected {
+					tags = append(tags, "rejected")
+				}
+				if id.IssuedByServer {
+					tags = append(tags, "issued-token")
+				}
+				if id.Effective {
+					tags = append(tags, "effective")
+				}
+				if id.Role != "" {
+					tags = append(tags, "role="+id.Role)
+				}
+				if id.AuthScheme != "" {
+					tags = append(tags, "scheme="+id.AuthScheme)
+				}
+				if id.HasCSRF {
+					tags = append(tags, "csrf")
+				}
+				fmt.Fprintf(w, "    %s: %v\n", name, tags)
+				if len(id.CookieNames) > 0 {
+					fmt.Fprintf(w, "      cookies: %v\n", id.CookieNames)
 				}
 			}
 		}
 
-		// Parameters
-		fmt.Fprintln(w, "Parameters:")
-		if len(ent.Params) == 0 {
-			fmt.Fprintln(w, "  (none)")
-		} else {
+		// Parameters — skip entirely if injected-only with zero evidence
+		hasInterestingParams := false
+		for _, p := range ent.Params {
+			if p == nil {
+				continue
+			}
+			if paramHasEvidence(p) {
+				hasInterestingParams = true
+				break
+			}
+		}
+
+		if hasInterestingParams || hasNonInjectedParams(ent) {
+			fmt.Fprintln(w, "  Parameters:")
 			pnames := make([]string, 0, len(ent.Params))
 			for n := range ent.Params {
 				pnames = append(pnames, n)
@@ -358,147 +310,174 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 				if p == nil {
 					continue
 				}
-				fmt.Fprintln(w, "  Name:", p.Name)
 
-				// Sources
-				fmt.Fprintln(w, "    Sources:")
-
-				srcs := make([]string, 0)
-				for s, on := range p.Sources {
-					if on {
-						srcs = append(srcs, paramSourceLabel(p, s))
-					}
-				}
-				// If no source recorded, treat as scanner injected
-				if len(srcs) == 0 {
-					srcs = append(srcs, paramSourceLabel(p, knowledge.ParamInjected))
-				}
-				sort.Strings(srcs)
-				for _, s := range srcs {
-					fmt.Fprintln(w, "      -", s)
+				// skip injected params with zero evidence entirely
+				if p.InjectedOnly() && !paramHasEvidence(p) {
+					continue
 				}
 
-				// Heuristics
-				fmt.Fprintln(w, "    Heuristics:")
-				fmt.Fprintln(w, "      IDLike:", p.IDLike)
-				fmt.Fprintln(w, "      TokenLike:", p.TokenLike)
-				fmt.Fprintln(w, "      DebugLike:", p.DebugLike)
-				fmt.Fprintln(w, "      LikelyReflection:", p.LikelyReflection)
-				fmt.Fprintln(w, "      LikelyObjectAccess:", p.LikelyObjectAccess)
+				src := paramSourceShort(p)
+				tags := []string{src}
+				if p.IDLike {
+					tags = append(tags, "IDLike")
+				}
+				if p.TokenLike {
+					tags = append(tags, "TokenLike")
+				}
+				if p.DebugLike {
+					tags = append(tags, "DebugLike")
+				}
+				if p.LikelyReflection {
+					tags = append(tags, "Reflection")
+				}
+				if p.LikelyObjectAccess {
+					tags = append(tags, "ObjectAccess")
+				}
+				if p.Enumerable {
+					tags = append(tags, "Enumerable")
+				}
+				if p.AuthBoundary {
+					tags = append(tags, "AuthBoundary")
+				}
+				if p.OwnershipBoundary {
+					tags = append(tags, "OwnershipBoundary")
+				}
+				if p.PossibleIDOR {
+					tags = append(tags, "PossibleIDOR")
+				}
+				if p.SuspectIDOR {
+					tags = append(tags, "SuspectIDOR")
+				}
+				if p.Interest > 0 {
+					tags = append(tags, fmt.Sprintf("interest=%d", p.Interest))
+				}
 
-				// Evidence / boundaries
-				fmt.Fprintln(w, "    Evidence:")
-				fmt.Fprintln(w, "      Enumerable:", p.Enumerable)
-				fmt.Fprintln(w, "      AuthBoundary:", p.AuthBoundary)
-				fmt.Fprintln(w, "      OwnershipBoundary:", p.OwnershipBoundary)
-				fmt.Fprintln(w, "      PossibleIDOR:", p.PossibleIDOR)
-				fmt.Fprintln(w, "      SuspectIDOR:", p.SuspectIDOR)
-				fmt.Fprintln(w, "      Interest:", p.Interest)
+				fmt.Fprintf(w, "    %s: %v\n", name, tags)
 
-				// Observed changes
-				fmt.Fprintln(w, "    ObservedChanges:")
-				if len(p.ObservedChanges) == 0 {
-					fmt.Fprintln(w, "      (none)")
-				} else {
+				if len(p.ObservedChanges) > 0 {
 					keys := make([]string, 0, len(p.ObservedChanges))
 					for k := range p.ObservedChanges {
 						keys = append(keys, k)
 					}
 					sort.Strings(keys)
-					for _, k := range keys {
-						fmt.Fprintln(w, "      -", k)
-					}
+					fmt.Fprintf(w, "      changes: %v\n", keys)
 				}
 
-				// Identity access/denied maps
-				fmt.Fprintln(w, "    IdentityAccess:")
-				writeStringIntMap(w, "      ", p.IdentityAccess)
-				fmt.Fprintln(w, "    IdentityDenied:")
-				writeStringIntMap(w, "      ", p.IdentityDenied)
+				if len(p.IdentityAccess) > 0 {
+					fmt.Fprintf(w, "      access: %v\n", p.IdentityAccess)
+				}
+				if len(p.IdentityDenied) > 0 {
+					fmt.Fprintf(w, "      denied: %v\n", p.IdentityDenied)
+				}
 			}
 		}
 
-		// JS Intelligence
-		fmt.Fprintln(w, "JS Intelligence:")
-		if len(ent.Content.JSFindings) == 0 && len(ent.Content.JSLeaks) == 0 {
-			fmt.Fprintln(w, "  (none)")
-		} else {
-			fmt.Fprintln(w, "  Findings:")
-			if len(ent.Content.JSFindings) == 0 {
-				fmt.Fprintln(w, "    (none)")
-			} else {
+		// JS Intelligence — only if something found
+		if len(ent.Content.JSFindings) > 0 || len(ent.Content.JSLeaks) > 0 {
+			fmt.Fprintln(w, "  JS Intelligence:")
+			if len(ent.Content.JSFindings) > 0 {
 				keys := make([]string, 0, len(ent.Content.JSFindings))
 				for k := range ent.Content.JSFindings {
 					keys = append(keys, k)
 				}
 				sort.Strings(keys)
 				for _, k := range keys {
-					fmt.Fprintf(w, "    - %s: %d\n", k, ent.Content.JSFindings[k])
+					fmt.Fprintf(w, "    %s: %d\n", k, ent.Content.JSFindings[k])
 				}
 			}
-
-			fmt.Fprintln(w, "  Leaks:")
-			if len(ent.Content.JSLeaks) == 0 {
-				fmt.Fprintln(w, "    (none)")
-			} else {
-				for _, leak := range ent.Content.JSLeaks {
-					fmt.Fprintln(w, "    - Kind:", leak.Kind)
-					fmt.Fprintln(w, "      Source:", leak.Source)
-					fmt.Fprintln(w, "      Key:", emptyAsNone(leak.Key))
-					// Option A: raw value, no masking.
-					fmt.Fprintln(w, "      Value:", leak.Value)
-				}
+			for _, leak := range ent.Content.JSLeaks {
+				fmt.Fprintf(w, "    [%s] %s: %s\n", leak.Kind, leak.Key, leak.Value)
 			}
 		}
 
-		// Findings
-		fmt.Fprintln(w, "Findings:")
+		// Findings and Next Steps — always print if present
 		findings := deriveFindings(ent)
-		if len(findings) == 0 {
-			fmt.Fprintln(w, "  (none)")
-		} else {
+		if len(findings) > 0 {
+			fmt.Fprintln(w, "  Findings:")
 			for _, f := range findings {
-				fmt.Fprintln(w, "  -", f)
+				fmt.Fprintln(w, "    !", f)
 			}
 		}
 
-		// Next Steps
-		fmt.Fprintln(w, "Next Steps:")
 		steps := deriveNextSteps(ent)
-		if len(steps) == 0 {
-			fmt.Fprintln(w, "  (none)")
-		} else {
+		if len(steps) > 0 {
+			fmt.Fprintln(w, "  Next Steps:")
 			for _, s := range steps {
-				fmt.Fprintln(w, "  -", s)
+				fmt.Fprintln(w, "    >", s)
 			}
 		}
 	}
 }
 
+// paramHasEvidence returns true if a param has any non-default evidence worth reporting.
+func paramHasEvidence(p *knowledge.ParamIntel) bool {
+	if p.LikelyReflection || p.LikelyObjectAccess || p.Enumerable {
+		return true
+	}
+	if p.AuthBoundary || p.OwnershipBoundary || p.PossibleIDOR || p.SuspectIDOR {
+		return true
+	}
+	if p.Interest > 0 {
+		return true
+	}
+	if len(p.ObservedChanges) > 0 {
+		return true
+	}
+	// access is only meaningful if there's also denial — mixed access = auth boundary evidence
+	if len(p.IdentityAccess) > 0 && len(p.IdentityDenied) > 0 {
+		return true
+	}
+	// denial alone is always meaningful
+	if len(p.IdentityDenied) > 0 {
+		return true
+	}
+	return false
+}
+
+// hasNonInjectedParams returns true if entity has any params from real sources.
+func hasNonInjectedParams(ent *knowledge.Entity) bool {
+	for _, p := range ent.Params {
+		if p == nil {
+			continue
+		}
+		if !p.InjectedOnly() {
+			return true
+		}
+	}
+	return false
+}
+
+func paramSourceShort(p *knowledge.ParamIntel) string {
+	if p.Sources[knowledge.ParamQuery] {
+		return "query"
+	}
+	if p.Sources[knowledge.ParamForm] {
+		return "form"
+	}
+	if p.Sources[knowledge.ParamJSON] {
+		return "json"
+	}
+	if p.Sources[knowledge.ParamPath] {
+		return "path"
+	}
+	return "injected"
+}
+
 func paramSourceLabel(p *knowledge.ParamIntel, src knowledge.ParamSource) string {
-
 	switch src {
-
 	case knowledge.ParamInjected:
-
 		if p.DiscoveryReason != "" {
 			return "injected (scanner discovery: " + p.DiscoveryReason + ")"
 		}
-
 		return "injected (scanner discovery)"
-
 	case knowledge.ParamQuery:
 		return "query"
-
 	case knowledge.ParamForm:
 		return "form"
-
 	case knowledge.ParamJSON:
 		return "json"
-
 	case knowledge.ParamPath:
 		return "path"
-
 	default:
 		return "unknown"
 	}
