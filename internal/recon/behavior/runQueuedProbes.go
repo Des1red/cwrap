@@ -177,14 +177,18 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		e.analyzeOwnership(target, statuses)
 		e.analyzeIDOR(target, responses, statuses)
 		e.analyzeMethods(target)
+		e.analyzeCredentiallessIssuance(target)
 		// Learn + expand TARGET (not root)
 		e.learnProbeImpact(target, probe, probeFP, ref)
 		e.Expand(target)
-		// propagate any probes target generated back to root so they actually run
-		for target.ProbeQueue.Len() > 0 {
-			p, ok := target.ProbeQueue.PopBest()
-			if ok && !root.SeenProbes[p.Key()] {
-				root.ProbeQueue.Push(p)
+		// propagate sub-probes from non-root target entities to root queue
+		// if target IS root, Expand already pushed to root.ProbeQueue directly
+		if target != root {
+			for target.ProbeQueue.Len() > 0 {
+				p, ok := target.ProbeQueue.PopBest()
+				if ok && !root.SeenProbes[p.Key()] {
+					root.ProbeQueue.Push(p)
+				}
 			}
 		}
 	}
@@ -215,7 +219,7 @@ func methodAllowed(status int) bool {
 		return false
 
 	case 200, 201, 202, 204,
-		301, 302,
+		301, 302, 303, 304, 307, 308,
 		400, 401, 403:
 		return true
 

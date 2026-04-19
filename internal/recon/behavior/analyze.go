@@ -104,6 +104,26 @@ func countCredStatus(ent *knowledge.Entity, byID map[string]int, want int) int {
 
 // ---------- analyzers ----------
 
+func (e *Engine) analyzeCredentiallessIssuance(ent *knowledge.Entity) {
+	isStateful := ent.SeenSignal(knowledge.SigStateChanging) ||
+		ent.SessionIssued ||
+		ent.HTTP.AuthLikely
+
+	if !isStateful {
+		return
+	}
+
+	for _, id := range ent.Identities {
+		if id == nil {
+			continue
+		}
+		if !id.SentCreds && id.IssuedByServer && !id.Rejected {
+			ent.Tag(knowledge.SigCredentiallessTokenIssuance)
+			return
+		}
+	}
+}
+
 func (e *Engine) analyzeIDOR(
 	ent *knowledge.Entity,
 	responses map[string]map[string]map[string][]byte,

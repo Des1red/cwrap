@@ -17,6 +17,7 @@ const (
 	SigAdminSurface
 	SigObjectOwnership
 	SigPossibleIDOR
+	SigCredentiallessTokenIssuance
 )
 
 func (s Signal) String() string {
@@ -47,6 +48,8 @@ func (s Signal) String() string {
 		return "ObjectOwnership"
 	case SigPossibleIDOR:
 		return "PossibleIDOR"
+	case SigCredentiallessTokenIssuance:
+		return "CredentiallessTokenIssuance"
 	default:
 		return "UnknownSignal"
 	}

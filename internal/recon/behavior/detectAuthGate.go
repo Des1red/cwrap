@@ -2,7 +2,14 @@ package behavior
 
 func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int, probeFP map[string]string) {
 	baseline, okB := identityStatuses["baseline"]
-	if !okB || baseline != 200 {
+	if !okB {
+		return
+	}
+
+	// treat any 2xx or 3xx as baseline succeeded
+	baselineSucceeded := baseline >= 200 && baseline < 400
+
+	if !baselineSucceeded {
 		return
 	}
 
@@ -19,8 +26,8 @@ func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int, probeFP
 			return
 		}
 
-		// soft signal: same status but different response fingerprint
-		// catches empty-body responses, redirects, stripped data
+		// soft signal: same status family but different response fingerprint
+		// catches empty-body responses, stripped data, soft redirects
 		if baseFP != "" {
 			idFP := probeFP[name]
 			if idFP != "" && idFP != baseFP {

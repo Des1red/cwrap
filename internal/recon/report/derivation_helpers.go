@@ -109,6 +109,9 @@ func deriveFindings(ent *knowledge.Entity) []string {
 	if ent.SeenSignal(knowledge.SigObjectOwnership) {
 		out = append(out, "Object ownership enforcement observed")
 	}
+	if ent.SeenSignal(knowledge.SigCredentiallessTokenIssuance) {
+		out = append(out, "Server issues tokens/sessions without credentials — credentialless authentication bypass possible")
+	}
 
 	// Param-based findings
 	pnames := make([]string, 0, len(ent.Params))
@@ -213,6 +216,12 @@ func deriveNextSteps(ent *knowledge.Entity) []string {
 		out = append(out, "Review JS findings for secrets, endpoints, role gates, and client-side auth assumptions")
 	}
 
+	if ent.SeenSignal(knowledge.SigCredentiallessTokenIssuance) {
+		out = append(out,
+			"Test whether issued tokens grant authenticated access to protected endpoints",
+			"Attempt to reuse credentiallessly issued tokens across sessions",
+		)
+	}
 	out = dedup(out)
 	sort.Strings(out)
 	return out

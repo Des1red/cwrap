@@ -56,7 +56,10 @@ func extractNumericValue(raw, key string) int {
 }
 
 func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
-
+	if ent.State.DiscoveryProbed {
+		return
+	}
+	ent.State.DiscoveryProbed = true
 	u, err := url.Parse(ent.URL)
 	if err != nil {
 		return
@@ -270,7 +273,12 @@ func (e *Engine) pushProbe(ent *knowledge.Entity, p knowledge.Probe) {
 		return
 	}
 
-	ent.SeenProbes[key] = true
+	// Only mark immediately for non-root entities.
+	// Root's SeenProbes is owned by the scheduler in runQueuedProbes.
+	root := e.k.Entity(e.k.Target)
+	if ent != root {
+		ent.SeenProbes[key] = true
+	}
 	ent.ProbeQueue.Push(p)
 }
 
