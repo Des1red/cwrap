@@ -32,17 +32,15 @@ func (e *Engine) Run(base model.Request, url string) error {
 		}
 	}
 
-	// ----------------------------------------
-	//  Inject cookies into baseReq
-	// ----------------------------------------
-	if ck := cookieHeader(ent.SessionCookies); ck != "" {
-		baseReq.Flags.Headers = upsertHeader(baseReq.Flags.Headers, "Cookie", ck)
+	// populate engine session cookies from persisted store
+	for k, v := range ent.SessionCookies {
+		e.sessionCookies[k] = v
 	}
 
 	// ----------------------------------------
 	//  Derive identities FROM baseReq
 	// ----------------------------------------
-	e.identities = deriveIdentities(baseReq)
+	e.identities = e.deriveIdentities(baseReq)
 
 	if e.debug {
 		println("== Active Identities ==")
@@ -63,6 +61,36 @@ func (e *Engine) Run(base model.Request, url string) error {
 	if err != nil {
 		return err
 	}
+
+	// ----------------------------------------
+	//  Detect stale session and retry
+	// ----------------------------------------
+	if resp.StatusCode == 401 && ent.SessionUsed {
+		if e.debug {
+			println("== Stale session detected (401 on baseline) — retrying without session cookies ==")
+		}
+		// clear stale in-memory cookies
+		ent.SessionCookies = make(map[string]string)
+		e.sessionCookies = make(map[string]string)
+		ent.SessionUsed = false
+
+		// rebuild baseReq without the injected cookie header
+		baseReq = cloneRequest(base)
+
+		// re-derive identities from the clean request
+		e.identities = e.deriveIdentities(baseReq)
+
+		// retry
+		resp, err = transport.Do(baseReq)
+		if err != nil {
+			return err
+		}
+		body, err = transport.ReadBody(resp)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Mark entity as seen
 	ent.State.Seen = true
 	if meta, ok := e.identityMeta("baseline"); ok {

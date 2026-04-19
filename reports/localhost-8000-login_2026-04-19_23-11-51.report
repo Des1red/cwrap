@@ -1,0 +1,122 @@
+========== CWRAP FULL RECON REPORT ==========
+Target:    http://localhost:8000/login
+Generated: 2026-04-19 23:11:51
+
+------------------------------------------------
+GLOBAL STATS
+------------------------------------------------
+Entities:          3
+Edges:             2
+Global parameters: 0
+
+Signals (count of entities tagged):
+  - AuthBoundary: 3
+  - CredentiallessTokenIssuance: 1
+  - HasForm: 1
+  - IDLikeParam: 3
+  - RoleBoundary: 1
+  - StateChanging: 3
+
+------------------------------------------------
+DISCOVERY TREE
+------------------------------------------------
+http://localhost:8000/login
+└── http://localhost:8000/login/submit  [form]
+    └── http://localhost:8000/home  [html]
+
+------------------------------------------------
+ENTITY INTELLIGENCE
+------------------------------------------------
+
+[ENTITY] http://localhost:8000/home
+  Probes: 16
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  CSRFPresent: true
+  Statuses: 401×16 403×32
+  Signals: [AuthBoundary IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected issued-token role=anonymous]
+      cookies: [auth_token]
+    baseline: [IdentityInvalid creds rejected issued-token effective role=member]
+      cookies: [auth_token refresh_token csrf_token session_killed]
+    fake-admin: [IdentityInvalid rejected issued-token role=anonymous]
+      cookies: [auth_token]
+  Parameters:
+    home: [injected]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+    id: [injected IDLike]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+    page: [injected]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+    q: [injected]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+    user: [injected IDLike]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+  Findings:
+    ! Authentication/authorization boundary observed
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Attempt username enumeration
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+    > Test weak credentials and default accounts
+
+[ENTITY] http://localhost:8000/login
+  Probes: 14
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: HTML
+  Statuses: 200×43
+  Signals: [AuthBoundary HasForm IDLikeParam StateChanging]
+  Session:
+    Used: true
+    - auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiNjhjMTMwZjQ3ZmY1M2RkZGNjNTUyZmQxYTgyNWJkYmYiLCJyb2xlIjoibWVtYmVyIiwiZXhwIjoxNzc2NjI3NDM0LCJ0eXBlIjoiYWNjZXNzIiwianRpIjoiMThkMmE0ZTE1Zjk0MGFjM2FmZWZkODMwNTY1MmNjYmIiLCJ1c2VyX2lkIjoxfQ.WWSWZpWlOIKOJic2T13zeqlgbtZUR-0zAvH12rG8nRE
+    - csrf_token=68f58d9ab257794a8f4520c523f289483b4de8bb5a1860761b97f1f21a490e2b
+    - refresh_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiNjhjMTMwZjQ3ZmY1M2RkZGNjNTUyZmQxYTgyNWJkYmYiLCJyb2xlIjoibWVtYmVyIiwiZXhwIjoxNzc2NjcwMzM0LCJ0eXBlIjoicmVmcmVzaCIsImp0aSI6IjFiMmVlMmMyMDFhM2I1MjI0YmRkMmMxYjE4ZjcwZjRlIiwiYWNjZXNzX2p0aSI6IjE4ZDJhNGUxNWY5NDBhYzNhZmVmZDgzMDU2NTJjY2JiIiwidXNlcl9pZCI6MX0.CzsARDt0028O64u_5d-3ILMnhtWMaBLp79B3T5caQuI
+    - session_killed=true
+  Identities:
+    anonymous: [IdentityNone]
+    baseline: [IdentityUser creds role=member]
+    fake-admin: [IdentityNone]
+  Findings:
+    ! Authentication/authorization boundary observed
+  Next Steps:
+    > Attempt username enumeration
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test weak credentials and default accounts
+
+[ENTITY] http://localhost:8000/login/submit
+  Probes: 17
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  CSRFPresent: true
+  Content: HTML
+  Statuses: 303×51
+  Signals: [AuthBoundary CredentiallessTokenIssuance IDLikeParam StateChanging]
+  Session:
+    Issued: true
+    - auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiM2IzYzUyZGRhNjFmNWQyMzU3N2ZiNTRhNTE0OWUzMDgiLCJyb2xlIjoibWVtYmVyIiwiZXhwIjoxNzc2NjI5ODExLCJ0eXBlIjoiYWNjZXNzIiwianRpIjoiMjFiMmY4OGY4NmU4MWExM2ZjNDhhMDk3MTU3OTQ5ZjkiLCJ1c2VyX2lkIjoxfQ.UNSj7LwWGXZHei1Ic4hKbQdDL4ho4OkzzHQamNvvfbk
+    - csrf_token=d214a7d3ea9a0cadb159fb28ff215db167a9624b612f0289a5b3095a7a0efb1c
+    - refresh_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiM2IzYzUyZGRhNjFmNWQyMzU3N2ZiNTRhNTE0OWUzMDgiLCJyb2xlIjoibWVtYmVyIiwiZXhwIjoxNzc2NjcyNzExLCJ0eXBlIjoicmVmcmVzaCIsImp0aSI6IjQ4ZmRhZmU3ODBiODYxOThiZTcyZTQwMmEyMmJjYzY3IiwiYWNjZXNzX2p0aSI6IjIxYjJmODhmODZlODFhMTNmYzQ4YTA5NzE1Nzk0OWY5IiwidXNlcl9pZCI6MX0.fvhXDsH9_b9nUrIlgpGldA-4Tjq1hmSCpt2Y-2yncmc
+    - session_killed=true
+  Identities:
+    anonymous: [IdentityBootstrap issued-token role=member]
+      cookies: [auth_token session_killed refresh_token csrf_token]
+    baseline: [IdentityBootstrap creds issued-token role=member]
+      cookies: [auth_token session_killed refresh_token csrf_token]
+    fake-admin: [IdentityBootstrap issued-token role=member]
+      cookies: [auth_token session_killed refresh_token csrf_token]
+  Findings:
+    ! Authentication/authorization boundary observed
+    ! Server issues tokens/sessions without credentials — credentialless authentication bypass possible
+  Next Steps:
+    > Attempt to reuse credentiallessly issued tokens across sessions
+    > Attempt username enumeration
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test weak credentials and default accounts
+    > Test whether issued tokens grant authenticated access to protected endpoints
+
+=============== END OF REPORT ===============

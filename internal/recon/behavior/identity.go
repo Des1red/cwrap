@@ -20,7 +20,7 @@ func (e *Engine) identityMeta(name string) (Identity, bool) {
 	return Identity{}, false
 }
 
-func deriveIdentities(base model.Request) []Identity {
+func (e *Engine) deriveIdentities(base model.Request) []Identity {
 
 	var ids []Identity
 
@@ -28,6 +28,26 @@ func deriveIdentities(base model.Request) []Identity {
 	ids = append(ids, Identity{
 		Name: "baseline",
 		Apply: func(r model.Request) model.Request {
+			if len(e.sessionCookies) == 0 {
+				return r
+			}
+			// merge session cookies with any user-supplied cookies
+			merged := make(map[string]string)
+			// start with session cookies
+			for k, v := range e.sessionCookies {
+				merged[k] = v
+			}
+			// overlay user-supplied cookies (they take priority)
+			for _, h := range r.Flags.Headers {
+				if strings.EqualFold(h.Name, "Cookie") {
+					for _, part := range strings.Split(h.Value, "; ") {
+						if j := strings.Index(part, "="); j != -1 {
+							merged[part[:j]] = part[j+1:]
+						}
+					}
+				}
+			}
+			r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", cookieHeader(merged))
 			return r
 		},
 	})

@@ -17,6 +17,7 @@ const (
 	ReasonIdentityProbe  = "identity probe"
 	ReasonMethodProbe    = "method probe"
 	ReasonPathIDProbe    = "path-id-probe"
+	ReasonRedirect       = "redirect"
 )
 
 func (p ParamSource) String() string {

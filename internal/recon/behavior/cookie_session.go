@@ -69,6 +69,7 @@ func (e *Engine) captureSession(ent *knowledge.Entity, idMeta Identity, resp *ht
 
 		// always keep in-memory cookies for this run
 		ent.SessionCookies[c.Name] = c.Value
+		e.sessionCookies[c.Name] = c.Value
 	}
 
 	if updated {

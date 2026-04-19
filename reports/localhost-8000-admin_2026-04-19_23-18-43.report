@@ -1,0 +1,69 @@
+========== CWRAP FULL RECON REPORT ==========
+Target:    http://localhost:8000/admin
+Generated: 2026-04-19 23:18:43
+
+------------------------------------------------
+GLOBAL STATS
+------------------------------------------------
+Entities:          1
+Edges:             0
+Global parameters: 0
+
+Signals (count of entities tagged):
+  - AuthBoundary: 1
+  - IDLikeParam: 1
+  - RoleBoundary: 1
+  - StateChanging: 1
+
+------------------------------------------------
+DISCOVERY TREE
+------------------------------------------------
+http://localhost:8000/admin
+
+------------------------------------------------
+ENTITY INTELLIGENCE
+------------------------------------------------
+
+[ENTITY] http://localhost:8000/admin
+  Probes: 15
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  CSRFPresent: true
+  Statuses: 401×15 403×31
+  Signals: [AuthBoundary IDLikeParam RoleBoundary StateChanging]
+  Session:
+    Used: true
+    - auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiM2IzYzUyZGRhNjFmNWQyMzU3N2ZiNTRhNTE0OWUzMDgiLCJyb2xlIjoibWVtYmVyIiwiZXhwIjoxNzc2NjI5ODExLCJ0eXBlIjoiYWNjZXNzIiwianRpIjoiMjFiMmY4OGY4NmU4MWExM2ZjNDhhMDk3MTU3OTQ5ZjkiLCJ1c2VyX2lkIjoxfQ.UNSj7LwWGXZHei1Ic4hKbQdDL4ho4OkzzHQamNvvfbk
+    - csrf_token=d214a7d3ea9a0cadb159fb28ff215db167a9624b612f0289a5b3095a7a0efb1c
+    - refresh_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiM2IzYzUyZGRhNjFmNWQyMzU3N2ZiNTRhNTE0OWUzMDgiLCJyb2xlIjoibWVtYmVyIiwiZXhwIjoxNzc2NjcyNzExLCJ0eXBlIjoicmVmcmVzaCIsImp0aSI6IjQ4ZmRhZmU3ODBiODYxOThiZTcyZTQwMmEyMmJjYzY3IiwiYWNjZXNzX2p0aSI6IjIxYjJmODhmODZlODFhMTNmYzQ4YTA5NzE1Nzk0OWY5IiwidXNlcl9pZCI6MX0.fvhXDsH9_b9nUrIlgpGldA-4Tjq1hmSCpt2Y-2yncmc
+    - session_killed=true
+  Identities:
+    anonymous: [IdentityInvalid rejected issued-token role=anonymous]
+      cookies: [auth_token]
+    baseline: [IdentityInvalid creds rejected issued-token effective role=member]
+      cookies: [auth_token refresh_token csrf_token session_killed]
+    fake-admin: [IdentityInvalid rejected issued-token role=anonymous]
+      cookies: [auth_token]
+  Parameters:
+    admin: [injected]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+    id: [injected IDLike]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+    page: [injected]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+    q: [injected]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+    user: [injected IDLike]
+      denied: map[anonymous:1 baseline:1 fake-admin:1]
+  Findings:
+    ! Authentication/authorization boundary observed
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Attempt username enumeration
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+    > Test weak credentials and default accounts
+
+=============== END OF REPORT ===============

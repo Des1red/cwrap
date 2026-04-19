@@ -21,6 +21,8 @@ type Engine struct {
 	authBoundaryConfirmed bool
 	authConfidence        int
 
+	sessionCookies map[string]string // live session cookies, updated as probing proceeds
+
 	debug bool
 }
 
@@ -29,6 +31,7 @@ func New(k *knowledge.Knowledge, i Interpreter, debug bool) *Engine {
 		k:   k,
 		int: i,
 
-		debug: debug, // toggle here
+		debug:          debug,
+		sessionCookies: make(map[string]string),
 	}
 }
