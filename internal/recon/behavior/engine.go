@@ -21,7 +21,9 @@ type Engine struct {
 	authBoundaryConfirmed bool
 	authConfidence        int
 
-	sessionCookies map[string]string // live session cookies, updated as probing proceeds
+	sessionCookies       map[string]string // live session cookies, updated as probing proceeds
+	discoveredIdentities map[string]bool   // tracks role|uid combos already added as live identities
+	knownRoleUIDs        map[string]bool   // role|uid of all real identities seen so far
 
 	debug bool
 }
@@ -31,7 +33,9 @@ func New(k *knowledge.Knowledge, i Interpreter, debug bool) *Engine {
 		k:   k,
 		int: i,
 
-		debug:          debug,
-		sessionCookies: make(map[string]string),
+		debug:                debug,
+		sessionCookies:       make(map[string]string),
+		discoveredIdentities: make(map[string]bool),
+		knownRoleUIDs:        make(map[string]bool),
 	}
 }

@@ -95,6 +95,13 @@ func (e *Engine) Run(base model.Request, url string) error {
 	ent.State.Seen = true
 	if meta, ok := e.identityMeta("baseline"); ok {
 		extractIdentity(ent, meta.Name, resp)
+		// register baseline role|uid so it's never added as a live identity
+		if id := ent.Identities["baseline"]; id != nil {
+			roleUID := id.Role + "|" + id.UserID
+			if roleUID != "|" {
+				e.knownRoleUIDs[roleUID] = true
+			}
+		}
 		e.captureSession(ent, meta, resp, base.URL)
 	}
 

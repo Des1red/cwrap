@@ -2,6 +2,7 @@ package behavior
 
 import (
 	"cwrap/internal/model"
+	"cwrap/internal/recon/knowledge"
 	"strings"
 )
 
@@ -97,4 +98,52 @@ func removeAuthHeaders(h []model.Header) []model.Header {
 		out = append(out, hdr)
 	}
 	return out
+}
+
+func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID string) {
+	// check if identity with this name already exists
+	for _, id := range e.identities {
+		if id.Name == name {
+			return
+		}
+	}
+
+	if e.debug {
+		println("== New identity discovered:", name, "==")
+	}
+	// register so subsequent probes with same role are blocked
+	e.knownRoleUIDs[roleUID] = true
+	// snapshot cookies so the closure is stable
+	snapshot := make(map[string]string, len(cookies))
+	for k, v := range cookies {
+		snapshot[k] = v
+	}
+
+	e.identities = append(e.identities, Identity{
+		Name:      name,
+		Synthetic: false,
+		Apply: func(r model.Request) model.Request {
+			// remove any existing cookie header first
+			r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
+			// inject this identity's specific cookies
+			if ck := cookieHeader(snapshot); ck != "" {
+				r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
+			}
+			return r
+		},
+	})
+
+	// re-queue all currently known entities for this new identity
+	root := e.k.Entity(e.k.Target)
+	for _, ent := range e.k.Entities {
+		if ent == nil || !ent.State.Seen {
+			continue
+		}
+		e.k.PushProbe(root, knowledge.Probe{
+			URL:      ent.URL,
+			Method:   "GET",
+			Reason:   knowledge.ReasonIdentityProbe,
+			Priority: 160,
+		})
+	}
 }

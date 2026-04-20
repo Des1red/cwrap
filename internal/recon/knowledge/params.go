@@ -17,6 +17,7 @@ const (
 	ReasonIdentityProbe  = "identity probe"
 	ReasonMethodProbe    = "method probe"
 	ReasonPathIDProbe    = "path-id-probe"
+	ReasonLinkProbe      = "link"
 	ReasonRedirect       = "redirect"
 	ReasonJSFetch        = "js-fetch"
 )

@@ -54,6 +54,7 @@ func extractJWTIntel(id *knowledge.Identity, claims jwtClaims) {
 	if claims == nil {
 		return
 	}
+	// top-level claims (HS256 style)
 	if r, ok := claims["role"].(string); ok {
 		id.Role = strings.ToLower(r)
 	}
@@ -66,5 +67,14 @@ func extractJWTIntel(id *knowledge.Identity, claims jwtClaims) {
 	}
 	if jti, ok := claims["jti"].(string); ok {
 		id.TokenJTI = jti
+	}
+	// nested data claims (RS256 style — Juice Shop)
+	if data, ok := claims["data"].(map[string]any); ok {
+		if r, ok := data["role"].(string); ok && id.Role == "" {
+			id.Role = strings.ToLower(r)
+		}
+		if uid, ok := data["id"]; ok && id.UserID == "" {
+			id.UserID = fmt.Sprintf("%v", uid)
+		}
 	}
 }

@@ -43,10 +43,18 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 						if link, ok := e.normalizeLink(ent.URL, a.Val); ok {
 
 							e.k.AddEdge(ent.URL, link, knowledge.EdgeDiscoveredFromHTML)
-
 							if isSensitivePath(link) {
 								ent.Tag(knowledge.SigAdminSurface)
 							}
+
+							// queue discovered links as GET probes
+							e.k.PushProbe(e.k.Entity(ent.URL), knowledge.Probe{
+								URL:      link,
+								Method:   "GET",
+								Reason:   knowledge.ReasonLinkProbe,
+								Priority: 60,
+								Created:  time.Now(),
+							})
 						}
 					}
 				}
