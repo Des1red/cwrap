@@ -38,7 +38,9 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 
 		// Mark target as seen the first time we actually execute something against it
 		target.State.Seen = true
-
+		if probe.Reason == knowledge.ReasonPathIDProbe && !target.State.OrganicallyDiscovered {
+			target.State.IsPathVariant = true
+		}
 		// Per-probe maps (so analyzers don't mix endpoints)
 		responses := map[string]map[string]map[string][]byte{}
 		statuses := map[string]map[string]map[string]int{}
@@ -133,7 +135,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			probeFP[id.Name] = fpString(resp.StatusCode, body)
 			e.int.Learn(reqID.URL, resp, body)
 
-			storeResponse(target, responses, statuses, probe, id.Name, resp.StatusCode, body, e.baseStatus, e.baseBody, base.URL)
+			storeResponse(target, responses, statuses, probe, id.Name, resp.StatusCode, body, e.baseStatus, e.baseBody, base.URL, e.k)
 		}
 
 		// auth gate detection is GLOBAL behavior mode, keep it as-is
@@ -141,6 +143,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		// entity-level role boundary detection
 		// runs directly off identity statuses, not param maps
 		e.detectRoleBoundary(target, identityStatuses)
+		e.detectAuthBoundary(target, identityStatuses)
 
 		// Choose a reference fingerprint (prefer a no-creds identity if available)
 		ref := ""
@@ -175,12 +178,20 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		}
 
 		// Run analyzers on TARGET endpoint only (per-probe maps)
-		e.analyzeParamBehavior(target, responses)
+
+		// accumulated (needs full history to detect structural changes across values)
+		e.analyzeParamBehavior(target, target.AccumResponses)
 		e.analyzeAuthBoundary(target, statuses)
 		e.analyzeOwnership(target, statuses)
 		e.analyzeIDOR(target, responses, statuses)
 		e.analyzeMethods(target)
 		e.analyzeCredentiallessIssuance(target)
+		// for path id probes, also run param behavior on the source entity
+		// so it sees all variant values accumulated across probes
+		if probe.Reason == knowledge.ReasonPathIDProbe && probe.SourceURL != "" {
+			sourceEnt := e.k.Entity(probe.SourceURL)
+			e.analyzeParamBehavior(sourceEnt, sourceEnt.AccumResponses)
+		}
 		// Learn + expand TARGET (not root)
 		e.learnProbeImpact(target, probe, probeFP, ref)
 		e.Expand(target)

@@ -427,14 +427,4 @@ func (e *Engine) analyzeMethods(ent *knowledge.Entity) {
 
 		ent.Tag(knowledge.SigHasJSONBody)
 	}
-
-	// ---------------------------------
-	// AUTH BOUNDARY SIGNAL
-	// ---------------------------------
-	// If endpoint allows mutation and identities differ
-	if ent.SeenSignal(knowledge.SigStateChanging) &&
-		len(ent.Identities) > 1 {
-
-		ent.Tag(knowledge.SigAuthBoundary)
-	}
 }

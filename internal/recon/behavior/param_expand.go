@@ -289,6 +289,12 @@ func (e *Engine) expandMethods(ent *knowledge.Entity) {
 		return
 	}
 
+	// skip method sweep on path-variant entities — they're probe-generated URLs
+	// not real discovered endpoints, so sweeping methods is wasteful noise
+	if ent.State.IsPathVariant {
+		ent.State.MethodProbed = true
+		return
+	}
 	// don't re-probe methods we already know about
 	methods := []string{
 		"GET",
@@ -342,7 +348,21 @@ func replacePathSegment(u *url.URL, idx int, val string) string {
 	return newU.String()
 }
 
+func pathTemplate(u *url.URL) string {
+	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+	for i, seg := range segments {
+		if looksLikePathID(seg) {
+			segments[i] = "{id}"
+		}
+	}
+	return "/" + strings.Join(segments, "/")
+}
+
 func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
+	if ent.State.PathIDProbed {
+		return
+	}
+	ent.State.PathIDProbed = true
 	if ent.State.ProbeCount > 50 {
 		return
 	}
@@ -357,6 +377,12 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 		return
 	}
 
+	tmpl := pathTemplate(u)
+	if _, seen := e.probedPathTemplates[tmpl]; seen {
+		return
+	}
+	e.probedPathTemplates[tmpl] = struct{}{}
+
 	segments := strings.Split(rawPath, "/")
 
 	for i, seg := range segments {
@@ -368,7 +394,6 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 		name := "id"
 		if i > 0 {
 			parent := strings.ToLower(segments[i-1])
-			// naive singularize: strip trailing 's' (users -> user)
 			if strings.HasSuffix(parent, "s") && len(parent) > 2 {
 				parent = parent[:len(parent)-1]
 			}
@@ -381,7 +406,7 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 		e.int.ClassifyParam(ent, name)
 		ent.Tag(knowledge.SigIDLikeParam)
 
-		// base mutations
+		// base mutations only — fixed depth, no adaptive expansion
 		tests := []string{"0", "1", "-1"}
 		if id, err := strconv.Atoi(seg); err == nil {
 			tests = append(tests,
@@ -389,31 +414,7 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 				strconv.Itoa(id+1),
 			)
 		} else {
-			// UUID: probe a null UUID
 			tests = append(tests, "00000000-0000-0000-0000-000000000000")
-		}
-
-		// adaptive depth based on Interest
-		p := ent.Params[name]
-		if p != nil && p.Interest >= 1 {
-			tests = append(tests, "999999", "null")
-		}
-		if p != nil && p.Interest >= 3 {
-			if id, err := strconv.Atoi(seg); err == nil {
-				tests = append(tests,
-					strconv.Itoa(id+2),
-					strconv.Itoa(id+5),
-					"2147483647",
-				)
-			}
-		}
-
-		priority := 100
-		if p != nil && p.Interest >= 1 {
-			priority = 120
-		}
-		if p != nil && p.Interest >= 3 {
-			priority = 140
 		}
 
 		for _, v := range tests {
@@ -424,8 +425,9 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 				PathParams:    map[string]string{name: v},
 				PathParamBase: map[string]string{name: seg},
 				Reason:        knowledge.ReasonPathIDProbe,
-				Priority:      priority,
+				Priority:      100,
 				Created:       time.Now(),
+				SourceURL:     ent.URL,
 			})
 		}
 	}

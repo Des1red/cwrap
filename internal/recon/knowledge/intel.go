@@ -1,10 +1,13 @@
 package knowledge
 
 type EntityState struct {
-	Seen            bool
-	ProbeCount      int
-	MethodProbed    bool
-	DiscoveryProbed bool
+	Seen                  bool
+	ProbeCount            int
+	MethodProbed          bool
+	DiscoveryProbed       bool
+	PathIDProbed          bool
+	IsPathVariant         bool
+	OrganicallyDiscovered bool
 }
 
 type HTTPIntel struct {

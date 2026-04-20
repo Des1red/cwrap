@@ -431,6 +431,11 @@ func paramHasEvidence(p *knowledge.ParamIntel) bool {
 	if len(p.ObservedChanges) > 0 {
 		return true
 	}
+	// injected params with only access/denied maps don't have real evidence —
+	// those maps just reflect entity-level auth, not param-specific behavior
+	if p.InjectedOnly() {
+		return false
+	}
 	// access is only meaningful if there's also denial — mixed access = auth boundary evidence
 	if len(p.IdentityAccess) > 0 && len(p.IdentityDenied) > 0 {
 		return true

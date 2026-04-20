@@ -19,9 +19,9 @@ func storeResponse(
 	baseStatus int,
 	baseBody []byte,
 	baseURL string,
+	kg *knowledge.Knowledge,
 ) {
 	entries := make([]paramEntry, 0, len(probe.AddQuery)+len(probe.PathParams))
-
 	for k, v := range probe.AddQuery {
 		entries = append(entries, paramEntry{k, v, extractCurrentValue(baseURL, k)})
 	}
@@ -41,7 +41,8 @@ func storeResponse(
 			statuses[k][v] = map[string]int{}
 		}
 
-		if baseVal != "" {
+		_, isPathParam := probe.PathParams[k]
+		if baseVal != "" && !isPathParam {
 			if responses[k][baseVal] == nil {
 				responses[k][baseVal] = map[string][]byte{}
 				statuses[k][baseVal] = map[string]int{}
@@ -54,6 +55,23 @@ func storeResponse(
 
 		responses[k][v][identity] = body
 		statuses[k][v][identity] = status
+
+		// path params accumulate on source entity (the one that ran expandPathIDs)
+		// query params accumulate on the target entity
+		accumEnt := ent
+		if isPathParam && probe.SourceURL != "" {
+			accumEnt = kg.Entity(probe.SourceURL)
+		}
+		if accumEnt.AccumResponses[k] == nil {
+			accumEnt.AccumResponses[k] = map[string]map[string][]byte{}
+			accumEnt.AccumStatuses[k] = map[string]map[string]int{}
+		}
+		if accumEnt.AccumResponses[k][v] == nil {
+			accumEnt.AccumResponses[k][v] = map[string][]byte{}
+			accumEnt.AccumStatuses[k][v] = map[string]int{}
+		}
+		accumEnt.AccumResponses[k][v][identity] = body
+		accumEnt.AccumStatuses[k][v][identity] = status
 
 		p := ent.Params[k]
 		if p != nil {

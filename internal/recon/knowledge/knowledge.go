@@ -57,6 +57,18 @@ func (k *Knowledge) AddEdge(from, to string, t EdgeType) {
 	}
 	k.EdgeSeen[key] = true
 	k.Edges = append(k.Edges, Edge{From: from, To: to, Type: t})
+	// mark destination as organically discovered for HTML/form edges
+	// this prevents path-variant probes from wrongly suppressing method sweeps
+	if t == EdgeDiscoveredFromHTML || t == EdgeFormAction {
+		dest := k.Entities[to]
+		if dest == nil {
+			dest = NewEntity(to)
+			k.Entities[to] = dest
+		}
+		dest.State.OrganicallyDiscovered = true
+		// if it was previously marked as a path variant, clear it
+		dest.State.IsPathVariant = false
+	}
 	k.mu.Unlock()
 }
 func (k *Knowledge) AddParam(name string) {

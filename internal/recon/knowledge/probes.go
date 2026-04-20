@@ -18,6 +18,8 @@ type Probe struct {
 	Priority int
 
 	Created time.Time
+
+	SourceURL string // entity that spawned this probe (for path param accumulation)
 }
 
 type ProbeQueue struct {

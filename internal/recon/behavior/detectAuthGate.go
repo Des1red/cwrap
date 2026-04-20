@@ -39,6 +39,28 @@ func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int, probeFP
 	}
 }
 
+func (e *Engine) detectAuthBoundary(ent *knowledge.Entity, identityStatuses map[string]int) {
+	hasAuthedSuccess := false
+	hasUnauthDenied := false
+
+	for idName, status := range identityStatuses {
+		id := ent.Identities[idName]
+		if id == nil {
+			continue
+		}
+		if status == 200 && id.SentCreds {
+			hasAuthedSuccess = true
+		}
+		if (status == 401 || status == 403) && !id.SentCreds {
+			hasUnauthDenied = true
+		}
+	}
+
+	if hasAuthedSuccess && hasUnauthDenied {
+		ent.Tag(knowledge.SigAuthBoundary)
+	}
+}
+
 func (e *Engine) detectRoleBoundary(ent *knowledge.Entity, identityStatuses map[string]int) {
 	for idName, status := range identityStatuses {
 		if status != 401 && status != 403 {

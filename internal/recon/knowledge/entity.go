@@ -29,6 +29,10 @@ type Entity struct {
 	SessionCookies map[string]string // name -> value
 	SessionUsed    bool              // session reused this run
 	SessionIssued  bool              // server issued new cookies
+
+	// accumulated across all probes for structural behavior analysis
+	AccumResponses map[string]map[string]map[string][]byte
+	AccumStatuses  map[string]map[string]map[string]int
 }
 
 func (e *Entity) Tag(s Signal) {
@@ -64,6 +68,8 @@ func NewEntity(url string) *Entity {
 		Identities:     make(map[string]*Identity),
 		IdentityIndex:  make(map[string]*Identity),
 		SessionCookies: make(map[string]string),
+		AccumResponses: make(map[string]map[string]map[string][]byte),
+		AccumStatuses:  make(map[string]map[string]map[string]int),
 	}
 }
 
