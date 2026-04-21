@@ -14,15 +14,16 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 
 	// Global counts / flags
 	var (
-		entityCount     = len(urls)
-		edgeCount       = len(k.Edges)
-		globalParamCnt  = len(k.Params)
-		hasAuthBoundary = false
-		hasRoleBoundary = false
-		hasOwnership    = false
-		possibleIDOR    = 0
-		adminSurface    = 0
-		jsLeakCount     = 0
+		entityCount         = len(urls)
+		edgeCount           = len(k.Edges)
+		globalParamCnt      = len(k.Params)
+		hasAuthBoundary     = false
+		hasRoleBoundary     = false
+		hasOwnership        = false
+		hasCredlessIssuance = false
+		possibleIDOR        = 0
+		adminSurface        = 0
+		jsLeakCount         = 0
 	)
 
 	for _, u := range urls {
@@ -40,6 +41,9 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 
 		if ent.SeenSignal(knowledge.SigRoleBoundary) {
 			hasRoleBoundary = true
+		}
+		if ent.SeenSignal(knowledge.SigCredentiallessTokenIssuance) {
+			hasCredlessIssuance = true
 		}
 		for _, p := range ent.Params {
 			if p == nil {
@@ -81,6 +85,7 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 	fmt.Fprintf(w, "IDOR surfaces:       %d\n", possibleIDOR)
 	fmt.Fprintf(w, "Admin surfaces:      %d\n", adminSurface)
 	fmt.Fprintf(w, "JS leaks:            %d\n", jsLeakCount)
+	fmt.Fprintf(w, "Credentialless issuance: %v\n", yesNo(hasCredlessIssuance))
 
 	if len(high) > 0 {
 		fmt.Fprintln(w)
@@ -142,7 +147,7 @@ func buildHighRiskHighlights(k *knowledge.Knowledge) []string {
 			if p == nil {
 				continue
 			}
-			if p.IdentityAccess != nil && p.IdentityAccess["anonymous"] > 0 {
+			if p.IdentityAccess != nil && p.IdentityAccess["anonymous"] > 0 && len(p.IdentityDenied) > 0 {
 				out = append(out, fmt.Sprintf("Unauthenticated access observed: %s (via param behavior)", ent.URL))
 				break
 			}

@@ -184,6 +184,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		e.analyzeAuthBoundary(target, statuses)
 		e.analyzeOwnership(target, statuses)
 		e.analyzeIDOR(target, responses, statuses)
+		e.analyzeIDOR(target, target.AccumResponses, target.AccumStatuses)
 		e.analyzeMethods(target)
 		e.analyzeCredentiallessIssuance(target)
 		// for path id probes, also run param behavior on the source entity
@@ -191,6 +192,8 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		if probe.Reason == knowledge.ReasonPathIDProbe && probe.SourceURL != "" {
 			sourceEnt := e.k.Entity(probe.SourceURL)
 			e.analyzeParamBehavior(sourceEnt, sourceEnt.AccumResponses)
+			e.analyzeOwnership(sourceEnt, sourceEnt.AccumStatuses)
+			e.analyzeIDOR(sourceEnt, sourceEnt.AccumResponses, sourceEnt.AccumStatuses)
 		}
 		// Learn + expand TARGET (not root)
 		e.learnProbeImpact(target, probe, probeFP, ref)

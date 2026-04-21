@@ -3,7 +3,6 @@ package behavior
 import (
 	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/recon/session"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -36,6 +35,14 @@ func (e *Engine) captureSession(ent *knowledge.Entity, idMeta Identity, resp *ht
 
 	// don't persist rejected identities
 	if id.Rejected {
+		return
+	}
+
+	// live identities (discovered accounts like member-uid-2) have frozen
+	// cookie snapshots from discovery — never overwrite them from subsequent
+	// probes. Still check for newly discoverable identities in the response.
+	if idMeta.Name != "session" {
+		e.discoverIdentityFromResponse(resp)
 		return
 	}
 
@@ -80,31 +87,5 @@ func (e *Engine) captureSession(ent *knowledge.Entity, idMeta Identity, resp *ht
 		ent.SessionIssued = true
 	}
 
-	// ---- check for new discoverable identity ----
-	var newRole, newUID string
-	for _, c := range resp.Cookies() {
-		if strings.Count(c.Value, ".") == 2 {
-			claims := parseJWT(c.Value)
-			if claims != nil {
-				if r, ok := claims["role"].(string); ok {
-					newRole = strings.ToLower(r)
-				}
-				if u, ok := claims["user_id"]; ok {
-					newUID = fmt.Sprintf("%v", u)
-				}
-			}
-		}
-	}
-
-	if newRole != "" || newUID != "" {
-		roleUID := newRole + "|" + newUID
-		if !e.knownRoleUIDs[roleUID] && !e.discoveredIdentities[roleUID] {
-			e.discoveredIdentities[roleUID] = true
-			cookies := make(map[string]string)
-			for _, c := range resp.Cookies() {
-				cookies[c.Name] = c.Value
-			}
-			e.addLiveIdentity("role-"+newRole, cookies, roleUID)
-		}
-	}
+	e.discoverIdentityFromResponse(resp)
 }

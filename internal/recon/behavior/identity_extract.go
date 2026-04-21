@@ -51,7 +51,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		id.HasCSRF = true
 	}
 	// ---- rejection ----
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+	if resp.StatusCode == 401 {
 		id.Rejected = true
 	}
 	if id.IssuedByServer || id.AuthScheme != "" {

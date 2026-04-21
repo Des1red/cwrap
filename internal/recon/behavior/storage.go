@@ -73,8 +73,8 @@ func storeResponse(
 		accumEnt.AccumResponses[k][v][identity] = body
 		accumEnt.AccumStatuses[k][v][identity] = status
 
-		p := ent.Params[k]
-		if p != nil {
+		p := accumEnt.Params[k]
+		if p != nil && shouldReportIdentity(identity) {
 			if status == 200 {
 				p.IdentityAccess[identity]++
 			}
@@ -83,4 +83,8 @@ func storeResponse(
 			}
 		}
 	}
+}
+
+func shouldReportIdentity(name string) bool {
+	return name != "session"
 }

@@ -19,11 +19,21 @@ func anyStatusIs(m map[string]int, want ...int) bool {
 
 // ---------- identity-agnostic helpers ----------
 
+func isComparableIdentity(name string, id *knowledge.Identity) bool {
+	if id == nil || !id.SentCreds {
+		return false
+	}
+	if name == "session" {
+		return false
+	}
+	return true
+}
+
 // pick a "credentialed" body for this value (prefer a cred identity that succeeded)
 func pickCredBody(ent *knowledge.Entity, bodies map[string][]byte, statuses map[string]int) ([]byte, bool) {
 	for idName, body := range bodies {
 		id := ent.Identities[idName]
-		if id == nil || !id.SentCreds {
+		if !isComparableIdentity(idName, id) {
 			continue
 		}
 		if statuses != nil && statuses[idName] != 200 {
@@ -37,7 +47,7 @@ func pickCredBody(ent *knowledge.Entity, bodies map[string][]byte, statuses map[
 	// fallback: any cred body (even if status map missing)
 	for idName, body := range bodies {
 		id := ent.Identities[idName]
-		if id == nil || !id.SentCreds {
+		if !isComparableIdentity(idName, id) {
 			continue
 		}
 		if len(body) == 0 {
@@ -64,7 +74,7 @@ func anyNoCredDenied(ent *knowledge.Entity, byID map[string]int) bool {
 func anyCredStatus(ent *knowledge.Entity, byID map[string]int, want ...int) bool {
 	for idName, s := range byID {
 		id := ent.Identities[idName]
-		if id == nil || !id.SentCreds {
+		if !isComparableIdentity(idName, id) {
 			continue
 		}
 		for _, w := range want {
@@ -80,7 +90,7 @@ func countCredStatus(ent *knowledge.Entity, byID map[string]int, want int) int {
 	n := 0
 	for idName, s := range byID {
 		id := ent.Identities[idName]
-		if id == nil || !id.SentCreds {
+		if !isComparableIdentity(idName, id) {
 			continue
 		}
 		if s == want {
@@ -302,7 +312,7 @@ func (e *Engine) analyzeOwnership(ent *knowledge.Entity, statuses map[string]map
 		authIdentities := []string{}
 
 		for idName, id := range ent.Identities {
-			if id != nil && id.SentCreds && !id.Rejected {
+			if isComparableIdentity(idName, id) {
 				authIdentities = append(authIdentities, idName)
 			}
 		}

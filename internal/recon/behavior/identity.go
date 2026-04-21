@@ -3,6 +3,8 @@ package behavior
 import (
 	"cwrap/internal/model"
 	"cwrap/internal/recon/knowledge"
+	"fmt"
+	"net/http"
 	"strings"
 )
 
@@ -25,9 +27,9 @@ func (e *Engine) deriveIdentities(base model.Request) []Identity {
 
 	var ids []Identity
 
-	// baseline (user supplied identity)
+	// session (user supplied identity)
 	ids = append(ids, Identity{
-		Name: "baseline",
+		Name: "session",
 		Apply: func(r model.Request) model.Request {
 			if len(e.sessionCookies) == 0 {
 				return r
@@ -146,4 +148,75 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 			Priority: 160,
 		})
 	}
+	// clear probed path templates so expandPathIDs re-runs on organically
+	// discovered entities with the new identity's perspective
+	for tmpl := range e.probedPathTemplates {
+		delete(e.probedPathTemplates, tmpl)
+	}
+
+	// re-queue path ID expansion for all seen entities that have path params
+	for _, ent := range e.k.Entities {
+		if ent == nil || !ent.State.Seen {
+			continue
+		}
+		// only re-expand entities that had path ID params discovered
+		hasPP := false
+		for _, p := range ent.Params {
+			if p != nil && p.Sources[knowledge.ParamPath] {
+				hasPP = true
+				break
+			}
+		}
+		if !hasPP {
+			continue
+		}
+		// reset so expandPathIDs runs again for this entity
+		ent.State.PathIDProbed = false
+
+		// allow sibling/generated path-ID probes for the same route family
+		// to rerun under the new identity
+		clearSeenPathIDProbeFamily(root.SeenProbes, ent.URL)
+
+		e.k.PushProbe(root, knowledge.Probe{
+			URL:      ent.URL,
+			Method:   "GET",
+			Reason:   knowledge.ReasonIdentityProbe,
+			Priority: 155, // slightly below identity probes, above normal expansion
+		})
+	}
+}
+
+// discoverIdentityFromResponse checks if a response contains a JWT cookie
+// that belongs to a previously unseen role+uid combination, and if so
+// registers it as a new live identity.
+func (e *Engine) discoverIdentityFromResponse(resp *http.Response) {
+	var newRole, newUID string
+	var newCookies = map[string]string{}
+
+	for _, c := range resp.Cookies() {
+		newCookies[c.Name] = c.Value
+		if strings.Count(c.Value, ".") == 2 {
+			claims := parseJWT(c.Value)
+			if claims != nil {
+				if r, ok := claims["role"].(string); ok {
+					newRole = strings.ToLower(r)
+				}
+				if u, ok := claims["user_id"]; ok {
+					newUID = fmt.Sprintf("%v", u)
+				}
+			}
+		}
+	}
+
+	if newRole == "" && newUID == "" {
+		return
+	}
+
+	roleUID := newRole + "|" + newUID
+	if e.knownRoleUIDs[roleUID] || e.discoveredIdentities[roleUID] {
+		return
+	}
+
+	e.discoveredIdentities[roleUID] = true
+	e.addLiveIdentity(fmt.Sprintf("%s-uid-%s", newRole, newUID), newCookies, roleUID)
 }

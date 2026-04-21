@@ -22,7 +22,7 @@ func (e *Engine) learnProbeImpact(ent *knowledge.Entity, probe knowledge.Probe, 
 		return
 	}
 
-	// Attribute change to the params this probe mutated.
+	// Query params belong to the target entity.
 	for k := range probe.AddQuery {
 		p := ent.Params[k]
 		if p == nil || p.InjectedOnly() {
@@ -30,5 +30,28 @@ func (e *Engine) learnProbeImpact(ent *knowledge.Entity, probe knowledge.Probe, 
 		}
 		p.Interest++
 		p.ObservedChanges["input-affects-response"] = true
+		if p.Interest > 5 {
+			p.Interest = 5
+		}
+	}
+
+	// Path params belong to the source/path-family entity when available.
+	pathEnt := ent
+	if probe.SourceURL != "" {
+		pathEnt = e.k.Entity(probe.SourceURL)
+	}
+
+	// Attribute change to the params this probe mutated.
+
+	for k := range probe.PathParams {
+		p := pathEnt.Params[k]
+		if p == nil || p.InjectedOnly() {
+			continue
+		}
+		p.Interest++
+		p.ObservedChanges["input-affects-response"] = true
+		if p.Interest > 5 {
+			p.Interest = 5
+		}
 	}
 }
