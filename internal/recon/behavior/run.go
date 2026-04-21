@@ -67,7 +67,7 @@ func (e *Engine) Run(base model.Request, url string) error {
 	// ----------------------------------------
 	if resp.StatusCode == 401 && ent.SessionUsed {
 		if e.debug {
-			println("== Stale session detected (401 on baseline) — retrying without session cookies ==")
+			println("== Stale session detected (401 on live session) — retrying without session cookies ==")
 		}
 		// clear stale in-memory cookies
 		ent.SessionCookies = make(map[string]string)
@@ -93,10 +93,10 @@ func (e *Engine) Run(base model.Request, url string) error {
 
 	// Mark entity as seen
 	ent.State.Seen = true
-	if meta, ok := e.identityMeta("baseline"); ok {
+	if meta, ok := e.identityMeta(LiveSession); ok {
 		extractIdentity(ent, meta.Name, resp)
-		// register baseline role|uid so it's never added as a live identity
-		if id := ent.Identities["baseline"]; id != nil {
+		// register session role|uid so it's never added as a live identity
+		if id := ent.Identities[LiveSession]; id != nil {
 			roleUID := id.Role + "|" + id.UserID
 			if roleUID != "|" {
 				e.knownRoleUIDs[roleUID] = true

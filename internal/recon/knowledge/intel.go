@@ -8,6 +8,7 @@ type EntityState struct {
 	PathIDProbed          bool
 	IsPathVariant         bool
 	OrganicallyDiscovered bool
+	JSAnalyzed            bool
 }
 
 type HTTPIntel struct {

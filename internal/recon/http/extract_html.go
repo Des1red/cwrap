@@ -168,7 +168,8 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 						}
 					}
 
-					if code.Len() > 0 {
+					if code.Len() > 0 && !ent.State.JSAnalyzed {
+						ent.State.JSAnalyzed = true
 						jsintel.Learn(ent, ent.URL+"#inline", []byte(code.String()))
 					}
 				}

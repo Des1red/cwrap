@@ -23,7 +23,7 @@ func isComparableIdentity(name string, id *knowledge.Identity) bool {
 	if id == nil || !id.SentCreds {
 		return false
 	}
-	if name == "session" {
+	if name == LiveSession {
 		return false
 	}
 	return true

@@ -91,7 +91,7 @@ cwrap automatically probes endpoints, tracks sessions, and reasons about authori
 #### What recon does
 
 - Fetches the target and extracts links, forms, and JS endpoints
-- Derives multiple probe identities: baseline (your credentials), anonymous (no auth), fake-admin (role confusion headers)
+- Derives multiple probe identities: session (your credentials), anonymous (no auth), fake-admin (role confusion headers)
 - Probes discovered endpoints with each identity and compares responses
 - Detects path-level ID segments (`/users/123`) and generates mutation probes
 - Tracks session cookies across the run and reuses them on subsequent runs
@@ -133,7 +133,7 @@ cwrap recon https://site.com http --debug
 #### Session persistence
 
 cwrap captures cookies issued during probing and saves them to `~/.config/cwrap/sessions/<host>.json`.
-On the next run against the same host, those cookies are automatically injected into the baseline identity — giving the engine an authenticated starting point without re-supplying credentials.
+On the next run against the same host, those cookies are automatically injected into the session identity — giving the engine an authenticated starting point without re-supplying credentials.
 
 #### Reports
 

@@ -16,20 +16,33 @@ func extractCurrentValue(raw, key string) string {
 	return u.Query().Get(key)
 }
 
-func pathFamilyPrefix(rawURL string) string {
-	prefix := rawURL
-	if i := strings.LastIndex(prefix, "/"); i != -1 {
-		return prefix[:i+1]
+func clearSeenPathIDProbeFamily(rootSeen map[string]bool, ent *knowledge.Entity, rawURL string) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return
 	}
-	return prefix
-}
+	tmpl := pathTemplate(u) // e.g. "/api/users/{id}"
 
-func clearSeenPathIDProbeFamily(seen map[string]bool, rawURL string) {
-	prefix := pathFamilyPrefix(rawURL)
-
-	for key := range seen {
-		if strings.Contains(key, knowledge.ReasonPathIDProbe) && strings.Contains(key, prefix) {
-			delete(seen, key)
+	clearByTemplate := func(seen map[string]bool) {
+		for key := range seen {
+			if !strings.Contains(key, knowledge.ReasonPathIDProbe) {
+				continue
+			}
+			// key format: METHOD|URL|REASON|...
+			parts := strings.SplitN(key, "|", 3)
+			if len(parts) < 2 {
+				continue
+			}
+			ku, err := url.Parse(parts[1])
+			if err != nil {
+				continue
+			}
+			if pathTemplate(ku) == tmpl {
+				delete(seen, key)
+			}
 		}
 	}
+
+	clearByTemplate(rootSeen)
+	clearByTemplate(ent.SeenProbes)
 }

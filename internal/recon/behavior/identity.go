@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const LiveSession = "session"
+
 type Identity struct {
 	Name      string
 	Apply     func(model.Request) model.Request
@@ -29,7 +31,7 @@ func (e *Engine) deriveIdentities(base model.Request) []Identity {
 
 	// session (user supplied identity)
 	ids = append(ids, Identity{
-		Name: "session",
+		Name: LiveSession,
 		Apply: func(r model.Request) model.Request {
 			if len(e.sessionCookies) == 0 {
 				return r
@@ -175,8 +177,7 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 
 		// allow sibling/generated path-ID probes for the same route family
 		// to rerun under the new identity
-		clearSeenPathIDProbeFamily(root.SeenProbes, ent.URL)
-
+		clearSeenPathIDProbeFamily(root.SeenProbes, ent, ent.URL)
 		e.k.PushProbe(root, knowledge.Probe{
 			URL:      ent.URL,
 			Method:   "GET",
