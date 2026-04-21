@@ -2,21 +2,9 @@ package behavior
 
 import (
 	"bytes"
+	"cwrap/internal/recon/canonicalize"
 	"cwrap/internal/recon/knowledge"
 )
-
-// fallback for non-JSON responses: strip numbers to get a rough structural diff
-func stripNumbers(b []byte) []byte {
-	out := make([]byte, len(b))
-	copy(out, b)
-
-	for i := range out {
-		if out[i] >= '0' && out[i] <= '9' {
-			out[i] = '#'
-		}
-	}
-	return out
-}
 
 func anyStatusIs(m map[string]int, want ...int) bool {
 	for _, s := range m {
@@ -167,7 +155,7 @@ func (e *Engine) analyzeIDOR(
 			// --- Canonicalized structural diff (strong signal)
 			n, err := e.int.Canonicalize(body, "")
 			if err != nil {
-				n = stripNumbers(body)
+				n = canonicalize.StripNumbers(body)
 			}
 			canonBodies = append(canonBodies, n)
 

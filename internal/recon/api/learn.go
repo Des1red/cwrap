@@ -29,8 +29,8 @@ func (e *Engine) learn(url string, resp *http.Response, body []byte) {
 		}
 	}
 
-	// API-specific intelligence
-	if ent.Content.LooksLikeJSON {
+	// Json intelligence
+	if ent.Content.LooksLikeJSON && resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		e.extractJSON(ent, body)
 	}
 }

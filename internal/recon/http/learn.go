@@ -3,6 +3,7 @@ package http
 import (
 	"cwrap/internal/recon/httpintel"
 	"cwrap/internal/recon/jsintel"
+	"cwrap/internal/recon/jsonintel"
 	"cwrap/internal/recon/knowledge"
 	"net/http"
 	"time"
@@ -35,11 +36,17 @@ func (e *Engine) learn(url string, resp *http.Response, body []byte) {
 		e.extractHTML(ent, body)
 	}
 
+	// JSON intelligence — extract param keys from JSON response schema
+	// The HTTP engine was previously blind to JSON bodies entirely.
+	// Any endpoint returning JSON now registers its top-level keys as
+	// ParamJSON candidates, feeding expandDiscovery with real signal.
+	if ent.Content.LooksLikeJSON && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		jsonintel.ExtractParams(ent, e.k, body)
+	}
+
 	// JS intelligence
 	if looksLikeJS(url, resp) {
-
 		jsEndpoints := jsintel.Learn(ent, url, body)
-
 		e.handleJSEndpoints(ent, url, jsEndpoints)
 	}
 }

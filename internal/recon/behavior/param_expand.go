@@ -74,13 +74,73 @@ func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
 		return
 	}
 	ent.State.DiscoveryProbed = true
+
 	u, err := url.Parse(ent.URL)
 	if err != nil {
 		return
 	}
 
-	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+	// item endpoints (path already contains an ID segment) return data fields
+	// in their response body — these describe the object, not the query interface.
+	// Probing them as query params is noise. Only collection endpoints benefit
+	// from body-derived param discovery.
+	hasPathParam := false
+	for _, p := range ent.Params {
+		if p.Sources[knowledge.ParamPath] {
+			hasPathParam = true
+			break
+		}
+	}
+	// -------------------------------------------------------
+	// Phase 1 — body-derived params (ground truth)
+	// -------------------------------------------------------
+	// Params registered from JSON keys or form fields are actual
+	// schema the server exposed. Probe these with type-appropriate
+	// values before falling back to guessing.
+	bodyProbed := false
+	for name, p := range ent.Params {
+		// skip JSON params on item endpoints — response fields are data, not filters
+		if p.Sources[knowledge.ParamJSON] && hasPathParam {
+			continue
+		}
+		// skip: path params handled by expandPathIDs
+		if p.Sources[knowledge.ParamPath] {
+			continue
+		}
+		// skip: token-like params — injecting random values is noisy and useless
+		if p.TokenLike {
+			continue
+		}
+		// only act on params we learned from the response body or a form
+		if !p.Sources[knowledge.ParamJSON] && !p.Sources[knowledge.ParamForm] {
+			continue
+		}
 
+		for _, v := range discoveryValuesFor(p) {
+			e.pushProbe(ent, knowledge.Probe{
+				URL:    ent.URL,
+				Method: "GET",
+				AddQuery: map[string]string{
+					name: v,
+				},
+				Reason:   knowledge.ReasonParamDiscovery,
+				Priority: 55,
+			})
+		}
+		bodyProbed = true
+	}
+
+	// -------------------------------------------------------
+	// Phase 2 — path segment heuristics (fallback only)
+	// -------------------------------------------------------
+	// Only run if the response body gave us nothing to work with.
+	// This covers endpoints that return HTML or opaque content with
+	// no extractable param schema.
+	if bodyProbed {
+		return
+	}
+
+	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
 	for _, s := range segments {
 		if len(s) < 3 {
 			continue
@@ -88,7 +148,6 @@ func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
 		if _, err := strconv.Atoi(s); err == nil {
 			continue // skip numeric path parts
 		}
-
 		e.pushProbe(ent, knowledge.Probe{
 			URL:    ent.URL,
 			Method: "GET",
@@ -100,9 +159,9 @@ func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
 		})
 	}
 
-	// small universal fallback
-	common := []string{"id", "user", "page", "q"}
-
+	// minimal universal fallback — only params that have broad real-world
+	// coverage and are unlikely to cause destructive side effects
+	common := []string{"id", "page", "limit", "q"}
 	for _, p := range common {
 		e.pushProbe(ent, knowledge.Probe{
 			URL:    ent.URL,
@@ -114,6 +173,52 @@ func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
 			Priority: 40,
 		})
 	}
+}
+
+// discoveryValuesFor returns type-appropriate probe values for a param
+// based on its classification. The goal is to produce responses that
+// differ structurally from each other so analyzeParamBehavior can detect
+// object access, enumeration, and reflection.
+func discoveryValuesFor(p *knowledge.ParamIntel) []string {
+	name := strings.ToLower(p.Name)
+
+	if p.IDLike {
+		// probe small integers to test object-level access
+		return []string{"1", "2", "0"}
+	}
+
+	// pagination params — probe realistic values
+	switch name {
+	case "page", "p":
+		return []string{"1", "2"}
+	case "limit", "per_page", "page_size", "size", "count":
+		return []string{"10", "100"}
+	case "offset", "skip", "from":
+		return []string{"0", "10"}
+	}
+
+	// boolean-like flags — probe both states
+	if strings.HasPrefix(name, "is_") ||
+		strings.HasPrefix(name, "has_") ||
+		strings.HasPrefix(name, "show_") ||
+		name == "enabled" || name == "active" ||
+		name == "published" || name == "visible" {
+		return []string{"true", "false"}
+	}
+
+	// sort/order params — common in list endpoints
+	if name == "sort" || name == "order" || name == "order_by" || name == "sort_by" {
+		return []string{"asc", "desc"}
+	}
+
+	// search/filter params — probe a non-matching value to test empty state
+	if name == "q" || name == "query" || name == "search" ||
+		name == "filter" || name == "keyword" {
+		return []string{"test", ""}
+	}
+
+	// generic fallback — single probe to detect if the param has any effect
+	return []string{"1"}
 }
 
 func (e *Engine) expandMutation(ent *knowledge.Entity) {
