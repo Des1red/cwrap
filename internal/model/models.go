@@ -3,6 +3,7 @@ package model
 type Request struct {
 	Method   string
 	URL      string
+	FilePath string
 	Flags    Flags
 	Original string
 }
@@ -60,3 +61,6 @@ type QueryParam struct {
 	Key   string
 	Value string
 }
+
+const ReportExtension = "report"
+const ReportDirecoryName = ReportExtension

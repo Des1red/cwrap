@@ -1,0 +1,429 @@
+========== CWRAP FULL RECON REPORT ==========
+Target:    http://localhost:9001/login/alice
+Generated: 2026-04-22 16:36:55
+
+------------------------------------------------
+GLOBAL STATS
+------------------------------------------------
+Entities:          14
+Edges:             11
+Global parameters: 9
+
+Signals (count of entities tagged):
+  - AdminSurface: 1
+  - AuthBoundary: 6
+  - CredentiallessTokenIssuance: 3
+  - HasForm: 1
+  - HasJSONBody: 5
+  - IDLikeParam: 13
+  - ObjectOwnership: 1
+  - RoleBoundary: 10
+  - StateChanging: 13
+
+------------------------------------------------
+DISCOVERY TREE
+------------------------------------------------
+http://localhost:9001/login/alice
+└── http://localhost:9001/home  [html]
+    ├── http://localhost:9001/api/notes  [html]
+    ├── http://localhost:9001/api/notes/1  [html]
+    ├── http://localhost:9001/api/notes/2  [html]
+    ├── http://localhost:9001/api/messages/1  [html]
+    ├── http://localhost:9001/api/messages/2  [html]
+    ├── http://localhost:9001/login/bob  [html]
+    │   └── http://localhost:9001/home  [html]  (seen)
+    ├── http://localhost:9001/login/admin  [html]
+    │   └── http://localhost:9001/home  [html]  (seen)
+    └── http://localhost:9001/logout  [form]
+
+------------------------------------------------
+ENTITY INTELLIGENCE
+------------------------------------------------
+
+[ENTITY] http://localhost:9001/api/notes/1
+  Probes: 19
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: JSON
+  Statuses: 200×31 401×39 403×13
+  Signals: [AuthBoundary HasJSONBody IDLikeParam ObjectOwnership RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityUser creds effective role=member uid=1 exp=2026-04-23 01:36]
+  Parameters:
+    content: [json]
+    id: [json IDLike AuthBoundary OwnershipBoundary interest=1]
+      changes: [auth-wall-mixed-status input-affects-response role-wall-403-authenticated]
+      access: map[owner-uid-3:1]
+      denied: map[anonymous:1 fake-admin:1 member-uid-2:1]
+    note_id: [path IDLike ObjectAccess AuthBoundary OwnershipBoundary SuspectIDOR interest=5]
+      changes: [auth-wall-mixed-status idor-raw-diff interest+object stable-structure structure-changes]
+      access: map[member-uid-2:1 owner-uid-3:2]
+      denied: map[anonymous:8 fake-admin:8 member-uid-2:1]
+    owner_id: [json IDLike]
+    title: [json]
+  Findings:
+    ! Authentication/authorization boundary observed
+    ! Object ownership enforcement observed
+    ! Role/permission boundary observed — authenticated identity denied access
+    ! Suspect IDOR surface via param: note_id
+  Next Steps:
+    > Attempt cross-identity object access via note_id
+    > Attempt cross-user object access (IDOR) across identities
+    > Attempt username enumeration
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test horizontal privilege escalation using id
+    > Test horizontal privilege escalation using note_id
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+    > Test weak credentials and default accounts
+
+[ENTITY] http://localhost:9001/home
+  Probes: 16
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: HTML
+  Statuses: 200×35 401×33
+  Signals: [AdminSurface AuthBoundary HasForm IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityUser creds effective role=member uid=1 exp=2026-04-23 01:36]
+  Findings:
+    ! Administrative surface detected
+    ! Authentication/authorization boundary observed
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Attempt username enumeration
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+    > Test weak credentials and default accounts
+
+[ENTITY] http://localhost:9001/api/messages/1
+  Probes: 19
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: JSON
+  Statuses: 200×44 401×39
+  Signals: [AuthBoundary HasJSONBody IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityUser creds effective role=member uid=1 exp=2026-04-23 01:36]
+  Parameters:
+    body: [json]
+    id: [json IDLike AuthBoundary interest=1]
+      changes: [auth-wall-mixed-status input-affects-response]
+      access: map[member-uid-2:1 owner-uid-3:1]
+      denied: map[anonymous:1 fake-admin:1]
+    message_id: [path IDLike ObjectAccess AuthBoundary SuspectIDOR interest=2]
+      changes: [auth-wall-mixed-status idor-raw-diff interest+object structure-changes]
+      access: map[member-uid-2:2 owner-uid-3:2]
+      denied: map[anonymous:8 fake-admin:8]
+    receiver_id: [json IDLike]
+    sender_id: [json IDLike]
+  Findings:
+    ! Authentication/authorization boundary observed
+    ! Role/permission boundary observed — authenticated identity denied access
+    ! Suspect IDOR surface via param: message_id
+  Next Steps:
+    > Attempt cross-identity object access via message_id
+    > Attempt username enumeration
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test vertical privilege escalation / role boundary using id
+    > Test vertical privilege escalation / role boundary using message_id
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+    > Test weak credentials and default accounts
+
+[ENTITY] http://localhost:9001/api/messages/2
+  Probes: 13
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: JSON
+  Statuses: 200×26 401×27
+  Signals: [AuthBoundary HasJSONBody IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+  Parameters:
+    body: [json]
+    id: [json IDLike]
+    message_id: [path IDLike AuthBoundary]
+      changes: [auth-wall-mixed-status]
+    receiver_id: [json IDLike]
+    sender_id: [json IDLike]
+  Findings:
+    ! Authentication/authorization boundary observed
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Attempt username enumeration
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test vertical privilege escalation / role boundary using message_id
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+    > Test weak credentials and default accounts
+
+[ENTITY] http://localhost:9001/api/notes
+  Probes: 19
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: JSON
+  Statuses: 200×46 401×39
+  Signals: [AuthBoundary HasJSONBody IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+  Parameters:
+    content: [json AuthBoundary interest=1]
+      changes: [auth-wall-mixed-status input-affects-response]
+      access: map[member-uid-2:1 owner-uid-3:1]
+      denied: map[anonymous:1 fake-admin:1]
+    id: [json IDLike Reflection AuthBoundary interest=5]
+      changes: [auth-wall-mixed-status input-affects-response stable-structure]
+      access: map[member-uid-2:3 owner-uid-3:3]
+      denied: map[anonymous:3 fake-admin:3]
+    owner_id: [json IDLike Reflection AuthBoundary interest=5]
+      changes: [auth-wall-mixed-status input-affects-response stable-structure]
+      access: map[member-uid-2:3 owner-uid-3:3]
+      denied: map[anonymous:3 fake-admin:3]
+    title: [json AuthBoundary interest=1]
+      changes: [auth-wall-mixed-status input-affects-response]
+      access: map[member-uid-2:1 owner-uid-3:1]
+      denied: map[anonymous:1 fake-admin:1]
+  Findings:
+    ! Authentication/authorization boundary observed
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Attempt username enumeration
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test vertical privilege escalation / role boundary using content
+    > Test vertical privilege escalation / role boundary using id
+    > Test vertical privilege escalation / role boundary using owner_id
+    > Test vertical privilege escalation / role boundary using title
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+    > Test weak credentials and default accounts
+
+[ENTITY] http://localhost:9001/api/notes/2
+  Probes: 13
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: JSON
+  Statuses: 200×21 401×27 403×5
+  Signals: [AuthBoundary HasJSONBody IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+  Parameters:
+    content: [json]
+    id: [json IDLike]
+    note_id: [path IDLike AuthBoundary]
+      changes: [auth-wall-mixed-status role-wall-403-authenticated]
+    owner_id: [json IDLike]
+    title: [json]
+  Findings:
+    ! Authentication/authorization boundary observed
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Attempt username enumeration
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test auth bypass headers (X-Forwarded-For, X-Original-URL, X-Rewrite-URL)
+    > Test vertical privilege escalation / role boundary using note_id
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+    > Test weak credentials and default accounts
+
+[ENTITY] http://localhost:9001/api/messages/-1
+  Probes: 12
+  Methods: [GET]
+  AuthLikely: true
+  Statuses: 401×25 404×25
+  Signals: [IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityUser creds effective role=member uid=1 exp=2026-04-23 01:36]
+  Parameters:
+    message_id: [path IDLike]
+  Findings:
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+
+[ENTITY] http://localhost:9001/api/messages/0
+  Probes: 12
+  Methods: [GET]
+  AuthLikely: true
+  Statuses: 401×25 404×25
+  Signals: [IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityUser creds effective role=member uid=1 exp=2026-04-23 01:36]
+  Parameters:
+    message_id: [path IDLike]
+  Findings:
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+
+[ENTITY] http://localhost:9001/api/notes/-1
+  Probes: 12
+  Methods: [GET]
+  AuthLikely: true
+  Statuses: 401×25 404×25
+  Signals: [IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityUser creds effective role=member uid=1 exp=2026-04-23 01:36]
+  Parameters:
+    note_id: [path IDLike]
+  Findings:
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+
+[ENTITY] http://localhost:9001/api/notes/0
+  Probes: 12
+  Methods: [GET]
+  AuthLikely: true
+  Statuses: 401×25 404×25
+  Signals: [IDLikeParam RoleBoundary StateChanging]
+  Identities:
+    anonymous: [IdentityInvalid rejected]
+    fake-admin: [IdentityInvalid rejected]
+    member-uid-2: [IdentityUser creds effective role=member uid=2 exp=2026-04-23 01:36]
+    owner-uid-3: [IdentityElevated creds effective role=owner uid=3 exp=2026-04-23 01:36]
+    session: [IdentityUser creds effective role=member uid=1 exp=2026-04-23 01:36]
+  Parameters:
+    note_id: [path IDLike]
+  Findings:
+    ! Role/permission boundary observed — authenticated identity denied access
+  Next Steps:
+    > Check if role is encoded in JWT claims and attempt tampering
+    > Probe role confusion via header injection (X-User-Role, X-Forwarded-User)
+    > Test vertical privilege escalation — attempt access with lower-privilege token
+
+[ENTITY] http://localhost:9001/login/admin
+  Probes: 17
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: HTML
+  Statuses: 303×84
+  Signals: [CredentiallessTokenIssuance IDLikeParam StateChanging]
+  Session:
+    Issued: true
+    - auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjMsInJvbGUiOiJvd25lciIsInVzZXJfaWQiOjMsImp0aSI6IjMtMTc3Njg2NTAxNTI4NTQ2OTU4MSIsImV4cCI6MTc3NjkwODIxNX0.7yeysGvZpBBF1xlmOFG6peBI8exPPHCCNf7Na47LN0w
+  Identities:
+    anonymous: [IdentityElevated issued-token role=owner uid=3 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    fake-admin: [IdentityElevated issued-token role=owner uid=3 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    member-uid-2: [IdentityElevated creds issued-token role=owner uid=3 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    owner-uid-3: [IdentityElevated creds issued-token role=owner uid=3 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    session: [IdentityElevated creds issued-token role=owner uid=3 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+  Findings:
+    ! Server issues tokens/sessions without credentials — credentialless authentication bypass possible
+  Next Steps:
+    > Attempt to reuse credentiallessly issued tokens across sessions
+    > Test whether issued tokens grant authenticated access to protected endpoints
+
+[ENTITY] http://localhost:9001/login/alice
+  Probes: 16
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: HTML
+  Statuses: 303×61
+  Signals: [CredentiallessTokenIssuance IDLikeParam StateChanging]
+  Session:
+    Used: true
+    Issued: true
+    - auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsInJvbGUiOiJtZW1iZXIiLCJ1c2VyX2lkIjoxLCJqdGkiOiIxLTE3NzY4NjUwMTUwMjY0OTk0MzYiLCJleHAiOjE3NzY5MDgyMTV9.LTozOm7c7Kd4HiYl9e57U5iuukQfxdSoQQhXgfQTn-w
+    - session_id=368139201d615de52bb68bf6f5cb3c8f
+  Identities:
+    anonymous: [IdentityBootstrap issued-token role=member uid=1 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    fake-admin: [IdentityBootstrap issued-token role=member uid=1 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    member-uid-2: [IdentityBootstrap creds issued-token role=member uid=1 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    owner-uid-3: [IdentityBootstrap creds issued-token role=member uid=1 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    session: [IdentityBootstrap creds issued-token role=member uid=1 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+  Findings:
+    ! Server issues tokens/sessions without credentials — credentialless authentication bypass possible
+  Next Steps:
+    > Attempt to reuse credentiallessly issued tokens across sessions
+    > Test whether issued tokens grant authenticated access to protected endpoints
+
+[ENTITY] http://localhost:9001/login/bob
+  Probes: 17
+  Methods: [DELETE GET HEAD OPTIONS PATCH POST PUT]
+  AuthLikely: true
+  Content: HTML
+  Statuses: 303×79
+  Signals: [CredentiallessTokenIssuance IDLikeParam StateChanging]
+  Session:
+    Issued: true
+    - auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIsInJvbGUiOiJtZW1iZXIiLCJ1c2VyX2lkIjoyLCJqdGkiOiIyLTE3NzY4NjUwMTUyNzM1NDkwMzIiLCJleHAiOjE3NzY5MDgyMTV9.Zg8AWnYfuLYU87p8eHttzwtVunf1Vhc6T0Tw66-LFNY
+  Identities:
+    anonymous: [IdentityBootstrap issued-token role=member uid=2 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    fake-admin: [IdentityBootstrap issued-token role=member uid=2 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    member-uid-2: [IdentityBootstrap creds issued-token role=member uid=2 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    owner-uid-3: [IdentityBootstrap creds issued-token role=member uid=2 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+    session: [IdentityBootstrap creds issued-token role=member uid=2 exp=2026-04-23 01:36]
+      cookies: [auth_token]
+  Findings:
+    ! Server issues tokens/sessions without credentials — credentialless authentication bypass possible
+  Next Steps:
+    > Attempt to reuse credentiallessly issued tokens across sessions
+    > Test whether issued tokens grant authenticated access to protected endpoints
+
+[ENTITY] http://localhost:9001/logout
+  Probes: 0
+
+=============== END OF REPORT ===============

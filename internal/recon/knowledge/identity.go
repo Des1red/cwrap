@@ -11,6 +11,18 @@ const (
 	IdentityInvalid                // tampered / rejected
 )
 
+const (
+	IdentityTagCreds       = "creds"
+	IdentityTagRejected    = "rejected"
+	IdentityTagIssuedToken = "issued-token"
+	IdentityTagEffective   = "effective"
+
+	IdentityTagCSRF           = "csrf"
+	IdentityTagCSRFToken      = "csrf-token"
+	IdentityTagCSRFHeader     = "csrf-header"
+	IdentityTagCSRFCookieName = "csrf-cookie"
+)
+
 type Identity struct {
 	Name     string
 	Kind     IdentityKind
@@ -22,7 +34,11 @@ type Identity struct {
 	// Mechanism fingerprint
 	CookieNames []string
 	AuthScheme  string
-	HasCSRF     bool
+
+	HasCSRF        bool
+	CSRFToken      string
+	CSRFHeader     string // e.g. "X-CSRF-Token" — which header to send it back in
+	CSRFCookieName string
 
 	// Behavior evidence
 	IssuedByServer bool

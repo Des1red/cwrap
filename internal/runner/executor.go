@@ -19,7 +19,11 @@ func Execute(req model.Request) error {
 	for i, t := range targets {
 
 		r := req
-		r.URL = t
+		if req.FilePath != "" {
+			r.FilePath = t
+		} else {
+			r.URL = t
+		}
 
 		exec := resolveExecutor(r)
 
@@ -34,9 +38,14 @@ func Execute(req model.Request) error {
 }
 
 func expandTargets(req model.Request) ([]string, error) {
-	if req.Flags.Target == "" && req.URL == "" {
-		return nil, fmt.Errorf("either URL or --tfile required")
+	if req.Flags.Target == "" && req.URL == "" && req.FilePath == "" {
+		return nil, fmt.Errorf("either URL/ReportPath or --tfile required")
 	}
+
+	if req.FilePath != "" {
+		return []string{req.FilePath}, nil
+	}
+
 	if req.Flags.Target == "" {
 		return []string{req.URL}, nil
 	}

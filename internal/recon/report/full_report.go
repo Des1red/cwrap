@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -150,13 +151,13 @@ func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
 func edgeTypeLabel(t knowledge.EdgeType) string {
 	switch t {
 	case knowledge.EdgeDiscoveredFromHTML:
-		return "html"
+		return knowledge.EdgeLabelHTML
 	case knowledge.EdgeDiscoveredFromJS:
-		return "js"
+		return knowledge.EdgeLabelJS
 	case knowledge.EdgeFormAction:
-		return "form"
+		return knowledge.EdgeLabelForm
 	default:
-		return "edge"
+		return knowledge.EdgeLabelEdge
 	}
 }
 
@@ -189,10 +190,10 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 			fmt.Fprintf(w, "  Methods: %v\n", methods)
 		}
 		if ent.HTTP.AuthLikely {
-			fmt.Fprintln(w, "  AuthLikely: true")
+			fmt.Fprintln(w, "  AuthLikely: "+strconv.FormatBool(ent.HTTP.AuthLikely))
 		}
 		if ent.HTTP.CSRFPresent {
-			fmt.Fprintln(w, "  CSRFPresent: true")
+			fmt.Fprintln(w, "  CSRFPresent: "+strconv.FormatBool(ent.HTTP.CSRFPresent))
 		}
 
 		// Content — only print true content type
@@ -227,10 +228,10 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 		if ent.SessionUsed || ent.SessionIssued || len(ent.SessionCookies) > 0 {
 			fmt.Fprintln(w, "  Session:")
 			if ent.SessionUsed {
-				fmt.Fprintln(w, "    Used: true")
+				fmt.Fprintln(w, "    Used: "+strconv.FormatBool(ent.SessionUsed))
 			}
 			if ent.SessionIssued {
-				fmt.Fprintln(w, "    Issued: true")
+				fmt.Fprintln(w, "    Issued: "+strconv.FormatBool(ent.SessionIssued))
 			}
 			if len(ent.SessionCookies) > 0 {
 				names := make([]string, 0, len(ent.SessionCookies))
@@ -260,16 +261,16 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 				tags := []string{}
 				tags = append(tags, identityKindLabel(id.Kind))
 				if id.SentCreds {
-					tags = append(tags, "creds")
+					tags = append(tags, knowledge.IdentityTagCreds)
 				}
 				if id.Rejected {
-					tags = append(tags, "rejected")
+					tags = append(tags, knowledge.IdentityTagRejected)
 				}
 				if id.IssuedByServer {
-					tags = append(tags, "issued-token")
+					tags = append(tags, knowledge.IdentityTagIssuedToken)
 				}
 				if id.Effective {
-					tags = append(tags, "effective")
+					tags = append(tags, knowledge.IdentityTagEffective)
 				}
 				if id.Role != "" {
 					tags = append(tags, "role="+id.Role)
@@ -284,7 +285,16 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 					tags = append(tags, "scheme="+id.AuthScheme)
 				}
 				if id.HasCSRF {
-					tags = append(tags, "csrf")
+					tags = append(tags, knowledge.IdentityTagCSRF)
+					if id.CSRFToken != "" {
+						tags = append(tags, knowledge.IdentityTagCSRFToken+"="+id.CSRFToken)
+					}
+					if id.CSRFHeader != "" {
+						tags = append(tags, knowledge.IdentityTagCSRFHeader+"="+id.CSRFHeader)
+					}
+					if id.CSRFCookieName != "" {
+						tags = append(tags, knowledge.IdentityTagCSRFCookieName+"="+id.CSRFCookieName)
+					}
 				}
 				fmt.Fprintf(w, "    %s: %v\n", name, tags)
 				if len(id.CookieNames) > 0 {
@@ -327,34 +337,34 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 				src := paramSourceShort(p)
 				tags := []string{src}
 				if p.IDLike {
-					tags = append(tags, "IDLike")
+					tags = append(tags, knowledge.ParamTagIDLike)
 				}
 				if p.TokenLike {
-					tags = append(tags, "TokenLike")
+					tags = append(tags, knowledge.ParamTagTokenLike)
 				}
 				if p.DebugLike {
-					tags = append(tags, "DebugLike")
+					tags = append(tags, knowledge.ParamTagDebugLike)
 				}
 				if p.LikelyReflection {
-					tags = append(tags, "Reflection")
+					tags = append(tags, knowledge.ParamTagReflection)
 				}
 				if p.LikelyObjectAccess {
-					tags = append(tags, "ObjectAccess")
+					tags = append(tags, knowledge.ParamTagObjectAccess)
 				}
 				if p.Enumerable {
-					tags = append(tags, "Enumerable")
+					tags = append(tags, knowledge.ParamTagEnumerable)
 				}
 				if p.AuthBoundary {
-					tags = append(tags, "AuthBoundary")
+					tags = append(tags, knowledge.ParamTagAuthBoundary)
 				}
 				if p.OwnershipBoundary {
-					tags = append(tags, "OwnershipBoundary")
+					tags = append(tags, knowledge.ParamTagOwnershipBoundary)
 				}
 				if p.PossibleIDOR {
-					tags = append(tags, "PossibleIDOR")
+					tags = append(tags, knowledge.ParamTagPossibleIDOR)
 				}
 				if p.SuspectIDOR {
-					tags = append(tags, "SuspectIDOR")
+					tags = append(tags, knowledge.ParamTagSuspectIDOR)
 				}
 				if p.Interest > 0 {
 					tags = append(tags, fmt.Sprintf("interest=%d", p.Interest))

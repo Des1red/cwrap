@@ -1,6 +1,7 @@
 package report
 
 import (
+	"cwrap/internal/model"
 	"cwrap/internal/recon/knowledge"
 	"fmt"
 	"os"
@@ -33,7 +34,7 @@ func CreateFileReport(k *knowledge.Knowledge) (string, error) {
 // ---- file plumbing ----
 
 func ensureDir() error {
-	return os.MkdirAll("reports", 0o755)
+	return os.MkdirAll(model.ReportDirecoryName, 0o755)
 }
 
 func createFile(k *knowledge.Knowledge) (*os.File, string, error) {
@@ -44,8 +45,8 @@ func createFile(k *knowledge.Knowledge) (*os.File, string, error) {
 
 	// Local time (your machine / environment timezone). Filename includes date.
 	ts := time.Now().Format("2006-01-02_15-04-05")
-	name := fmt.Sprintf("%s_%s.report", targetPart, ts)
-	path := filepath.Join("reports", name)
+	name := fmt.Sprintf("%s_%s."+model.ReportExtension, targetPart, ts)
+	path := filepath.Join(model.ReportDirecoryName, name)
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {

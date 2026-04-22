@@ -8,6 +8,13 @@ const (
 	EdgeFormAction
 )
 
+const (
+	EdgeLabelHTML = "html"
+	EdgeLabelJS   = "js"
+	EdgeLabelForm = "form"
+	EdgeLabelEdge = "edge"
+)
+
 type Edge struct {
 	From string
 	To   string

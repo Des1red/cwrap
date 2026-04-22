@@ -47,8 +47,26 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	}
 
 	// ---- csrf ----
-	if resp.Header.Get("X-CSRF-Token") != "" || resp.Header.Get("X-XSRF-Token") != "" {
+	// ---- csrf ----
+	// check response headers first
+	if token := resp.Header.Get("X-CSRF-Token"); token != "" {
 		id.HasCSRF = true
+		id.CSRFToken = token
+		id.CSRFHeader = "X-CSRF-Token"
+	} else if token := resp.Header.Get("X-XSRF-Token"); token != "" {
+		id.HasCSRF = true
+		id.CSRFToken = token
+		id.CSRFHeader = "X-XSRF-Token"
+	}
+
+	// check Set-Cookie for csrf cookies
+	for _, c := range resp.Cookies() {
+		ln := strings.ToLower(c.Name)
+		if strings.Contains(ln, "csrf") || strings.Contains(ln, "xsrf") {
+			id.HasCSRF = true
+			id.CSRFToken = c.Value
+			id.CSRFCookieName = c.Name
+		}
 	}
 	// ---- rejection ----
 	if resp.StatusCode == 401 {
@@ -81,6 +99,10 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		}
 		if prev.SentCreds {
 			id.SentCreds = true
+		}
+		if id.CSRFToken == "" && prev.CSRFToken != "" {
+			id.CSRFToken = prev.CSRFToken
+			id.HasCSRF = true
 		}
 		if id.Role == "" && prev.Role != "" {
 			id.Role = prev.Role

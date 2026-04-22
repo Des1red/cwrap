@@ -9,6 +9,9 @@ func resolveExecutor(req model.Request) Executor {
 	case "recon":
 		return ReconExecutor{}
 
+	case "exploit":
+		return ExploitExecutor{}
+
 	default:
 		return CurlExecutor{}
 	}

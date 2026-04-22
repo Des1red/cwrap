@@ -22,6 +22,19 @@ const (
 	ReasonJSFetch        = "js-fetch"
 )
 
+const (
+	ParamTagOwnershipBoundary = "OwnershipBoundary"
+	ParamTagPossibleIDOR      = "PossibleIDOR"
+	ParamTagSuspectIDOR       = "SuspectIDOR"
+	ParamTagAuthBoundary      = "AuthBoundary"
+	ParamTagIDLike            = "IDLike"
+	ParamTagObjectAccess      = "ObjectAccess"
+	ParamTagReflection        = "Reflection"
+	ParamTagEnumerable        = "Enumerable"
+	ParamTagTokenLike         = "TokenLike"
+	ParamTagDebugLike         = "DebugLike"
+)
+
 func (p ParamSource) String() string {
 	switch p {
 	case ParamQuery:

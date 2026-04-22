@@ -23,7 +23,7 @@ func Execute() {
 	handler := intent.Resolve(req)
 
 	offset := 2
-	if req.URL != "" {
+	if req.URL != "" || req.FilePath != "" {
 		offset = 3
 	}
 
