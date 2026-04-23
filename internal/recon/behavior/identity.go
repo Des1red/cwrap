@@ -120,6 +120,7 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 	for k, v := range cookies {
 		snapshot[k] = v
 	}
+	e.k.DiscoveredIdentities[name] = snapshot
 
 	e.identities = append(e.identities, Identity{
 		Name:      name,

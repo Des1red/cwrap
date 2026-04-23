@@ -17,16 +17,18 @@ type Knowledge struct {
 	Edges    []Edge
 	EdgeSeen map[string]bool
 	// Global parameter dictionary (useful for cross-target heuristics).
-	Params map[string]bool
+	Params               map[string]bool
+	DiscoveredIdentities map[string]map[string]string
 }
 
 func New(target string) *Knowledge {
 	return &Knowledge{
-		Target:   target,
-		Entities: make(map[string]*Entity),
-		Edges:    make([]Edge, 0, 256),
-		EdgeSeen: make(map[string]bool),
-		Params:   make(map[string]bool),
+		Target:               target,
+		Entities:             make(map[string]*Entity),
+		Edges:                make([]Edge, 0, 256),
+		EdgeSeen:             make(map[string]bool),
+		Params:               make(map[string]bool),
+		DiscoveredIdentities: make(map[string]map[string]string),
 	}
 }
 

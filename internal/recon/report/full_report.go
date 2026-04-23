@@ -22,6 +22,7 @@ func writeFullReport(w io.Writer, k *knowledge.Knowledge) {
 	writeGlobalStats(w, k)
 	writeDiscoveryTree(w, k)
 	writeEntityDetails(w, k)
+	writeIdentityVault(w, k)
 
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "=============== END OF REPORT ===============")
@@ -504,4 +505,31 @@ func paramSourceLabel(p *knowledge.ParamIntel, src knowledge.ParamSource) string
 	default:
 		return "unknown"
 	}
+}
+
+func writeIdentityVault(w io.Writer, k *knowledge.Knowledge) {
+	if len(k.DiscoveredIdentities) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "------------------------------------------------")
+	fmt.Fprintln(w, "IDENTITY VAULT")
+	fmt.Fprintln(w, "------------------------------------------------")
+	names := make([]string, 0, len(k.DiscoveredIdentities))
+	for n := range k.DiscoveredIdentities {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		fmt.Fprintf(w, "  %s:\n", name)
+		cookies := k.DiscoveredIdentities[name]
+		cnames := make([]string, 0, len(cookies))
+		for cn := range cookies {
+			cnames = append(cnames, cn)
+		}
+		sort.Strings(cnames)
+		for _, cn := range cnames {
+			fmt.Fprintf(w, "    %s=%s\n", cn, cookies[cn])
+		}
+	}
+	fmt.Fprintln(w)
 }
