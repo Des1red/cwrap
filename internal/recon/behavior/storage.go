@@ -86,5 +86,5 @@ func storeResponse(
 }
 
 func shouldReportIdentity(name string) bool {
-	return name != LiveSession
+	return name != knowledge.LiveSession
 }

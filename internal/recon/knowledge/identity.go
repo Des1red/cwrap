@@ -3,6 +3,13 @@ package knowledge
 type IdentityKind int
 
 const (
+	LiveSession    = "session"
+	Anonymous      = "anonymous"
+	FakeAdmin      = "fake-admin"
+	CorruptedToken = "corrupted-token"
+)
+
+const (
 	IdentityUnknown   IdentityKind = iota
 	IdentityNone                   // no credentials sent
 	IdentityBootstrap              // server issued a session

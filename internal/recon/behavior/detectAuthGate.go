@@ -3,7 +3,7 @@ package behavior
 import "cwrap/internal/recon/knowledge"
 
 func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int, probeFP map[string]string) {
-	baseline, okB := identityStatuses["baseline"]
+	baseline, okB := identityStatuses[knowledge.LiveSession]
 	if !okB {
 		return
 	}
@@ -15,10 +15,10 @@ func (e *Engine) detectEndpointAuthGate(identityStatuses map[string]int, probeFP
 		return
 	}
 
-	baseFP := probeFP["baseline"]
+	baseFP := probeFP[knowledge.LiveSession]
 
 	for name, status := range identityStatuses {
-		if name == "baseline" {
+		if name == knowledge.LiveSession {
 			continue
 		}
 

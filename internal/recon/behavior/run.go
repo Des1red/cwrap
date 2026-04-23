@@ -2,6 +2,7 @@ package behavior
 
 import (
 	"cwrap/internal/model"
+	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/recon/session"
 	"cwrap/internal/recon/transport"
 )
@@ -93,10 +94,10 @@ func (e *Engine) Run(base model.Request, url string) error {
 
 	// Mark entity as seen
 	ent.State.Seen = true
-	if meta, ok := e.identityMeta(LiveSession); ok {
+	if meta, ok := e.identityMeta(knowledge.LiveSession); ok {
 		extractIdentity(ent, meta.Name, resp)
 		// register session role|uid so it's never added as a live identity
-		if id := ent.Identities[LiveSession]; id != nil {
+		if id := ent.Identities[knowledge.LiveSession]; id != nil {
 			roleUID := id.Role + "|" + id.UserID
 			if roleUID != "|" {
 				e.knownRoleUIDs[roleUID] = true

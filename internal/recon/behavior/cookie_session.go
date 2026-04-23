@@ -41,7 +41,7 @@ func (e *Engine) captureSession(ent *knowledge.Entity, idMeta Identity, resp *ht
 	// live identities (discovered accounts like member-uid-2) have frozen
 	// cookie snapshots from discovery — never overwrite them from subsequent
 	// probes. Still check for newly discoverable identities in the response.
-	if idMeta.Name != LiveSession {
+	if idMeta.Name != knowledge.LiveSession {
 		e.discoverIdentityFromResponse(resp)
 		return
 	}

@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-const LiveSession = "session"
-
 type Identity struct {
 	Name      string
 	Apply     func(model.Request) model.Request
@@ -31,7 +29,7 @@ func (e *Engine) deriveIdentities(base model.Request) []Identity {
 
 	// session (user supplied identity)
 	ids = append(ids, Identity{
-		Name: LiveSession,
+		Name: knowledge.LiveSession,
 		Apply: func(r model.Request) model.Request {
 			if len(e.sessionCookies) == 0 {
 				return r
@@ -59,7 +57,7 @@ func (e *Engine) deriveIdentities(base model.Request) []Identity {
 
 	// anonymous (remove auth)
 	ids = append(ids, Identity{
-		Name:      "anonymous",
+		Name:      knowledge.Anonymous,
 		Synthetic: true,
 		Apply: func(r model.Request) model.Request {
 			r.Flags.Bearer = ""
@@ -71,7 +69,7 @@ func (e *Engine) deriveIdentities(base model.Request) []Identity {
 	// corrupted token
 	if base.Flags.Bearer != "" {
 		ids = append(ids, Identity{
-			Name:      "corrupted-token",
+			Name:      knowledge.CorruptedToken,
 			Synthetic: true,
 			Apply: func(r model.Request) model.Request {
 				r.Flags.Bearer = r.Flags.Bearer + ".invalid"
@@ -82,7 +80,7 @@ func (e *Engine) deriveIdentities(base model.Request) []Identity {
 
 	// fake role
 	ids = append(ids, Identity{
-		Name:      "fake-admin",
+		Name:      knowledge.FakeAdmin,
 		Synthetic: true,
 		Apply: func(r model.Request) model.Request {
 			r.Flags.Headers = upsertHeader(r.Flags.Headers, "X-Forwarded-User", "admin")
