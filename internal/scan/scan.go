@@ -107,7 +107,8 @@ func Run(req model.Request) error {
 
 				mu.Lock()
 				fmt.Println(line)
-				if result.status == 200 {
+				if result.status != 404 && result.status != 500 &&
+					result.status != 0 {
 					hits = append(hits, target)
 				}
 				mu.Unlock()
