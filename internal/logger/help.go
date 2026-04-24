@@ -12,13 +12,13 @@ func PrintHelp() {
 	fmt.Println("Usage:")
 	fmt.Println("  cwrap <command> <url> [words] [flags]")
 	fmt.Println()
-
 	fmt.Println("Commands:")
 	clihelp.Print(
-		clihelp.F("fetch  <url>", "", "retrieve a resource (GET)"),
-		clihelp.F("send   <url>", "", "submit data (POST)"),
-		clihelp.F("upload <url>", "", "upload files (multipart POST)"),
-		clihelp.F("recon  <url> <profile>", "", "active security reconnaissance"),
+		clihelp.F("fetch", "<url>", "retrieve a resource (GET)"),
+		clihelp.F("send", "<url>", "submit data (POST)"),
+		clihelp.F("upload", "<url>", "upload files (multipart POST)"),
+		clihelp.F("recon", "<url>", "active security reconnaissance"),
+		clihelp.F("exploit", "<report>", "confirm vulnerabilities and expand access chains"),
 	)
 
 	fmt.Println("\nRecon profiles:")
@@ -29,8 +29,24 @@ func PrintHelp() {
 
 	fmt.Println("\nRecon flags:")
 	clihelp.Print(
-		clihelp.F("--tfile <path>", "", "read target URLs from file (one per line)"),
-		clihelp.F("--debug", "", "show probe execution details"),
+		clihelp.F("--tfile", "<path>", "read target URLs from file (one per line)"),
+	)
+
+	fmt.Println("\nRecon signals:")
+	clihelp.Print(
+		clihelp.F("AuthBoundary", "", "endpoint allows some identities and denies others"),
+		clihelp.F("RoleBoundary", "", "authenticated identity denied — role/permission wall"),
+		clihelp.F("ObjectOwnership", "", "different identities access different objects"),
+		clihelp.F("CredentiallessTokenIssuance", "", "server issues tokens without credentials"),
+		clihelp.F("AdminSurface", "", "path contains admin/internal/debug patterns"),
+		clihelp.F("PublicAccess", "", "endpoint accessible without any credentials"),
+		clihelp.F("StateChanging", "", "endpoint accepts POST/PUT/PATCH/DELETE"),
+	)
+
+	fmt.Println("\nExploit stages:")
+	clihelp.Print(
+		clihelp.F("Stage 1 — Vulnerability Confirmation", "", "replays vault tokens to prove findings"),
+		clihelp.F("Stage 2 — Chain Expansion", "", "expands confirmed findings to measure impact"),
 	)
 
 	fmt.Println("\nEncoding words (send/upload):")
@@ -94,10 +110,16 @@ func PrintHelp() {
 	fmt.Println("\nExamples — recon:")
 	clihelp.Print(
 		clihelp.F("cwrap recon https://site.com http", "", "web app recon"),
+		clihelp.F("cwrap recon https://site.com", "", "uses default:web app recon"),
 		clihelp.F("cwrap recon https://api.site/users api", "", "API recon"),
 		clihelp.F("cwrap recon https://site.com http bearer=TOKEN", "", "authenticated recon"),
-		clihelp.F("cwrap recon https://site.com http --debug", "", "show probe details"),
 		clihelp.F("cwrap recon --tfile urls.txt http", "", "recon from URL list"),
+	)
+
+	fmt.Println("\nExamples — exploit:")
+	clihelp.Print(
+		clihelp.F("cwrap exploit reports/site-com_2026-04-24.report", "", "confirm and expand findings"),
+		clihelp.F("cwrap exploit reports/site-com_2026-04-24.report", "", "show chain details"),
 	)
 
 	fmt.Println("\nEscape hatch (raw flags):")

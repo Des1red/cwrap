@@ -13,6 +13,7 @@ cwrap fetch https://site.com page=2
 cwrap send https://api.site/login json user=admin pass=123
 cwrap upload https://site.com/uploads file=@file
 cwrap recon https://site.com http
+cwrap exploit reports/site-com_2026-04-24_17-14-51.report
 ```
 
 ## Philosophy
@@ -27,6 +28,7 @@ cwrap expresses HTTP meaning.
 | auth | Authorization header | `bearer=` |
 | cookies | cookie jar flags | `cookie:` |
 | probe a target | custom scripts | `recon` |
+| confirm vulnerabilities | custom scripts | `exploit` |
 
 The goal is predictable, readable commands.
 
@@ -92,6 +94,7 @@ cwrap automatically probes endpoints, tracks sessions, and reasons about authori
 
 - Fetches the target and extracts links, forms, and JS endpoints
 - Derives multiple probe identities: session (your credentials), anonymous (no auth), fake-admin (role confusion headers)
+- Discovers live identities dynamically — when a new role/uid combination is observed in JWT cookies, cwrap registers it as a named identity and re-probes all known endpoints with it
 - Probes discovered endpoints with each identity and compares responses
 - Detects path-level ID segments (`/users/123`) and generates mutation probes
 - Tracks session cookies across the run and reuses them on subsequent runs
@@ -104,10 +107,11 @@ cwrap automatically probes endpoints, tracks sessions, and reasons about authori
 |--------|---------|
 | `AuthBoundary` | Endpoint allows some identities and denies others |
 | `RoleBoundary` | Authenticated identity denied — role/permission wall |
-| `ObjectOwnership` | Different identities access different objects |
+| `ObjectOwnership` | Different identities access different objects at the same endpoint |
 | `PossibleIDOR` | Structural response diff across ID values with no-cred denial |
 | `CredentiallessTokenIssuance` | Server issues tokens without credentials |
-| `AdminSurface` | Path contains admin/internal/debug patterns |
+| `AdminSurface` | Endpoint path contains admin/internal/debug patterns |
+| `PublicAccess` | Endpoint accessible without any credentials |
 | `StateChanging` | Endpoint accepts POST/PUT/PATCH/DELETE |
 | `SensitiveKeyword` | JS contains secrets, keys, or hardcoded credentials |
 
@@ -139,11 +143,82 @@ On the next run against the same host, those cookies are automatically injected 
 
 Every recon run produces a full report at `reports/<host>_<timestamp>.report` containing:
 - Discovery tree (how entities were found)
-- Per-entity signals, methods, headers, statuses
-- Identity behavior (what each probe identity received)
-- Parameter intelligence (IDLike, enumerable, auth/ownership boundary)
+- Per-entity signals, methods, statuses
+- Identity behavior (what each probe identity received, with role/uid from JWT claims)
+- Parameter intelligence (IDLike, enumerable, auth/ownership boundary, access and denial maps)
 - JS intelligence (secrets, endpoints, role gates, env vars)
+- Identity vault (frozen cookie snapshots for each discovered live identity)
 - Findings and actionable next steps
+
+---
+
+### Exploit — vulnerability confirmation and chain expansion
+```
+cwrap exploit <report> [flags]
+```
+
+Loads a recon report and runs a two-stage exploit engine against the target.
+
+#### Stage 1 — Vulnerability Confirmation
+
+Probes confirmed findings from the report to prove vulnerabilities exist:
+
+| Probe | What it tests |
+|-------|--------------|
+| Ownership probe | Cross-identity object access — can identity B read identity A's objects? |
+| IDOR probe | Parameter-level access control — can a denied identity reach a protected value? |
+| Credentialless probe | Token reuse — does a credentialless token grant authenticated access? |
+
+Each probe replays real tokens from the identity vault using frozen cookie snapshots captured during recon.
+
+#### Stage 2 — Chain Expansion
+
+Takes confirmed stage 1 findings and expands them to measure true impact:
+
+| Expander | Seeds from | Action |
+|----------|-----------|--------|
+| Credentialless Token Reuse | Confirmed credentialless access | Tests all credless identities against role/admin boundary endpoints not yet tested |
+| IDOR Object Enumeration | Confirmed ownership bypass | Enumerates neighboring object IDs with the denied identity — stops at 3 consecutive 404/403 responses |
+| Ownership Bypass Pivot | Confirmed ownership bypass | Tests the bypassing identity against neighboring objects — skips own objects |
+
+#### Examples
+
+```bash
+# Run exploit against a report
+cwrap exploit reports/site-com_2026-04-24.report
+
+# Debug mode
+cwrap exploit reports/site-com_2026-04-24.report --debug
+```
+
+#### Output
+
+```
+═══ Vulnerability Confirmation ═══
+
+[1/4] Ownership probe — https://site.com/api/notes/1 (param: note_id)
+  testing: member-uid-2 (role=member uid=2)
+  token:   auth_token=eyJ...
+  [CONFIRMED] member-uid-2 accessed https://site.com/api/notes/1 → 200
+  response:   {"id":1,"title":"Alice's note","owner_id":1}
+  ✓ Ownership bypass confirmed
+
+═══ Chain Expansion ═══
+
+  Credentialless Token Reuse
+    anonymous => member-uid-1 (role=member uid=1) — 6 tested, 5 confirmed
+    token:    auth_token=eyJ...
+      [CONFIRMED] https://site.com/api/notes/1 → 200
+      [blocked]   https://site.com/api/notes/2 → 403
+      ...
+
+  IDOR Object Enumeration
+    member-uid-2 (role=member uid=2) — 3 tested, 0 confirmed
+      [blocked]   https://site.com/api/notes/3 → 403
+      ...
+
+✓ Chain expansion confirmed — 5 additional access(es) confirmed
+```
 
 ---
 
@@ -246,6 +321,20 @@ cwrap interprets words first, flags second.
 
 ---
 
+## Typical Workflow
+
+```bash
+# 1. Recon — map the surface and detect vulnerabilities
+cwrap recon https://site.com http
+
+# 2. Exploit — confirm findings and measure impact
+cwrap exploit reports/site-com_2026-04-24_17-14-51.report
+```
+
+Recon and exploit are designed to chain. The report produced by recon is the exact input exploit expects — identity vault, param intelligence, signal attribution, and all.
+
+---
+
 ## Examples
 
 #### Read paginated API
@@ -278,11 +367,14 @@ cwrap recon https://site.com/login http
 cwrap recon https://api.site/users api bearer=TOKEN
 ```
 
-#### Recon with session from previous run
+#### Full security assessment workflow
 ```bash
-# First run captures cookies from login
+# First run — captures session cookies from login flow
 cwrap recon https://site.com/login http
 
-# Subsequent runs reuse them automatically
+# Subsequent runs reuse session automatically
 cwrap recon https://site.com/dashboard http
+
+# Confirm and expand discovered vulnerabilities
+cwrap exploit reports/site-com_2026-04-24_17-14-51.report
 ```
