@@ -19,6 +19,7 @@ func PrintHelp() {
 		clihelp.F("upload", "<url>", "upload files (multipart POST)"),
 		clihelp.F("recon", "<url>", "active security reconnaissance"),
 		clihelp.F("exploit", "<report>", "confirm vulnerabilities and expand access chains"),
+		clihelp.F("scan", "<url> <wordlist>", "parallel subdirectory scanner"),
 	)
 
 	fmt.Println("\nRecon profiles:")
@@ -120,6 +121,13 @@ func PrintHelp() {
 	clihelp.Print(
 		clihelp.F("cwrap exploit reports/site-com_2026-04-24.report", "", "confirm and expand findings"),
 		clihelp.F("cwrap exploit reports/site-com_2026-04-24.report", "", "show chain details"),
+	)
+
+	fmt.Println("\nExamples — scan:")
+	clihelp.Print(
+		clihelp.F("cwrap scan https://site.com wordlist.txt", "", "subdirectory scan"),
+		clihelp.F("cwrap scan https://site.com wordlist.txt bearer=TOKEN", "", "authenticated scan"),
+		clihelp.F("cwrap recon --tfile site-com_scan.txt", "", "recon discovered paths"),
 	)
 
 	fmt.Println("\nEscape hatch (raw flags):")

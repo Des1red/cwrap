@@ -25,6 +25,8 @@ func Resolve(req model.Request) Handler {
 		return &ReconHandler{}
 	case "exploit":
 		return &ExploitHandler{}
+	case "scan":
+		return &ScanHandler{}
 	default:
 		return nil
 	}
@@ -44,9 +46,15 @@ func Parse(args []string) model.Request {
 	// If a third argument exists AND it is not a flag,
 	// treat it as URL
 	if len(args) >= 3 && !strings.HasPrefix(args[2], "-") {
-		if strings.ToLower(args[1]) == "exploit" {
+		switch strings.ToLower(args[1]) {
+		case "exploit":
 			path = args[2]
-		} else {
+		case "scan":
+			url = args[2]
+			if len(args) >= 4 && !strings.HasPrefix(args[3], "-") {
+				path = args[3]
+			}
+		default:
 			url = args[2]
 		}
 	}
@@ -78,6 +86,13 @@ func Parse(args []string) model.Request {
 		return model.Request{
 			FilePath: path, // report path, not a URL
 			Original: "exploit",
+		}
+	case "scan":
+		return model.Request{
+			Method:   "GET",
+			URL:      url,
+			FilePath: path,
+			Original: "scan",
 		}
 	case "get", "post", "put", "delete", "download":
 		return model.Request{

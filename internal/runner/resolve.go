@@ -12,6 +12,8 @@ func resolveExecutor(req model.Request) Executor {
 	case "exploit":
 		return ExploitExecutor{}
 
+	case "scan":
+		return ScanExecutor{}
 	default:
 		return CurlExecutor{}
 	}

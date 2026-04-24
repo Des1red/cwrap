@@ -12,6 +12,7 @@ cwrap <command> <url> [words] [flags]
 cwrap fetch https://site.com page=2
 cwrap send https://api.site/login json user=admin pass=123
 cwrap upload https://site.com/uploads file=@file
+cwrap scan https://site.com wordlist.txt
 cwrap recon https://site.com http
 cwrap exploit reports/site-com_2026-04-24_17-14-51.report
 ```
@@ -27,6 +28,7 @@ cwrap expresses HTTP meaning.
 | JSON | content-type header | `json` |
 | auth | Authorization header | `bearer=` |
 | cookies | cookie jar flags | `cookie:` |
+| find hidden paths | custom scripts | `scan` |
 | probe a target | custom scripts | `recon` |
 | confirm vulnerabilities | custom scripts | `exploit` |
 
@@ -72,6 +74,56 @@ cwrap send https://httpbin.org/post name=your_name
 cwrap send https://httpbin.org/post json name=your_name age=30
 cwrap send https://api.site json user.name=your_name user.age=30
 ```
+
+---
+
+### Scan — subdirectory scanner
+```
+cwrap scan <url> <wordlist> [words]
+```
+
+Parallel subdirectory scanner with automatic soft 404 detection and baseline fingerprinting.
+
+#### What scan does
+
+- Takes two baseline probes against random paths to fingerprint the server's 404 behavior
+- Detects soft 404 servers (those that return 200 for everything) and filters them by exact content hash
+- For servers that randomize responses, falls back to size-band filtering (within 5%)
+- Runs 20 parallel workers against the wordlist
+- Prints found paths color-coded by status code
+- Saves all 200 results to `<host>_scan.txt` — one URL per line, ready to feed into `recon --tfile`
+
+#### Output colors
+
+| Color | Status |
+|-------|--------|
+| Green | 200 OK |
+| Yellow | 301/302/303 redirect |
+| Red | 401/403 denied |
+
+#### Examples
+
+```bash
+# Basic scan
+cwrap scan https://site.com wordlist.txt
+
+# Authenticated scan
+cwrap scan https://site.com wordlist.txt bearer=TOKEN
+
+# Chain into recon
+cwrap scan https://site.com wordlist.txt
+cwrap recon --tfile site-com_scan.txt http
+```
+
+#### Soft 404 detection
+
+Some servers return HTTP 200 for all paths including non-existent ones. cwrap detects this automatically:
+
+```
+⚠  Soft 404 detected — filtering by exact content match (baseline: 8753 bytes)
+```
+
+When detected, responses that match the baseline hash are silently skipped. Only paths with genuinely different content surface as findings.
 
 ---
 
@@ -324,14 +376,17 @@ cwrap interprets words first, flags second.
 ## Typical Workflow
 
 ```bash
-# 1. Recon — map the surface and detect vulnerabilities
-cwrap recon https://site.com http
+# 1. Scan — discover hidden paths
+cwrap scan https://site.com wordlist.txt
 
-# 2. Exploit — confirm findings and measure impact
+# 2. Recon — map the surface and detect vulnerabilities
+cwrap recon --tfile site-com_scan.txt http
+
+# 3. Exploit — confirm findings and measure impact
 cwrap exploit reports/site-com_2026-04-24_17-14-51.report
 ```
 
-Recon and exploit are designed to chain. The report produced by recon is the exact input exploit expects — identity vault, param intelligence, signal attribution, and all.
+Scan, recon, and exploit are designed to chain. Scan output feeds directly into recon via `--tfile`, and the report produced by recon is the exact input exploit expects.
 
 ---
 
@@ -357,24 +412,20 @@ cwrap fetch https://api.site/me bearer=TOKEN
 cwrap send https://api.site json filter.name=your_name filter.age=30 tag=a tag=b
 ```
 
-#### Recon a login page
+#### Discover and recon hidden paths
 ```bash
-cwrap recon https://site.com/login http
-```
-
-#### Recon an authenticated API endpoint
-```bash
-cwrap recon https://api.site/users api bearer=TOKEN
+cwrap scan https://site.com /usr/share/wordlists/dirb/common.txt
+cwrap recon --tfile site-com_scan.txt http
 ```
 
 #### Full security assessment workflow
 ```bash
-# First run — captures session cookies from login flow
-cwrap recon https://site.com/login http
+# Discover surface
+cwrap scan https://site.com wordlist.txt
 
-# Subsequent runs reuse session automatically
-cwrap recon https://site.com/dashboard http
+# Deep recon each discovered path
+cwrap recon --tfile site-com_scan.txt http
 
-# Confirm and expand discovered vulnerabilities
+# Confirm and expand vulnerabilities
 cwrap exploit reports/site-com_2026-04-24_17-14-51.report
 ```
