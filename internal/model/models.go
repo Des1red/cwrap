@@ -63,4 +63,4 @@ type QueryParam struct {
 }
 
 const ReportExtension = "report"
-const ReportDirecoryName = ReportExtension
+const ReportDirecoryName = "reports"

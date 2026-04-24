@@ -87,6 +87,15 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 	fmt.Fprintf(w, "JS leaks:            %d\n", jsLeakCount)
 	fmt.Fprintf(w, "Credentialless issuance: %v\n", yesNo(hasCredlessIssuance))
 
+	public := 0
+	for _, u := range urls {
+		ent := k.Entities[u]
+		if ent != nil && ent.Signals.Tags[knowledge.SigPublicAccess] {
+			public++
+		}
+	}
+	fmt.Fprintf(w, "Public endpoints:    %d\n", public)
+
 	if len(high) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "High Risk Findings:")
@@ -151,6 +160,10 @@ func buildHighRiskHighlights(k *knowledge.Knowledge) []string {
 				out = append(out, fmt.Sprintf("Unauthenticated access observed: %s (via param behavior)", ent.URL))
 				break
 			}
+		}
+
+		if ent.SeenSignal(knowledge.SigPublicAccess) && ent.SeenSignal(knowledge.SigAdminSurface) {
+			out = append(out, fmt.Sprintf("Public admin surface: %s", ent.URL))
 		}
 
 		// JS leak evidence

@@ -63,6 +63,22 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 		}
 	}
 
+	// Public endpoints
+	var publicURLs []string
+	for _, u := range urls {
+		ent := k.Entities[u]
+		if ent != nil && ent.Signals.Tags[knowledge.SigPublicAccess] {
+			publicURLs = append(publicURLs, u)
+		}
+	}
+	if len(publicURLs) > 0 {
+		fmt.Fprintf(w, "Public endpoints:  %d\n", len(publicURLs))
+		sort.Strings(publicURLs)
+		for _, u := range publicURLs {
+			fmt.Fprintf(w, "  - %s\n", u)
+		}
+	}
+
 	fmt.Fprintln(w)
 }
 

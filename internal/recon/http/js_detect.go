@@ -42,13 +42,12 @@ func (e *Engine) handleJSEndpoints(
 		switch ep.Method {
 		case "POST", "PUT", "PATCH", "DELETE":
 			priority = 70
-			ent.Tag(knowledge.SigStateChanging)
-			ent.AddMethod(ep.Method)
+			e.k.Entity(link).Tag(knowledge.SigStateChanging) // target not source
 		}
 
 		if isSensitivePath(link) {
 			priority += 20
-			ent.Tag(knowledge.SigAdminSurface)
+			e.k.Entity(link).Tag(knowledge.SigAdminSurface)
 		}
 
 		e.k.PushProbe(ent, knowledge.Probe{

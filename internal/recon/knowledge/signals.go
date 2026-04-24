@@ -5,6 +5,7 @@ type Signal int
 
 const (
 	SigHasQueryParams Signal = iota
+	SigPublicAccess
 	SigHasForm
 	SigHasJSONBody
 	SigStateChanging
@@ -53,6 +54,8 @@ func (s Signal) String() string {
 		return "PossibleIDOR"
 	case SigCredentiallessTokenIssuance:
 		return "CredentiallessTokenIssuance"
+	case SigPublicAccess:
+		return "PublicAccess"
 	default:
 		return "UnknownSignal"
 	}

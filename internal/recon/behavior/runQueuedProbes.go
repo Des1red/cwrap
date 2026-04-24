@@ -144,6 +144,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		// runs directly off identity statuses, not param maps
 		e.detectRoleBoundary(target, identityStatuses)
 		e.detectAuthBoundary(target, identityStatuses)
+		e.detectPublicAccess(target, identityStatuses)
 
 		// Choose a reference fingerprint (prefer a no-creds identity if available)
 		ref := ""

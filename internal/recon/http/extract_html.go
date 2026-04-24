@@ -44,7 +44,7 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 
 							e.k.AddEdge(ent.URL, link, knowledge.EdgeDiscoveredFromHTML)
 							if isSensitivePath(link) {
-								ent.Tag(knowledge.SigAdminSurface)
+								e.k.Entity(link).Tag(knowledge.SigAdminSurface)
 							}
 
 							// queue discovered links as GET probes
@@ -59,11 +59,10 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 					}
 				}
 
-			// ----------------------------
-			// FORMS
-			// ----------------------------
+				// ----------------------------
+				// FORMS
+				// ----------------------------
 			case "form":
-
 				method := "GET"
 				action := ""
 				for _, a := range n.Attr {
@@ -74,30 +73,24 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 						action = a.Val
 					}
 				}
-				ent.AddMethod(method)
-				ent.Tag(knowledge.SigHasForm)
+				ent.Tag(knowledge.SigHasForm) // form is on this page
 
-				// Collect structural form intelligence
 				fi := extractFormInputsAndIntel(e, ent, n)
 
-				// Mark state-changing behavior
-				if method == "POST" || fi.IsDestructive {
-					ent.Tag(knowledge.SigStateChanging)
-				}
-
-				// HTML spec: empty action submits to current URL
 				if action == "" {
 					action = ent.URL
 				}
 
 				if link, ok := e.normalizeLink(ent.URL, action); ok {
-
 					e.k.AddEdge(ent.URL, link, knowledge.EdgeFormAction)
-
-					if isSensitivePath(link) {
-						ent.Tag(knowledge.SigAdminSurface)
+					target := e.k.Entity(link)
+					target.AddMethod(method)
+					if method == "POST" || fi.IsDestructive {
+						target.Tag(knowledge.SigStateChanging)
 					}
-
+					if isSensitivePath(link) {
+						target.Tag(knowledge.SigAdminSurface)
+					}
 					// ----------------------------
 					// FORM EXECUTION POLICY
 					// ----------------------------

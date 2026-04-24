@@ -61,6 +61,17 @@ func (e *Engine) detectAuthBoundary(ent *knowledge.Entity, identityStatuses map[
 	}
 }
 
+func (e *Engine) detectPublicAccess(ent *knowledge.Entity, identityStatuses map[string]int) {
+	// public = anonymous gets 200 without sending any credentials
+	id := ent.Identities[knowledge.Anonymous]
+	if id == nil {
+		return
+	}
+	if id.Kind == knowledge.IdentityNone && identityStatuses[knowledge.Anonymous] == 200 {
+		ent.Tag(knowledge.SigPublicAccess)
+	}
+}
+
 func (e *Engine) detectRoleBoundary(ent *knowledge.Entity, identityStatuses map[string]int) {
 	for idName, status := range identityStatuses {
 		if status != 401 && status != 403 {
