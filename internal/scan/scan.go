@@ -2,80 +2,67 @@ package scan
 
 import (
 	"bufio"
-	"crypto/tls"
-	"cwrap/internal/model"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 )
 
-const workers = 20
-const defautWordlist = "wordlists/directory-list-2.3-medium.txt"
+type scanResult struct {
+	hits map[string]int  // url -> status — everything we like
+	dirs map[string]bool // url -> true — only 200s for stage 2
+}
 
-func Run(req model.Request) error {
-	if req.FilePath == "" {
-		wl := defaultWordlist()
-		if wl == "" {
-			return fmt.Errorf("scan requires a wordlist — cwrap scan <url> /path/to/words.txt")
-		}
-		if _, err := os.Stat(wl); err != nil {
-			return fmt.Errorf("no wordlist provided and default not found at %s", wl)
-		}
-		req.FilePath = wl
+func newScanResult() scanResult {
+	return scanResult{
+		hits: make(map[string]int),
+		dirs: make(map[string]bool),
 	}
-	if req.URL == "" {
-		return fmt.Errorf("scan requires a URL — cwrap scan <url> /path/to/words.txt")
-	}
+}
 
-	f, err := os.Open(req.FilePath)
+func stageOne(client *http.Client, base, wordlist string, bf baseline) scanResult {
+	return scanBase(client, base, wordlist, bf)
+}
+
+func stageTwo(client *http.Client, dirs map[string]bool, wordlist string, bf baseline) scanResult {
+	merged := newScanResult()
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for dir := range dirs {
+		wg.Add(1)
+		go func(d string) {
+			defer wg.Done()
+			fmt.Printf("  expanding %s\n", d)
+			r := scanBase(client, d, wordlist, bf)
+			mu.Lock()
+			for url, status := range r.hits {
+				merged.hits[url] = status
+			}
+			for url := range r.dirs {
+				merged.dirs[url] = true
+			}
+			mu.Unlock()
+		}(dir)
+	}
+	wg.Wait()
+	return merged
+}
+
+func scanBase(client *http.Client, base, wordlist string, bf baseline) scanResult {
+	result := newScanResult()
+
+	f, err := os.Open(wordlist)
 	if err != nil {
-		return fmt.Errorf("wordlist: %w", err)
+		fmt.Printf("⚠  Could not open wordlist: %v\n", err)
+		return result
 	}
 	defer f.Close()
-
-	base := strings.TrimRight(req.URL, "/")
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-			MaxIdleConns:        workers,
-			MaxIdleConnsPerHost: workers,
-		},
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
-	baseline1, err := probe(client, base+"/cwrap-xqzjk-404check")
-	if err != nil {
-		return fmt.Errorf("baseline probe failed: %w", err)
-	}
-	baseline2, err := probe(client, base+"/cwrap-zvmpt-404check")
-	if err != nil {
-		return fmt.Errorf("baseline probe failed: %w", err)
-	}
-
-	soft404 := baseline1.status == 200
-	trulyStatic := baseline1.hash == baseline2.hash
-
-	if soft404 {
-		if trulyStatic {
-			fmt.Printf("⚠  Soft 404 detected — filtering by exact content match (baseline: %d bytes)\n\n", baseline1.size)
-		} else {
-			fmt.Printf("⚠  Soft 404 detected — server randomizes responses, filtering by size band (baseline: %d bytes)\n\n", baseline1.size)
-		}
-	}
-
-	fmt.Printf("Scanning %s\n\n", base)
 
 	words := make(chan string, workers)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	var hits []string // 200 URLs only, for saving
 
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
@@ -83,33 +70,35 @@ func Run(req model.Request) error {
 			defer wg.Done()
 			for word := range words {
 				target := base + "/" + word
-				result, err := probe(client, target)
+				res, err := probe(client, target)
 				if err != nil {
 					continue
 				}
 
-				if soft404 && result.status == 200 {
-					if trulyStatic {
-						if result.hash == baseline1.hash {
+				if bf.soft404 && res.status == 200 {
+					if bf.trulyStatic {
+						if res.hash == bf.b1.hash {
 							continue
 						}
 					} else {
-						if isSimilarSize(result.size, baseline1.size) {
+						if isSimilarSize(res.size, bf.b1.size) {
 							continue
 						}
 					}
 				}
 
-				line := formatResult(result.status, target, result.size)
+				line := formatResult(res.status, target, res.size)
 				if line == "" {
 					continue
 				}
 
 				mu.Lock()
 				fmt.Println(line)
-				if result.status != 404 && result.status != 500 &&
-					result.status != 0 {
-					hits = append(hits, target)
+				if res.status != 404 && res.status != 500 && res.status != 0 {
+					result.hits[target] = res.status
+					if res.status == 200 {
+						result.dirs[target] = true
+					}
 				}
 				mu.Unlock()
 			}
@@ -127,35 +116,5 @@ func Run(req model.Request) error {
 	close(words)
 	wg.Wait()
 
-	if len(hits) > 0 {
-		if err := saveResults(req.URL, hits); err != nil {
-			fmt.Printf("⚠  Could not save results: %v\n", err)
-		}
-	}
-
-	return scanner.Err()
-}
-
-func isSimilarSize(a, b int64) bool {
-	if b == 0 {
-		return a == 0
-	}
-	diff := a - b
-	if diff < 0 {
-		diff = -diff
-	}
-	return float64(diff)/float64(b) < 0.05
-}
-
-func defaultWordlist() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return ""
-	}
-	// follow symlinks (go run creates a temp binary)
-	exe, err = filepath.EvalSymlinks(exe)
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(filepath.Dir(exe), "wordlists", "directory-list-2.3-medium.txt")
+	return result
 }
