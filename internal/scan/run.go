@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-const workers = 20
-
 func Run(req model.Request) error {
 	if err := validate(&req); err != nil {
 		return err
