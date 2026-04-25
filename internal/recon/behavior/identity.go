@@ -3,6 +3,7 @@ package behavior
 import (
 	"cwrap/internal/model"
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/tokens"
 	"fmt"
 	"net/http"
 	"strings"
@@ -196,7 +197,7 @@ func (e *Engine) discoverIdentityFromResponse(resp *http.Response) {
 	for _, c := range resp.Cookies() {
 		newCookies[c.Name] = c.Value
 		if strings.Count(c.Value, ".") == 2 {
-			claims := parseJWT(c.Value)
+			claims := tokens.ParseJWT(c.Value)
 			if claims != nil {
 				if r, ok := claims["role"].(string); ok {
 					newRole = strings.ToLower(r)

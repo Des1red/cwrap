@@ -2,6 +2,7 @@ package behavior
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/tokens"
 	"net/http"
 	"strings"
 )
@@ -16,7 +17,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	if sentCookie {
 		for _, c := range resp.Request.Cookies() {
 			if strings.Count(c.Value, ".") == 2 {
-				extractJWTIntel(id, parseJWT(c.Value))
+				extractJWTIntel(id, tokens.ParseJWT(c.Value))
 			}
 		}
 	}
@@ -32,7 +33,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		id.IssuedByServer = true
 		// try parse cookie as JWT
 		if strings.Count(c.Value, ".") == 2 {
-			extractJWTIntel(id, parseJWT(c.Value))
+			extractJWTIntel(id, tokens.ParseJWT(c.Value))
 		}
 	}
 
@@ -41,7 +42,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	if strings.HasPrefix(auth, "Bearer ") {
 		id.AuthScheme = "bearer"
 
-		extractJWTIntel(id, parseJWT(strings.TrimPrefix(auth, "Bearer ")))
+		extractJWTIntel(id, tokens.ParseJWT(strings.TrimPrefix(auth, "Bearer ")))
 	} else if strings.HasPrefix(auth, "Basic ") {
 		id.AuthScheme = "basic"
 	}
@@ -80,7 +81,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	switch {
 	case id.Rejected:
 		id.Kind = knowledge.IdentityInvalid
-	case id.Role != "" && isElevatedRole(id.Role):
+	case id.Role != "" && tokens.IsElevatedRole(id.Role):
 		id.Kind = knowledge.IdentityElevated
 	case id.IssuedByServer && resp.StatusCode >= 300 && resp.StatusCode < 400:
 		id.Kind = knowledge.IdentityBootstrap
@@ -118,19 +119,4 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		}
 	}
 	ent.AddIdentity(id)
-}
-
-func isElevatedRole(role string) bool {
-	r := strings.ToLower(role)
-
-	switch {
-	case strings.Contains(r, "admin"),
-		strings.Contains(r, "root"),
-		strings.Contains(r, "super"),
-		strings.Contains(r, "staff"),
-		strings.Contains(r, "mod"),
-		strings.Contains(r, "owner"):
-		return true
-	}
-	return false
 }

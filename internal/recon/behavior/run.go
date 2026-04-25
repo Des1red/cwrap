@@ -5,6 +5,7 @@ import (
 	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/recon/session"
 	"cwrap/internal/recon/transport"
+	"time"
 )
 
 func (e *Engine) Run(base model.Request, url string) error {
@@ -113,6 +114,20 @@ func (e *Engine) Run(base model.Request, url string) error {
 	e.int.Learn(baseReq.URL, resp, body)
 	e.Expand(ent)
 
+	// push additional seed URLs from grouped --tfile recon
+	// each seed gets probed as if discovered organically
+	for _, seedURL := range base.Flags.SeedURLs {
+		if seedURL == url {
+			continue // root already handled
+		}
+		e.k.PushProbe(ent, knowledge.Probe{
+			URL:      seedURL,
+			Method:   "GET",
+			Reason:   knowledge.ReasonLinkProbe,
+			Priority: 200,
+			Created:  time.Now(),
+		})
+	}
 	// ----------------------------------------
 	//  Probe loop
 	// ----------------------------------------

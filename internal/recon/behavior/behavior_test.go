@@ -3,6 +3,7 @@ package behavior
 import (
 	"cwrap/internal/recon/canonicalize"
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/tokens"
 	"net/http"
 	"net/url"
 	"testing"
@@ -202,12 +203,12 @@ func TestExtractCurrentValue(t *testing.T) {
 
 func TestIsElevatedRole(t *testing.T) {
 	for _, r := range []string{"admin", "owner", "root", "superuser", "staff", "moderator", "mod"} {
-		if !isElevatedRole(r) {
+		if !tokens.IsElevatedRole(r) {
 			t.Errorf("isElevatedRole(%q) = false want true", r)
 		}
 	}
 	for _, r := range []string{"member", "user", "viewer", "guest", "readonly"} {
-		if isElevatedRole(r) {
+		if tokens.IsElevatedRole(r) {
 			t.Errorf("isElevatedRole(%q) = true want false", r)
 		}
 	}
@@ -220,7 +221,7 @@ func TestIsElevatedRole(t *testing.T) {
 func TestParseJWT_ValidToken(t *testing.T) {
 	// header.{"role":"member","user_id":1,"exp":9999999999}.signature
 	token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoibWVtYmVyIiwidXNlcl9pZCI6MSwiZXhwIjo5OTk5OTk5OTk5fQ.signature"
-	claims := parseJWT(token)
+	claims := tokens.ParseJWT(token)
 	if claims == nil {
 		t.Fatal("expected claims, got nil")
 	}
@@ -231,7 +232,7 @@ func TestParseJWT_ValidToken(t *testing.T) {
 
 func TestParseJWT_InvalidFormat(t *testing.T) {
 	for _, bad := range []string{"not.a.valid.jwt.format.extra", "onlytwoparts.here", ""} {
-		if parseJWT(bad) != nil {
+		if tokens.ParseJWT(bad) != nil {
 			t.Errorf("expected nil for malformed token %q", bad)
 		}
 	}

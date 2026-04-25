@@ -3,6 +3,7 @@ package runner
 import (
 	"cwrap/internal/model"
 	"fmt"
+	"net/url"
 )
 
 type Executor interface {
@@ -10,6 +11,11 @@ type Executor interface {
 }
 
 func Execute(req model.Request) error {
+
+	// recon with --tfile gets special grouped handling
+	if req.Original == "recon" && req.Flags.Target != "" {
+		return executeReconGrouped(req)
+	}
 
 	targets, err := expandTargets(req)
 	if err != nil {
@@ -34,6 +40,34 @@ func Execute(req model.Request) error {
 		}
 	}
 
+	return nil
+}
+
+func executeReconGrouped(req model.Request) error {
+	targets, err := readTargets(req.Flags.Target)
+	if err != nil {
+		return err
+	}
+	if len(targets) == 0 {
+		return fmt.Errorf("no targets found in file")
+	}
+
+	groups := groupTargetsByHost(targets)
+	fmt.Printf("Loaded %d targets from %s (%d host group(s))\n",
+		len(targets), req.Flags.Target, len(groups))
+
+	i := 0
+	for host, urls := range groups {
+		i++
+		fmt.Printf("\n[%d/%d] %s (%d endpoint(s))\n", i, len(groups), host, len(urls))
+		r := req
+		r.URL = host
+		r.Flags.SeedURLs = urls
+		exec := resolveExecutor(r)
+		if err := exec.Run(r); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -65,4 +99,18 @@ func expandTargets(req model.Request) ([]string, error) {
 	)
 
 	return targets, nil
+}
+
+func groupTargetsByHost(targets []string) map[string][]string {
+	groups := make(map[string][]string)
+	for _, t := range targets {
+		u, err := url.Parse(t)
+		if err != nil {
+			groups[t] = append(groups[t], t)
+			continue
+		}
+		key := u.Scheme + "://" + u.Host
+		groups[key] = append(groups[key], t)
+	}
+	return groups
 }

@@ -9,6 +9,8 @@ type Request struct {
 }
 
 type Flags struct {
+	SeedURLs []string
+
 	Run     bool
 	Profile string
 
