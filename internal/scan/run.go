@@ -78,5 +78,5 @@ func defaultWordlist() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(filepath.Dir(exe), "/internal/scan/wordlists", "directory-list-2.3-medium.txt")
+	return filepath.Join(filepath.Dir(exe), "/internal/scan/wordlists", "wordlist.txt")
 }
