@@ -17,7 +17,6 @@ func cookieHeader(cookies map[string]string) string {
 	for k, v := range cookies {
 		parts = append(parts, k+"="+v)
 	}
-	// optional: sort.Strings(parts) for determinism
 	return strings.Join(parts, "; ")
 }
 
@@ -75,7 +74,7 @@ func (e *Engine) captureSession(ent *knowledge.Entity, idMeta Identity, resp *ht
 			updated = true
 		}
 
-		// always keep in-memory cookies for this run
+		// keep in-memory cookies for this run
 		ent.SessionCookies[c.Name] = c.Value
 		e.sessionCookies[c.Name] = c.Value
 	}

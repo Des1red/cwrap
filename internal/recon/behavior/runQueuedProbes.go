@@ -58,7 +58,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		for k, v := range probe.AddQuery {
 			req.Flags.Query = append(req.Flags.Query, model.QueryParam{Key: k, Value: v})
 
-			// IMPORTANT: decide source relative to the target URL, not base.URL
+			// decide source relative to the target URL, not base.URL
 			if extractCurrentValue(probe.URL, k) != "" {
 				target.AddParam(k, knowledge.ParamQuery)
 				e.k.AddParam(k)
