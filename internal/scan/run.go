@@ -14,7 +14,7 @@ func Run(req model.Request) error {
 	}
 
 	base := strings.TrimRight(req.URL, "/")
-	client := newClient()
+	client := newClient(req)
 
 	bf, err := buildBaseline(client, base)
 	if err != nil {
@@ -31,28 +31,37 @@ func Run(req model.Request) error {
 		r2 = stageTwo(client, r1.dirs, req.FilePath, bf)
 	}
 
-	all := mergeResults(r1, r2)
+	// ── Stage 3 — Subdomain Enumeration ──────────────────────────────────────
+	fmt.Printf("\n═══ Stage 3 — Subdomain Enumeration ═══\n\n")
+	r3 := newScanResult()
+
+	switch reason := subdomainSkipReason(base, req.SubdomainFile); reason {
+	case "":
+		subFile := resolveSubdomainFile(req.SubdomainFile)
+		r3 = stageThree(client, base, subFile)
+	default:
+		fmt.Printf("  skipped — %s\n", reason)
+	}
+
+	all := mergeResults(r1, r2, r3)
 	if len(all) > 0 {
 		if err := saveResults(req.URL, all); err != nil {
 			fmt.Printf("⚠  Could not save results: %v\n", err)
 		}
 	}
+
 	return nil
 }
 
-func mergeResults(r1, r2 scanResult) []string {
+func mergeResults(results ...scanResult) []string {
 	seen := make(map[string]bool)
 	var out []string
-	for url := range r1.hits {
-		if !seen[url] {
-			seen[url] = true
-			out = append(out, url)
-		}
-	}
-	for url := range r2.hits {
-		if !seen[url] {
-			seen[url] = true
-			out = append(out, url)
+	for _, r := range results {
+		for url := range r.hits {
+			if !seen[url] {
+				seen[url] = true
+				out = append(out, url)
+			}
 		}
 	}
 	return out
@@ -78,5 +87,5 @@ func defaultWordlist() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(filepath.Dir(exe), "/internal/scan/wordlists", "wordlist.txt")
+	return filepath.Join(filepath.Dir(exe), "./", "small-directory-list-20k.txt")
 }

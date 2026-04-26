@@ -12,7 +12,7 @@ func Do(req model.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	dumpRequest(r, req.Flags.Debug)
 	client := &http.Client{
 		Timeout: 15 * time.Second,
 		Transport: &http.Transport{

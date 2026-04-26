@@ -2,27 +2,29 @@
 cwrap is an intelligent HTTP client with built-in active security analysis.
 It translates intent into HTTP requests and automatically performs identity-aware probing, session tracking, and object-level authorization reasoning.
 
-Basic Usage
+## Basic Usage
 ```bash
 cwrap <command> <url> [words] [flags]
 ```
 
-### Example:
+### Examples
 ```bash
 cwrap fetch https://site.com page=2
 cwrap send https://api.site/login json user=admin pass=123
 cwrap upload https://site.com/uploads file=@file
-cwrap scan https://site.com wordlist.txt
+cwrap scan https://site.com --dir wordlist.txt
 cwrap recon https://site.com http
 cwrap exploit reports/site-com_2026-04-24_17-14-51.report
 ```
+
+---
 
 ## Philosophy
 curl exposes HTTP mechanics.  
 cwrap expresses HTTP meaning.
 
 | You think | curl requires | cwrap |
-|--------|--------|--------|
+|-----------|--------------|-------|
 | read page | GET | `fetch` |
 | send data | POST + headers | `send` |
 | JSON | content-type header | `json` |
@@ -33,6 +35,8 @@ cwrap expresses HTTP meaning.
 | confirm vulnerabilities | custom scripts | `exploit` |
 
 The goal is predictable, readable commands.
+
+---
 
 ## Installation
 ```bash
@@ -77,21 +81,40 @@ cwrap send https://api.site json user.name=your_name user.age=30
 
 ---
 
-### Scan — subdirectory scanner
+### Scan — multi-stage surface discovery
 ```
-cwrap scan <url> <wordlist> [words]
+cwrap scan <url> [words] [flags]
 ```
 
-Parallel subdirectory scanner with automatic soft 404 detection and baseline fingerprinting.
+Three-stage scanner: directory discovery, subdirectory expansion, and subdomain enumeration.
+Applies the full cwrap header stack (profile, bearer, cookies) to every probe.
+
+#### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--dir <path>` | Directory wordlist (falls back to bundled default) |
+| `--domain <path>` | Subdomain wordlist (skips stage 3 if omitted on localhost/IP) |
 
 #### What scan does
 
-- Takes two baseline probes against random paths to fingerprint the server's 404 behavior
-- Detects soft 404 servers (those that return 200 for everything) and filters them by exact content hash
-- For servers that randomize responses, falls back to size-band filtering (within 5%)
+**Stage 1 — Directory Discovery**
+- Takes two baseline probes to fingerprint the server's 404 behavior
+- Detects soft 404 servers (those that return 200 for everything) and filters by exact content hash
+- Falls back to size-band filtering (within 5%) for servers that randomize responses
 - Runs 20 parallel workers against the wordlist
-- Prints found paths color-coded by status code
-- Saves all 200 results to `<host>_scan.txt` — one URL per line, ready to feed into `recon --tfile`
+
+**Stage 2 — Subdirectory Expansion**
+- Takes every 200 found in Stage 1 and re-scans it with the full wordlist
+- Runs expansions in parallel, one goroutine per discovered directory
+
+**Stage 3 — Subdomain Enumeration**
+- Extracts the apex domain from the target URL
+- Probes two random subdomains to detect wildcard DNS catch-alls
+- Filters wildcard responses by content hash or size band (same logic as soft 404)
+- Skips automatically on localhost/IP targets unless `--domain` is explicitly passed
+
+Results are saved to `<host>_scan.txt` — one URL per line, ready to feed into `recon --tfile`.
 
 #### Output colors
 
@@ -105,25 +128,31 @@ Parallel subdirectory scanner with automatic soft 404 detection and baseline fin
 
 ```bash
 # Basic scan
-cwrap scan https://site.com wordlist.txt
+cwrap scan https://site.com --dir wordlist.txt
 
-# Authenticated scan
-cwrap scan https://site.com wordlist.txt bearer=TOKEN
+# With subdomain enumeration
+cwrap scan https://site.com --dir wordlist.txt --domain subdomains.txt
+
+# Authenticated scan with browser headers
+cwrap scan https://site.com browser --dir wordlist.txt bearer=TOKEN
+
+# Scan with session cookie
+cwrap scan https://site.com --dir wordlist.txt cookie:session=abc123
+
+# Debug — prints headers on first probe
+cwrap scan https://site.com --dir wordlist.txt --debug
 
 # Chain into recon
-cwrap scan https://site.com wordlist.txt
+cwrap scan https://site.com --dir wordlist.txt
 cwrap recon --tfile site-com_scan.txt http
 ```
 
-#### Soft 404 detection
-
-Some servers return HTTP 200 for all paths including non-existent ones. cwrap detects this automatically:
+#### Soft 404 / wildcard detection
 
 ```
 ⚠  Soft 404 detected — filtering by exact content match (baseline: 8753 bytes)
+⚠  Wildcard DNS detected — responses vary, filtering by size band (baseline: 1024 bytes)
 ```
-
-When detected, responses that match the baseline hash are silently skipped. Only paths with genuinely different content surface as findings.
 
 ---
 
@@ -133,24 +162,41 @@ cwrap recon <url> [profile] [flags]
 ```
 
 Performs identity-aware active reconnaissance against a web application or API.
-cwrap automatically probes endpoints, tracks sessions, and reasons about authorization boundaries.
+Probes endpoints, tracks sessions, and reasons about authorization boundaries.
 
 #### Profiles
 
-| Profile | Best for |
-|---------|----------|
-| `http` | Web applications (HTML, forms, JS) |
-| `api` | JSON APIs |
+| Profile | Best for | Request headers |
+|---------|----------|----------------|
+| `http` | Web applications (HTML, forms, JS) | default |
+| `api` | JSON APIs | `Accept: application/json` |
+
+Profiles are independent from request header profiles. You can combine them:
+
+```bash
+cwrap recon https://site.com http firefox    # http engine, Firefox headers
+cwrap recon https://api.site api             # api engine, api headers (auto)
+cwrap recon https://api.site api curl        # api engine, curl headers
+```
+
+#### Request header profiles
+
+| Word | Headers sent |
+|------|-------------|
+| `browser` / `firefox` | Full Firefox header stack |
+| `chrome` | Full Chrome header stack |
+| `api` | `Accept: application/json` |
+| `curl` | `User-Agent: curl/8.0` |
 
 #### What recon does
 
 - Fetches the target and extracts links, forms, and JS endpoints
 - Derives multiple probe identities: session (your credentials), anonymous (no auth), fake-admin (role confusion headers)
-- Discovers live identities dynamically — when a new role/uid combination is observed in JWT cookies, cwrap registers it as a named identity and re-probes all known endpoints with it
+- Discovers live identities dynamically — when a new role/uid combination appears in JWT cookies, cwrap registers it as a named identity and re-probes all known endpoints
 - Probes discovered endpoints with each identity and compares responses
 - Detects path-level ID segments (`/users/123`) and generates mutation probes
-- Tracks session cookies across the run and reuses them on subsequent runs
-- Runs analyzers to detect auth boundaries, role boundaries, IDOR surfaces, ownership patterns, and credentialless token issuance
+- Tracks session cookies across runs and reuses them automatically
+- Detects and recovers from stale sessions (401 on live session → retries without injected cookies)
 - Saves a full report to `reports/`
 
 #### Signals detected
@@ -174,22 +220,25 @@ cwrap automatically probes endpoints, tracks sessions, and reasons about authori
 cwrap recon https://site.com http
 
 # API recon
-cwrap recon https://api.site/users api
+cwrap recon https://api.site api
 
-# Authenticated recon (session reused from previous run)
+# With browser profile
+cwrap recon https://site.com http firefox
+
+# Authenticated
 cwrap recon https://site.com http bearer=TOKEN
 
-# Recon from a list of URLs
-cwrap recon --tfile urls.txt http
+# From a scan result list
+cwrap recon --tfile site-com_scan.txt http
 
-# Debug mode (shows probe execution)
+# Debug mode — shows every outgoing request with full headers
 cwrap recon https://site.com http --debug
 ```
 
 #### Session persistence
 
 cwrap captures cookies issued during probing and saves them to `~/.config/cwrap/sessions/<host>.json`.
-On the next run against the same host, those cookies are automatically injected into the session identity — giving the engine an authenticated starting point without re-supplying credentials.
+On the next run against the same host, those cookies are automatically injected into the session identity.
 
 #### Reports
 
@@ -206,14 +255,13 @@ Every recon run produces a full report at `reports/<host>_<timestamp>.report` co
 
 ### Exploit — vulnerability confirmation and chain expansion
 ```
-cwrap exploit <report> [flags]
+cwrap exploit <report> [words] [flags]
 ```
 
-Loads a recon report and runs a two-stage exploit engine against the target.
+Loads a recon report and runs a two-stage exploit engine.
+Applies the full header stack (profile, bearer) on every replay request.
 
 #### Stage 1 — Vulnerability Confirmation
-
-Probes confirmed findings from the report to prove vulnerabilities exist:
 
 | Probe | What it tests |
 |-------|--------------|
@@ -225,22 +273,17 @@ Each probe replays real tokens from the identity vault using frozen cookie snaps
 
 #### Stage 2 — Chain Expansion
 
-Takes confirmed stage 1 findings and expands them to measure true impact:
-
 | Expander | Seeds from | Action |
 |----------|-----------|--------|
 | Credentialless Token Reuse | Confirmed credentialless access | Tests all credless identities against role/admin boundary endpoints not yet tested |
-| IDOR Object Enumeration | Confirmed ownership bypass | Enumerates neighboring object IDs with the denied identity — stops at 3 consecutive 404/403 responses |
+| IDOR Object Enumeration | Confirmed ownership bypass | Enumerates neighboring object IDs with the denied identity — stops at 3 consecutive 404/403 |
 | Ownership Bypass Pivot | Confirmed ownership bypass | Tests the bypassing identity against neighboring objects — skips own objects |
 
 #### Examples
 
 ```bash
-# Run exploit against a report
 cwrap exploit reports/site-com_2026-04-24.report
-
-# Debug mode
-cwrap exploit reports/site-com_2026-04-24.report --debug
+cwrap exploit reports/site-com_2026-04-24.report firefox --debug
 ```
 
 #### Output
@@ -259,14 +302,8 @@ cwrap exploit reports/site-com_2026-04-24.report --debug
 
   Credentialless Token Reuse
     anonymous => member-uid-1 (role=member uid=1) — 6 tested, 5 confirmed
-    token:    auth_token=eyJ...
       [CONFIRMED] https://site.com/api/notes/1 → 200
       [blocked]   https://site.com/api/notes/2 → 403
-      ...
-
-  IDOR Object Enumeration
-    member-uid-2 (role=member uid=2) — 3 tested, 0 confirmed
-      [blocked]   https://site.com/api/notes/3 → 403
       ...
 
 ✓ Chain expansion confirmed — 5 additional access(es) confirmed
@@ -277,36 +314,35 @@ cwrap exploit reports/site-com_2026-04-24.report --debug
 ## Semantic Words
 Order does not matter.
 
-### Encoding
-- `json` → application/json
-- `form` → application/x-www-form-urlencoded
-
 ### Profiles
-- `browser` → Firefox headers (default)
+- `browser` / `firefox` → Firefox headers
 - `chrome` → Chrome headers
 - `api` → JSON API headers
 - `curl` → Curl headers
 
-### Recon profiles
-- `http` → Web application recon (HTML, forms, JS)
-- `web` → alias for http
-- `api` → API recon (JSON structure, auth)
+### Recon modes
+- `http` / `web` → Web application engine (HTML, forms, JS)
+- `api` → API engine (JSON structure, auth)
+
+### Encoding
+- `json` → `application/json`
+- `form` → `application/x-www-form-urlencoded`
 
 ### Data
 - `key=value` — meaning depends on command:
 
 | Command | Result |
-|------|------|
-| fetch | query string |
-| send | request body |
+|---------|--------|
+| `fetch` | query string |
+| `send` | request body |
 
 ---
 
 ## JSON Builder
 
-### Automatically infers types:
+Automatically infers types:
 ```bash
-send api json active=true count=5 price=3.14 name=your_name nullval=null
+cwrap send https://api.site json active=true count=5 price=3.14 name=your_name nullval=null
 ```
 ```json
 {
@@ -320,20 +356,17 @@ send api json active=true count=5 price=3.14 name=your_name nullval=null
 
 #### Nested objects
 ```bash
-send api json user.name=your_name user.age=30
+cwrap send https://api.site json user.name=your_name user.age=30
 ```
 ```json
 {
-  "user": {
-    "name": "your_name",
-    "age": 30
-  }
+  "user": { "name": "your_name", "age": 30 }
 }
 ```
 
 #### Arrays
 ```bash
-send api json tag=a tag=b tag=c
+cwrap send https://api.site json tag=a tag=b tag=c
 ```
 ```json
 {
@@ -345,12 +378,6 @@ send api json tag=a tag=b tag=c
 
 ## Authentication & Cookies
 
-```
-bearer=TOKEN
-cookie:name=value
-```
-
-#### Examples:
 ```bash
 cwrap fetch https://api.site/me bearer=abc123
 cwrap fetch https://site.com cookie:session=xyz
@@ -376,8 +403,8 @@ cwrap interprets words first, flags second.
 ## Typical Workflow
 
 ```bash
-# 1. Scan — discover hidden paths
-cwrap scan https://site.com wordlist.txt
+# 1. Scan — discover hidden paths and subdomains
+cwrap scan https://site.com --dir wordlist.txt --domain subdomains.txt
 
 # 2. Recon — map the surface and detect vulnerabilities
 cwrap recon --tfile site-com_scan.txt http
@@ -387,45 +414,3 @@ cwrap exploit reports/site-com_2026-04-24_17-14-51.report
 ```
 
 Scan, recon, and exploit are designed to chain. Scan output feeds directly into recon via `--tfile`, and the report produced by recon is the exact input exploit expects.
-
----
-
-## Examples
-
-#### Read paginated API
-```bash
-cwrap fetch https://api.site/users api page=2 limit=20
-```
-
-#### Login request
-```bash
-cwrap send https://api.site/login json username=admin password=123
-```
-
-#### Authenticated request
-```bash
-cwrap fetch https://api.site/me bearer=TOKEN
-```
-
-#### Complex JSON
-```bash
-cwrap send https://api.site json filter.name=your_name filter.age=30 tag=a tag=b
-```
-
-#### Discover and recon hidden paths
-```bash
-cwrap scan https://site.com /usr/share/wordlists/dirb/common.txt
-cwrap recon --tfile site-com_scan.txt http
-```
-
-#### Full security assessment workflow
-```bash
-# Discover surface
-cwrap scan https://site.com wordlist.txt
-
-# Deep recon each discovered path
-cwrap recon --tfile site-com_scan.txt http
-
-# Confirm and expand vulnerabilities
-cwrap exploit reports/site-com_2026-04-24_17-14-51.report
-```

@@ -49,11 +49,6 @@ func Parse(args []string) model.Request {
 		switch strings.ToLower(args[1]) {
 		case "exploit":
 			path = args[2]
-		case "scan":
-			url = args[2]
-			if len(args) >= 4 && !strings.HasPrefix(args[3], "-") {
-				path = args[3]
-			}
 		default:
 			url = args[2]
 		}
@@ -91,7 +86,6 @@ func Parse(args []string) model.Request {
 		return model.Request{
 			Method:   "GET",
 			URL:      url,
-			FilePath: path,
 			Original: "scan",
 		}
 	case "get", "post", "put", "delete", "download":

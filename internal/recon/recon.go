@@ -19,10 +19,6 @@ func selectEngine(req model.Request) Engine {
 
 	case "api":
 		return api.New()
-
-	case "http", "web":
-		return http.New()
-
 	default:
 		return http.New()
 	}

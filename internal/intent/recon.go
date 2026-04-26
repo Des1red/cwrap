@@ -3,9 +3,10 @@ package intent
 import "cwrap/internal/model"
 
 type ReconHandler struct {
-	profile string
-	cookies []model.Cookie
-	bearer  string
+	reconMode string
+	profile   string
+	cookies   []model.Cookie
+	bearer    string
 }
 
 func (h *ReconHandler) Translate(args []string) []string {
@@ -18,8 +19,12 @@ func (h *ReconHandler) Translate(args []string) []string {
 		switch t.Type {
 
 		case TokenWord:
-			if p, ok := isReconProfile(t.Value); ok {
-				h.profile = p
+			if m, ok := isReconProfile(t.Value); ok {
+				h.reconMode = m // engine selection
+				continue
+			}
+			if p, ok := isProfile(t.Value); ok && h.reconMode != "api" {
+				h.profile = p // explicit header override
 				continue
 			}
 			out = append(out, t)
@@ -44,6 +49,7 @@ func (h *ReconHandler) Translate(args []string) []string {
 func (h *ReconHandler) ApplyDefaults(req *model.Request, f *model.Flags) {
 
 	req.Method = "GET"
+	req.ReconMode = h.reconMode
 
 	// profile
 	if h.profile != "" {

@@ -16,6 +16,10 @@ func New() *Engine {
 
 func (e *Engine) Run(req model.Request) (*knowledge.Knowledge, error) {
 
+	if req.Flags.Profile == "" {
+		req.Flags.Profile = "api"
+	}
+
 	e.k = knowledge.New(req.URL)
 	e.learnURLParams(req.URL)
 

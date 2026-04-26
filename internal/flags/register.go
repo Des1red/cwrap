@@ -42,6 +42,8 @@ func register(fs *flag.FlagSet, f *model.Flags) *rawInput {
 
 	fs.StringVar(&f.Target, "tfile", "", "file containing target URLs (one per line)")
 	fs.BoolVar(&f.Debug, "debug", false, "show interpreted request")
+	fs.StringVar(&f.DirWordlist, "dir", "", "directory wordlist for scan (overrides bundled default)")
+	fs.StringVar(&f.DomainWordlist, "domain", "", "subdomain wordlist for scan (overrides bundled default)")
 
 	return r
 }

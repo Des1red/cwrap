@@ -19,10 +19,23 @@ func PrintHelp() {
 		clihelp.F("upload", "<url>", "upload files (multipart POST)"),
 		clihelp.F("recon", "<url>", "active security reconnaissance"),
 		clihelp.F("exploit", "<report>", "confirm vulnerabilities and expand access chains"),
-		clihelp.F("scan", "<url> <wordlist>", "parallel subdirectory scanner"),
+		clihelp.F("scan", "<url>", "multi-stage directory and subdomain scanner"),
 	)
 
-	fmt.Println("\nRecon profiles:")
+	fmt.Println("\nScan flags:")
+	clihelp.Print(
+		clihelp.F("--dir", "<path>", "directory wordlist (falls back to bundled default)"),
+		clihelp.F("--domain", "<path>", "subdomain wordlist — enables stage 3"),
+	)
+
+	fmt.Println("\nScan stages:")
+	clihelp.Print(
+		clihelp.F("Stage 1", "Directory Discovery", "baseline fingerprinting + parallel wordlist scan"),
+		clihelp.F("Stage 2", "Subdirectory Expansion", "re-scans every found directory with the full wordlist"),
+		clihelp.F("Stage 3", "Subdomain Enumeration", "wildcard detection + subdomain wordlist scan"),
+	)
+
+	fmt.Println("\nRecon modes:")
 	clihelp.Print(
 		clihelp.F("http", "default", "web app recon — HTML, forms, JS, headers"),
 		clihelp.F("api", "", "API recon — JSON structure, auth, endpoints"),
@@ -56,7 +69,7 @@ func PrintHelp() {
 		clihelp.F("form", "", "encode body as form-urlencoded"),
 	)
 
-	fmt.Println("\nProfile words:")
+	fmt.Println("\nProfile words (all commands):")
 	clihelp.Print(
 		clihelp.F("browser", "default", "Firefox headers"),
 		clihelp.F("chrome", "", "Chrome headers"),
@@ -111,7 +124,7 @@ func PrintHelp() {
 	fmt.Println("\nExamples — recon:")
 	clihelp.Print(
 		clihelp.F("cwrap recon https://site.com http", "", "web app recon"),
-		clihelp.F("cwrap recon https://site.com", "", "uses default:web app recon"),
+		clihelp.F("cwrap recon https://site.com http firefox", "", "web app recon with Firefox headers"),
 		clihelp.F("cwrap recon https://api.site/users api", "", "API recon"),
 		clihelp.F("cwrap recon https://site.com http bearer=TOKEN", "", "authenticated recon"),
 		clihelp.F("cwrap recon --tfile urls.txt http", "", "recon from URL list"),
@@ -120,14 +133,15 @@ func PrintHelp() {
 	fmt.Println("\nExamples — exploit:")
 	clihelp.Print(
 		clihelp.F("cwrap exploit reports/site-com_2026-04-24.report", "", "confirm and expand findings"),
-		clihelp.F("cwrap exploit reports/site-com_2026-04-24.report", "", "show chain details"),
+		clihelp.F("cwrap exploit reports/site-com_2026-04-24.report firefox", "", "with browser headers"),
 	)
 
 	fmt.Println("\nExamples — scan:")
 	clihelp.Print(
-		clihelp.F("cwrap scan https://site.com wordlist.txt", "", "subdirectory scan"),
-		clihelp.F("cwrap scan https://site.com wordlist.txt bearer=TOKEN", "", "authenticated scan"),
-		clihelp.F("cwrap recon --tfile site-com_scan.txt", "", "recon discovered paths"),
+		clihelp.F("cwrap scan https://site.com --dir wordlist.txt", "", "directory scan"),
+		clihelp.F("cwrap scan https://site.com --dir wordlist.txt --domain subs.txt", "", "directory + subdomain scan"),
+		clihelp.F("cwrap scan https://site.com firefox --dir wordlist.txt bearer=TOKEN", "", "authenticated scan with browser headers"),
+		clihelp.F("cwrap recon --tfile site-com_scan.txt http", "", "recon discovered paths"),
 	)
 
 	fmt.Println("\nEscape hatch (raw flags):")

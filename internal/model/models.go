@@ -1,11 +1,13 @@
 package model
 
 type Request struct {
-	Method   string
-	URL      string
-	FilePath string
-	Flags    Flags
-	Original string
+	Method        string
+	URL           string
+	FilePath      string
+	SubdomainFile string
+	ReconMode     string
+	Flags         Flags
+	Original      string
 }
 
 type Flags struct {
@@ -40,6 +42,10 @@ type Flags struct {
 	Target     string
 	Debug      bool
 	AutoCookie bool
+
+	// scan-specific
+	DirWordlist    string // --dir
+	DomainWordlist string // --domain
 }
 
 type Header struct {

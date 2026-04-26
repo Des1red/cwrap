@@ -1,27 +1,14 @@
 package scan
 
 import (
-	"cwrap/internal/model"
 	"fmt"
 	"net/http"
-	"os"
 )
 
 type baseline struct {
 	soft404     bool
 	trulyStatic bool
 	b1          probeResult
-}
-
-func (b baseline) print() {
-	if !b.soft404 {
-		return
-	}
-	if b.trulyStatic {
-		fmt.Printf("⚠  Soft 404 detected — filtering by exact content match (baseline: %d bytes)\n\n", b.b1.size)
-	} else {
-		fmt.Printf("⚠  Soft 404 detected — server randomizes responses, filtering by size band (baseline: %d bytes)\n\n", b.b1.size)
-	}
 }
 
 func buildBaseline(client *http.Client, base string) (baseline, error) {
@@ -40,20 +27,67 @@ func buildBaseline(client *http.Client, base string) (baseline, error) {
 	}, nil
 }
 
-func validate(req *model.Request) error {
-	if req.URL == "" {
-		return fmt.Errorf("scan requires a URL — cwrap scan <url> /path/to/words.txt")
+func (b baseline) print() {
+	if !b.soft404 {
+		return
 	}
-	if req.FilePath != "" {
-		return nil
+	if b.trulyStatic {
+		fmt.Printf("⚠  Soft 404 detected — filtering by exact content match (baseline: %d bytes)\n\n", b.b1.size)
+	} else {
+		fmt.Printf("⚠  Soft 404 detected — server randomizes responses, filtering by size band (baseline: %d bytes)\n\n", b.b1.size)
 	}
-	wl := defaultWordlist()
-	if wl == "" {
-		return fmt.Errorf("scan requires a wordlist — cwrap scan <url> /path/to/words.txt")
+}
+
+// buildSubdomainBaseline detects wildcard DNS by probing two random subdomains.
+// Reuses the baseline type — soft404=true means the apex has a wildcard catch-all.
+func buildSubdomainBaseline(client *http.Client, scheme, apex, port string) (baseline, error) {
+	u1 := buildSubdomainURL(scheme, "cwrap-xqzjk-nowildcard", apex, port)
+	u2 := buildSubdomainURL(scheme, "cwrap-zvmpt-nowildcard", apex, port)
+
+	b1, err := probe(client, u1)
+	if err != nil {
+		// A connection error on a random subdomain is expected (NXDOMAIN / refused).
+		// Treat as no wildcard.
+		return baseline{soft404: false}, nil
 	}
-	if _, err := os.Stat(wl); err != nil {
-		return fmt.Errorf("no wordlist provided and default not found at %s", wl)
+
+	b2, err := probe(client, u2)
+	if err != nil {
+		return baseline{soft404: false}, nil
 	}
-	req.FilePath = wl
-	return nil
+
+	if b1.status != 200 {
+		// Wildcard only matters when random subdomains return 200.
+		return baseline{soft404: false}, nil
+	}
+
+	bl := baseline{
+		soft404:     true,
+		trulyStatic: b1.hash == b2.hash,
+		b1:          b1,
+	}
+	return bl, nil
+}
+
+// subdomainBaselinePrint overrides baseline.print() messaging for subdomain context.
+func subdomainBaselinePrint(bf baseline) {
+	if !bf.soft404 {
+		return
+	}
+	if bf.trulyStatic {
+		fmt.Printf("⚠  Wildcard DNS detected — filtering by exact content match (baseline: %d bytes)\n\n", bf.b1.size)
+	} else {
+		fmt.Printf("⚠  Wildcard DNS detected — responses vary, filtering by size band (baseline: %d bytes)\n\n", bf.b1.size)
+	}
+}
+
+func (b baseline) printSubdomain() {
+	if !b.soft404 {
+		return
+	}
+	if b.trulyStatic {
+		fmt.Printf("⚠  Wildcard DNS detected — filtering by exact content match (baseline: %d bytes)\n\n", b.b1.size)
+	} else {
+		fmt.Printf("⚠  Wildcard DNS detected — responses vary, filtering by size band (baseline: %d bytes)\n\n", b.b1.size)
+	}
 }
