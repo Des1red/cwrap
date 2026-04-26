@@ -16,7 +16,7 @@ func stageTwo(client *http.Client, dirs map[string]bool, wordlist string, bf bas
 		go func(d string) {
 			defer wg.Done()
 			fmt.Printf("  expanding %s\n", d)
-			r := scanBase(client, d, wordlist, bf)
+			r := scanBase(client, d, wordlist, bf, scanSingleSegmentsOnly)
 			mu.Lock()
 			for url, status := range r.hits {
 				merged.hits[url] = status

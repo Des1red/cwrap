@@ -1,0 +1,12 @@
+http://localhost:9001/logout
+http://localhost:9001/?wsdl
+http://localhost:9001/api/messages/count
+http://localhost:9001/api/messages/import
+http://localhost:9001/api/messages
+http://localhost:9001/api/messages/export
+http://localhost:9001/api/messages/list
+http://localhost:9001/api/messages/stats
+http://localhost:9001/home
+http://localhost:9001/api/messages/bulk
+http://localhost:9001/api/messages/create
+http://localhost:9001/api/messages/search

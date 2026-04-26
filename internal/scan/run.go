@@ -14,21 +14,25 @@ func Run(req model.Request) error {
 	}
 
 	base := strings.TrimRight(req.URL, "/")
-	client := newClient(req)
+	plainClient := newPlainClient() // baseline only — no auth headers
+	scanClient := newClient(req)    // real probes — full auth stack
 
-	bf, err := buildBaseline(client, base)
+	bf, err := buildBaseline(scanClient, base)
 	if err != nil {
 		return err
 	}
 	bf.print()
 
 	fmt.Printf("═══ Stage 1 — Directory Discovery ═══\n\n")
-	r1 := stageOne(client, base, req.FilePath, bf)
+	r1 := stageOne(scanClient, base, req.FilePath, bf)
 
 	r2 := newScanResult()
 	if len(r1.dirs) > 0 {
 		fmt.Printf("\n═══ Stage 2 — Subdirectory Expansion (%d directories) ═══\n\n", len(r1.dirs))
-		r2 = stageTwo(client, r1.dirs, req.FilePath, bf)
+		r2 = stageTwo(scanClient, r1.dirs, req.FilePath, bf)
+	} else {
+		fmt.Printf("\n═══ Stage 2 — Subdirectory Expansion ═══\n\n")
+		fmt.Printf("  skipped — no expandable 200 directories found\n")
 	}
 
 	// ── Stage 3 — Subdomain Enumeration ──────────────────────────────────────
@@ -38,7 +42,7 @@ func Run(req model.Request) error {
 	switch reason := subdomainSkipReason(base, req.SubdomainFile); reason {
 	case "":
 		subFile := resolveSubdomainFile(req.SubdomainFile)
-		r3 = stageThree(client, base, subFile)
+		r3 = stageThree(plainClient, base, subFile)
 	default:
 		fmt.Printf("  skipped — %s\n", reason)
 	}
@@ -65,17 +69,6 @@ func mergeResults(results ...scanResult) []string {
 		}
 	}
 	return out
-}
-
-func isSimilarSize(a, b int64) bool {
-	if b == 0 {
-		return a == 0
-	}
-	diff := a - b
-	if diff < 0 {
-		diff = -diff
-	}
-	return float64(diff)/float64(b) < 0.05
 }
 
 func defaultWordlist() string {

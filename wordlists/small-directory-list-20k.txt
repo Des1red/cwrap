@@ -119,15 +119,6 @@ proc/version
 14
 15
 16
-169.254.169.254
-169.254.169.254/latest
-169.254.169.254/latest/meta-data
-169.254.169.254/latest/meta-data/hostname
-169.254.169.254/latest/meta-data/iam/security-credentials
-169.254.169.254/latest/meta-data/local-ipv4
-169.254.169.254/latest/meta-data/public-ipv4
-169.254.169.254/latest/user-data
-169.254.170.2
 17
 18
 19

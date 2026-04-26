@@ -11,6 +11,17 @@ type baseline struct {
 	b1          probeResult
 }
 
+func isSimilarSize(a, b int64) bool {
+	if b == 0 {
+		return a == 0
+	}
+	diff := a - b
+	if diff < 0 {
+		diff = -diff
+	}
+	return float64(diff)/float64(b) < 0.05
+}
+
 func buildBaseline(client *http.Client, base string) (baseline, error) {
 	b1, err := probe(client, base+"/cwrap-xqzjk-404check")
 	if err != nil {
@@ -21,7 +32,7 @@ func buildBaseline(client *http.Client, base string) (baseline, error) {
 		return baseline{}, fmt.Errorf("baseline probe failed: %w", err)
 	}
 	return baseline{
-		soft404:     b1.status == 200,
+		soft404:     b1.hash == b2.hash || isSimilarSize(b1.size, b2.size),
 		trulyStatic: b1.hash == b2.hash,
 		b1:          b1,
 	}, nil
@@ -67,18 +78,6 @@ func buildSubdomainBaseline(client *http.Client, scheme, apex, port string) (bas
 		b1:          b1,
 	}
 	return bl, nil
-}
-
-// subdomainBaselinePrint overrides baseline.print() messaging for subdomain context.
-func subdomainBaselinePrint(bf baseline) {
-	if !bf.soft404 {
-		return
-	}
-	if bf.trulyStatic {
-		fmt.Printf("⚠  Wildcard DNS detected — filtering by exact content match (baseline: %d bytes)\n\n", bf.b1.size)
-	} else {
-		fmt.Printf("⚠  Wildcard DNS detected — responses vary, filtering by size band (baseline: %d bytes)\n\n", bf.b1.size)
-	}
 }
 
 func (b baseline) printSubdomain() {

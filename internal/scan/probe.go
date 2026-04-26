@@ -17,8 +17,13 @@ func probe(client *http.Client, url string) (probeResult, error) {
 	if err != nil {
 		return probeResult{}, err
 	}
-	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return probeResult{}, err
+	}
+
 	return probeResult{
 		status: resp.StatusCode,
 		size:   int64(len(body)),

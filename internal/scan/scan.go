@@ -11,6 +11,13 @@ import (
 
 const workers = 20
 
+type scanMode int
+
+const (
+	scanAllPaths scanMode = iota
+	scanSingleSegmentsOnly
+)
+
 type scanResult struct {
 	hits map[string]int  // url -> status — everything we like
 	dirs map[string]bool // url -> true — only 200s for stage 2
@@ -23,7 +30,28 @@ func newScanResult() scanResult {
 	}
 }
 
-func scanBase(client *http.Client, base, wordlist string, bf baseline) scanResult {
+func shouldSkipWord(word string, mode scanMode) bool {
+	if word == "" || strings.HasPrefix(word, "#") {
+		return true
+	}
+
+	// never allow traversal-style payloads in directory scanner
+	if strings.Contains(word, "..") {
+		return true
+	}
+
+	if mode == scanSingleSegmentsOnly {
+		if strings.Contains(word, "/") ||
+			strings.Contains(word, "?") ||
+			strings.Contains(word, ".") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func scanBase(client *http.Client, base, wordlist string, bf baseline, mode scanMode) scanResult {
 	result := newScanResult()
 
 	f, err := os.Open(wordlist)
@@ -37,10 +65,10 @@ func scanBase(client *http.Client, base, wordlist string, bf baseline) scanResul
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		word := strings.TrimSpace(scanner.Text())
-		if word == "" || strings.HasPrefix(word, "#") {
+		if shouldSkipWord(word, mode) {
 			continue
 		}
-		wordList = append(wordList, word)
+		wordList = append(wordList, strings.TrimLeft(word, "/"))
 	}
 	total := len(wordList)
 
@@ -54,6 +82,9 @@ func scanBase(client *http.Client, base, wordlist string, bf baseline) scanResul
 		go func() {
 			defer wg.Done()
 			for word := range words {
+				isExpandable := !strings.Contains(word, "/") &&
+					!strings.Contains(word, "?") &&
+					!strings.Contains(word, ".")
 				target := base + "/" + word
 				res, err := probe(client, target)
 
@@ -94,7 +125,7 @@ func scanBase(client *http.Client, base, wordlist string, bf baseline) scanResul
 
 				if res.status != 404 && res.status != 500 && res.status != 0 {
 					result.hits[target] = res.status
-					if res.status == 200 {
+					if res.status == 200 && isExpandable {
 						result.dirs[target] = true
 					}
 				}
