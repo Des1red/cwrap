@@ -1,6 +1,5 @@
 # cwrap
-cwrap is an intelligent HTTP client with built-in active security analysis.
-It translates intent into HTTP requests and automatically performs identity-aware probing, session tracking, and object-level authorization reasoning.
+cwrap is an active authorization testing tool. It translates intent into identity-aware HTTP probes, tracks sessions across requests, and automatically detects object-level access control failures by comparing what different identities can reach.
 
 ## Basic Usage
 ```bash
