@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -170,44 +169,7 @@ func apexHost(host string) string {
 	return last2
 }
 
-// defaultSubdomainWordlist returns the path to the bundled subdomain wordlist,
-// resolved relative to the cwrap executable — same pattern as defaultWordlist().
-func defaultSubdomainWordlist() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return ""
-	}
-	exe, err = filepath.EvalSymlinks(exe)
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(filepath.Dir(exe), "./", "small-subdomain-list-20k.txt")
-}
-
-// validateSubdomainFile resolves which subdomain wordlist to use.
-// Prefers req.SubdomainFile, falls back to the bundled default.
-// Returns "" if no wordlist is available (stage 3 will be skipped gracefully).
-func resolveSubdomainFile(provided string) string {
-	if provided != "" {
-		return provided
-	}
-	wl := defaultSubdomainWordlist()
-	if wl == "" {
-		return ""
-	}
-	if _, err := os.Stat(wl); err != nil {
-		return ""
-	}
-	return wl
-}
-
 func subdomainSkipReason(base, subdomainFile string) string {
-	// explicit flag provided — always attempt regardless of host type
-	if subdomainFile != "" {
-		return ""
-	}
-
-	// no explicit flag — check whether the host is worth scanning
 	u, err := url.Parse(base)
 	if err != nil {
 		return "could not parse target URL"
@@ -215,15 +177,10 @@ func subdomainSkipReason(base, subdomainFile string) string {
 	host := u.Hostname()
 
 	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-		return "target is localhost — use --domain to force subdomain scan"
+		return "target is localhost — subdomain scan not applicable"
 	}
 	if net.ParseIP(host) != nil {
-		return "target is an IP address — use --domain to force subdomain scan"
-	}
-
-	// no flag and no bundled wordlist
-	if resolveSubdomainFile("") == "" {
-		return "no subdomain wordlist found — use --domain /path/to/subdomains.txt"
+		return "target is an IP address — subdomain scan not applicable"
 	}
 
 	return ""

@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-func stageTwo(client *http.Client, dirs map[string]bool, wordlist string, bf baseline) scanResult {
+func stageTwo(client *http.Client, dirs map[string]bool, wordlist string, bf baseline, debug bool) scanResult {
 	merged := newScanResult()
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -15,9 +15,16 @@ func stageTwo(client *http.Client, dirs map[string]bool, wordlist string, bf bas
 		wg.Add(1)
 		go func(d string) {
 			defer wg.Done()
-			fmt.Printf("  expanding %s\n", d)
+			if debug {
+				fmt.Printf("  expanding %s\n", d)
+			}
 			r := scanBase(client, d, wordlist, bf, scanSingleSegmentsOnly)
 			mu.Lock()
+			if debug {
+				if len(r.hits) == 0 {
+					fmt.Printf("  no findings under %s\n", d)
+				}
+			}
 			for url, status := range r.hits {
 				merged.hits[url] = status
 			}
@@ -28,5 +35,8 @@ func stageTwo(client *http.Client, dirs map[string]bool, wordlist string, bf bas
 		}(dir)
 	}
 	wg.Wait()
+	if len(merged.hits) == 0 {
+		fmt.Printf("  no findings\n")
+	}
 	return merged
 }

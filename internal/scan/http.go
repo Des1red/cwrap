@@ -10,20 +10,6 @@ import (
 	"time"
 )
 
-func newPlainClient() *http.Client {
-	return &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-			MaxIdleConns:        workers,
-			MaxIdleConnsPerHost: workers,
-		},
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-}
-
 func newClient(req model.Request) *http.Client {
 	base := &http.Transport{
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
