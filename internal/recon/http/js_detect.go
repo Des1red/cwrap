@@ -25,6 +25,22 @@ func looksLikeJS(url string, resp *http.Response) bool {
 	return false
 }
 
+func isStaticAssetURL(u string) bool {
+	u = strings.ToLower(u)
+	static := []string{
+		".js", ".js?", ".js#",
+		".css", ".css?",
+		".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico",
+		".woff", ".woff2", ".ttf", ".eot",
+		".map", ".map?",
+	}
+	for _, ext := range static {
+		if strings.Contains(u, ext) {
+			return true
+		}
+	}
+	return false
+}
 func (e *Engine) handleJSEndpoints(
 	ent *knowledge.Entity,
 	sourceURL string,
@@ -33,6 +49,10 @@ func (e *Engine) handleJSEndpoints(
 	for _, ep := range endpoints {
 		link, ok := e.normalizeLink(sourceURL, ep.Path)
 		if !ok {
+			continue
+		}
+
+		if isStaticAssetURL(link) { // check the link string
 			continue
 		}
 
@@ -58,4 +78,21 @@ func (e *Engine) handleJSEndpoints(
 			Created:  time.Now(),
 		})
 	}
+}
+
+// reject URLs where the same path segment repeats more than twice
+// this catches infinite relative import resolution loops
+func looksLikePathExplosion(u string) bool {
+	parts := strings.Split(strings.ToLower(u), "/")
+	seen := map[string]int{}
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		seen[p]++
+		if seen[p] > 1 {
+			return true
+		}
+	}
+	return false
 }

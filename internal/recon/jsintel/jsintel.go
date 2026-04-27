@@ -2,6 +2,7 @@ package jsintel
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -236,10 +237,13 @@ func Learn(ent *knowledge.Entity, sourceURL string, body []byte) []JSEndpoint {
 	// Hardcoded hosts / internal infra
 	// ----------------------------
 	urls := reURL.FindAllString(s, -1)
-	if len(urls) > 0 {
-		ent.Content.JSFindings["host_url"] += len(urls)
-		for i := 0; i < len(urls) && i < 8; i++ {
-			appendLeak(ent, "host_url", sourceURL, "url", redact(urls[i], 180))
+	for _, u := range urls {
+		if isNoiseURL(u) {
+			continue
+		}
+		ent.Content.JSFindings["host_url"]++
+		if len(ent.Content.JSLeaks) < 8 {
+			appendLeak(ent, "host_url", sourceURL, "url", redact(u, 180))
 		}
 	}
 
@@ -322,4 +326,54 @@ func redact(s string, max int) string {
 		return s[:max] + "..."
 	}
 	return s
+}
+
+// JSPathSuffix extracts the /js/... suffix from a URL path.
+// Returns "" if the URL doesn't contain a /js/ segment.
+func JSPathSuffix(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	lower := strings.ToLower(u.Path)
+	idx := strings.Index(lower, "/js/")
+	if idx == -1 {
+		return ""
+	}
+	return u.Path[idx:] // e.g. "/js/app.js"
+}
+
+// IsPhantomJSURL returns true if the URL is a path-prefix variant of an
+// already-known JS file. This happens when a SPA returns its HTML shell for
+// API routes — relative script imports resolve under the API prefix, producing
+// phantom entities like /api/js/app.js when /js/app.js already exists.
+func IsPhantomJSURL(k *knowledge.Knowledge, resolvedURL string) bool {
+	suffix := JSPathSuffix(resolvedURL)
+	if suffix == "" {
+		return false
+	}
+	return k.HasJSSuffix(suffix)
+}
+
+// isNoiseURL returns true for URLs that are structurally valid but semantically
+// useless for recon — XML namespaces, W3C schema URIs, CDN boilerplate, etc.
+func isNoiseURL(u string) bool {
+	noise := []string{
+		"www.w3.org",
+		"schemas.xmlsoap.org",
+		"schemas.microsoft.com",
+		"purl.org",
+		"dublincore.org",
+		"ogp.me",
+		"schema.org",
+		"json-ld.org",
+		"xmlns.com",
+	}
+	lower := strings.ToLower(u)
+	for _, n := range noise {
+		if strings.Contains(lower, n) {
+			return true
+		}
+	}
+	return false
 }

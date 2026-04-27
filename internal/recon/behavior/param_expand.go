@@ -9,23 +9,46 @@ import (
 	"time"
 )
 
-func isJSEntity(ent *knowledge.Entity) bool {
+func isStaticAsset(ent *knowledge.Entity) bool {
 	u := strings.ToLower(ent.URL)
-	return strings.HasSuffix(u, ".js") ||
-		strings.Contains(u, ".js?") ||
-		strings.Contains(u, ".js#")
+	static := []string{
+		".js", ".js?", ".js#",
+		".css", ".css?",
+		".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico",
+		".woff", ".woff2", ".ttf", ".eot",
+		".map", ".map?",
+		".json?", // bundled config fetches
+	}
+	for _, ext := range static {
+		if strings.Contains(u, ext) {
+			return true
+		}
+	}
+	return false
 }
 
+func isSessionTerminator(u string) bool {
+	lower := strings.ToLower(u)
+	terminators := []string{
+		"/logout", "/log-out", "/signout", "/sign-out",
+		"/logoff", "/log-off", "/session/destroy", "/auth/logout",
+	}
+	for _, t := range terminators {
+		if strings.Contains(lower, t) {
+			return true
+		}
+	}
+	return false
+}
 func (e *Engine) Expand(ent *knowledge.Entity) {
 
 	if ent.State.ProbeCount > 50 {
 		return
 	}
 
-	// skip param discovery and mutation on static JS files
-	if isJSEntity(ent) {
-		e.expandMethods(ent)
-		e.expandIdentity(ent)
+	// static assets have no security surface
+	// JS intel (endpoint discovery, secrets) already extracted in e.int.Learn
+	if isStaticAsset(ent) {
 		return
 	}
 
@@ -283,6 +306,12 @@ func (e *Engine) expandMutation(ent *knowledge.Entity) {
 
 func (e *Engine) expandIdentity(ent *knowledge.Entity) {
 
+	// skip identity probes on session-terminating endpoints —
+	// probing these with live credentials will kill the active session
+	if isSessionTerminator(ent.URL) {
+		return
+	}
+
 	// auth signals on this specific entity
 	hasAuthSignal := ent.SeenSignal(knowledge.SigAuthBoundary) ||
 		ent.SeenSignal(knowledge.SigObjectOwnership) ||
@@ -400,6 +429,13 @@ func (e *Engine) expandMethods(ent *knowledge.Entity) {
 		ent.State.MethodProbed = true
 		return
 	}
+	// don't sweep methods on session-terminating endpoints —
+	// POST/DELETE against logout will kill the active session
+	if isSessionTerminator(ent.URL) {
+		ent.State.MethodProbed = true
+		return
+	}
+
 	// don't re-probe methods we already know about
 	methods := []string{
 		"GET",

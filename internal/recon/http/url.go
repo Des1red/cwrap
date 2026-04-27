@@ -45,5 +45,11 @@ func (e *Engine) normalizeLink(baseURL, raw string) (string, bool) {
 		return "", false
 	}
 
+	// reject path explosion — same segment repeating more than twice
+	// catches infinite relative import resolution loops from JS files
+	if looksLikePathExplosion(abs.String()) {
+		return "", false
+	}
+
 	return abs.String(), true
 }

@@ -19,6 +19,7 @@ type Knowledge struct {
 	// Global parameter dictionary (useful for cross-target heuristics).
 	Params               map[string]bool
 	DiscoveredIdentities map[string]map[string]string
+	KnownJSSuffixes      sync.Map
 }
 
 func New(target string) *Knowledge {
@@ -87,4 +88,14 @@ func (p *ParamIntel) InjectedOnly() bool {
 		return true
 	}
 	return false
+}
+
+func (k *Knowledge) RegisterJSSuffix(suffix string) bool {
+	_, loaded := k.KnownJSSuffixes.LoadOrStore(suffix, struct{}{})
+	return !loaded // true = first registration, false = already existed
+}
+
+func (k *Knowledge) HasJSSuffix(suffix string) bool {
+	_, ok := k.KnownJSSuffixes.Load(suffix)
+	return ok
 }
