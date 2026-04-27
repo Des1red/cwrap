@@ -27,6 +27,7 @@ func (h *ReconHandler) Translate(args []string) []string {
 				h.profile = p // explicit header override
 				continue
 			}
+
 			out = append(out, t)
 
 		case TokenCookie:

@@ -1,7 +1,7 @@
 package runner
 
 import (
-	"cwrap/internal/builder"
+	"cwrap/internal/curl"
 	"cwrap/internal/logger"
 	"cwrap/internal/model"
 	"fmt"
@@ -12,16 +12,13 @@ import (
 type CurlExecutor struct{}
 
 func (CurlExecutor) Run(req model.Request) error {
-
-	result := builder.Build(req)
+	result := curl.Build(req)
 	logger.PrintCommand(req, result)
 
 	if !req.Flags.Run {
 		fmt.Print("\nExecute request? (y/n): ")
-
 		var input string
 		fmt.Scanln(&input)
-
 		if input != "y" && input != "Y" {
 			fmt.Println("aborted.")
 			return nil
@@ -33,5 +30,17 @@ func (CurlExecutor) Run(req model.Request) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	// sync curl's cookie jar into the cwrap session store so recon
+	// can pick up the session automatically on the next run
+	if req.Flags.AutoCookie {
+		if err := curl.SyncJarToSession(req.URL); err != nil {
+			fmt.Fprintf(os.Stderr, "\ncwrap: warning: failed to sync cookies to session store: %v\n", err)
+		}
+	}
+
+	return nil
 }

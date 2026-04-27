@@ -49,18 +49,19 @@ func Scan(args []string) []Token {
 		// ----- cookie:key=value -----
 		lower := strings.ToLower(a)
 		if strings.HasPrefix(lower, "cookie:") || strings.HasPrefix(lower, "cookies:") {
-
 			kv := a[strings.Index(a, ":")+1:]
-
-			if j := strings.Index(kv, "="); j != -1 {
-				out = append(out, Token{
-					Type:  TokenCookie,
-					Key:   kv[:j],
-					Value: kv[j+1:],
-					Raw:   kv,
-				})
-				continue
+			for _, pair := range strings.Split(kv, ",") {
+				pair = strings.TrimSpace(pair)
+				if j := strings.Index(pair, "="); j != -1 {
+					out = append(out, Token{
+						Type:  TokenCookie,
+						Key:   pair[:j],
+						Value: pair[j+1:],
+						Raw:   pair,
+					})
+				}
 			}
+			continue
 		}
 
 		// ----- bearer/auth/token -----

@@ -1,12 +1,12 @@
 package logger
 
 import (
-	"cwrap/internal/builder"
+	"cwrap/internal/curl"
 	"cwrap/internal/model"
 	"fmt"
 )
 
-func PrintCommand(req model.Request, result builder.Result) {
+func PrintCommand(req model.Request, result curl.Result) {
 	fmt.Println(key("method")+":", val(req.Method))
 	fmt.Println(key("url")+":", val(req.URL))
 	fmt.Println(key("run")+":", val(fmt.Sprint(req.Flags.Run)))

@@ -30,13 +30,9 @@ func (e *Engine) Run(base model.Request, url string) error {
 				continue
 			}
 			ent.SessionCookies[c.Name] = c.Value
+			e.sessionCookies[c.Name] = c.Value
 			ent.SessionUsed = true
 		}
-	}
-
-	// populate engine session cookies from persisted store
-	for k, v := range ent.SessionCookies {
-		e.sessionCookies[k] = v
 	}
 
 	// ----------------------------------------
@@ -144,6 +140,8 @@ func (e *Engine) Run(base model.Request, url string) error {
 			break
 		}
 	}
+	// strip auth signals from SPA shell entities before returning
+	e.stripSPAShellSignals()
 
 	return nil
 }
