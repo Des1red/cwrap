@@ -6,6 +6,7 @@ import (
 	"cwrap/internal/tokens"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -139,15 +140,30 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 
 	// re-queue all currently known entities for this new identity
 	root := e.k.Entity(e.k.Target)
+	// replace the existing re-queue block for path param entities
 	for _, ent := range e.k.Entities {
 		if ent == nil || !ent.State.Seen {
 			continue
 		}
+
+		pathParams := extractPathParams(ent)
+		if len(pathParams) == 0 {
+			continue
+		}
+
+		// reset so expandPathIDs re-runs for this entity under the new identity
+		ent.State.PathIDProbed = false
+		clearSeenPathIDProbeFamily(root.SeenProbes, ent, ent.URL)
+		if e.debug {
+			fmt.Printf("[debug addLiveIdentity] queuing %s pathParams=%v\n", ent.URL, pathParams)
+		}
+		// push with PathParams so storeResponse populates IdentityAccess/IdentityDenied
 		e.k.PushProbe(root, knowledge.Probe{
-			URL:      ent.URL,
-			Method:   "GET",
-			Reason:   knowledge.ReasonIdentityProbe,
-			Priority: 160,
+			URL:        ent.URL,
+			Method:     "GET",
+			PathParams: pathParams,
+			Reason:     knowledge.ReasonIdentityProbe,
+			Priority:   155,
 		})
 	}
 	// clear probed path templates so expandPathIDs re-runs on organically
@@ -158,6 +174,7 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 
 	// re-queue path ID expansion for all seen entities that have path params
 	for _, ent := range e.k.Entities {
+
 		if ent == nil || !ent.State.Seen {
 			continue
 		}
@@ -185,6 +202,30 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 			Priority: 155, // slightly below identity probes, above normal expansion
 		})
 	}
+}
+
+func extractPathParams(ent *knowledge.Entity) map[string]string {
+	u, err := url.Parse(ent.URL)
+	if err != nil {
+		return nil
+	}
+	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+	out := map[string]string{}
+	for i, seg := range segments {
+		if !looksLikePathID(seg) {
+			continue
+		}
+		name := "id"
+		if i > 0 {
+			parent := strings.ToLower(segments[i-1])
+			if strings.HasSuffix(parent, "s") && len(parent) > 2 {
+				parent = parent[:len(parent)-1]
+			}
+			name = parent + "_id"
+		}
+		out[name] = seg
+	}
+	return out
 }
 
 // discoverIdentityFromResponse checks if a response contains a JWT cookie

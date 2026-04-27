@@ -468,6 +468,7 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 		return
 	}
 	ent.State.PathIDProbed = true
+
 	if ent.State.ProbeCount > 50 {
 		return
 	}
@@ -482,20 +483,14 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 		return
 	}
 
-	tmpl := pathTemplate(u)
-	if _, seen := e.probedPathTemplates[tmpl]; seen {
-		return
-	}
-	e.probedPathTemplates[tmpl] = struct{}{}
-
 	segments := strings.Split(rawPath, "/")
+	tmpl := pathTemplate(u)
 
 	for i, seg := range segments {
 		if !looksLikePathID(seg) {
 			continue
 		}
 
-		// derive a meaningful param name from the parent segment
 		name := "id"
 		if i > 0 {
 			parent := strings.ToLower(segments[i-1])
@@ -505,13 +500,29 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 			name = parent + "_id"
 		}
 
-		// register param
 		ent.AddParam(name, knowledge.ParamPath)
 		e.k.AddParam(name)
 		e.int.ClassifyParam(ent, name)
 		ent.Tag(knowledge.SigIDLikeParam)
 
-		// base mutations only — fixed depth, no adaptive expansion
+		// always probe this entity with its own value under all identities
+		// so IdentityAccess/IdentityDenied get populated for THIS entity
+		e.pushProbe(ent, knowledge.Probe{
+			URL:           ent.URL,
+			Method:        "GET",
+			PathParams:    map[string]string{name: seg},
+			PathParamBase: map[string]string{name: seg},
+			Reason:        knowledge.ReasonPathIDSelfProbe,
+			Priority:      110,
+			Created:       time.Now(),
+			SourceURL:     ent.URL,
+		})
+
+		// neighbor probes — only once per template
+		if _, seen := e.probedPathTemplates[tmpl]; seen {
+			continue
+		}
+
 		tests := []string{"0", "1", "-1"}
 		if id, err := strconv.Atoi(seg); err == nil {
 			tests = append(tests,
@@ -523,6 +534,9 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 		}
 
 		for _, v := range tests {
+			if v == seg {
+				continue
+			}
 			newURL := replacePathSegment(u, i, v)
 			e.pushProbe(ent, knowledge.Probe{
 				URL:           newURL,
@@ -536,4 +550,6 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 			})
 		}
 	}
+
+	e.probedPathTemplates[tmpl] = struct{}{}
 }

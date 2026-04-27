@@ -1,15 +1,20 @@
 package logger
 
 const (
-	reset  = "\033[0m"
-	green  = "\033[32m"
-	purple = "\033[35m"
+	Reset  = "\033[0m"
+	Red    = "\033[31m"
+	Green  = "\033[32m"
+	Yellow = "\033[33m"
+	Cyan   = "\033[36m"
+	Gray   = "\033[90m"
+	Bold   = "\033[1m"
+	Purple = "\033[35m"
 )
 
 func key(s string) string {
-	return purple + s + reset
+	return Purple + s + Reset
 }
 
 func val(s string) string {
-	return green + s + reset
+	return Green + s + Reset
 }

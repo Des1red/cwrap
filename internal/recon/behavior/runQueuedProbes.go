@@ -135,7 +135,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			probeFP[id.Name] = fpString(resp.StatusCode, body)
 			e.int.Learn(reqID.URL, resp, body)
 
-			storeResponse(target, responses, statuses, probe, id.Name, resp.StatusCode, body, e.baseStatus, e.baseBody, base.URL, e.k)
+			storeResponse(target, responses, statuses, probe, id.Name, resp.StatusCode, body, e.baseStatus, e.baseBody, base.URL, e.k, e.debug)
 		}
 
 		// auth gate detection is GLOBAL behavior mode, keep it as-is

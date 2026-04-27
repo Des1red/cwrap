@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"cwrap/internal/recon/canonicalize"
 	"cwrap/internal/recon/knowledge"
+	"fmt"
+	"strings"
 )
 
 func anyStatusIs(m map[string]int, want ...int) bool {
@@ -133,7 +135,10 @@ func (e *Engine) analyzeIDOR(
 		if p == nil || p.InjectedOnly() || p.LikelyReflection {
 			continue
 		}
-
+		if e.debug && strings.Contains(name, "_id") {
+			fmt.Printf("[IDOR check] param=%s IDLike=%v OwnershipBoundary=%v\n",
+				name, p.IDLike, p.OwnershipBoundary)
+		}
 		noCredDenied := false
 
 		// canonicalized bodies (strong structural diff)
@@ -169,7 +174,9 @@ func (e *Engine) analyzeIDOR(
 			}
 			canonBodies = append(canonBodies, n)
 
-			if anyNoCredDenied(ent, byIDStatus) {
+			// ownership IDOR: some cred identities allowed, others denied on this same value
+			if anyCredStatus(ent, byIDStatus, 200) &&
+				(anyCredStatus(ent, byIDStatus, 403) || anyCredStatus(ent, byIDStatus, 401)) {
 				noCredDenied = true
 			}
 		}
@@ -203,6 +210,12 @@ func (e *Engine) analyzeIDOR(
 				p.PossibleIDOR = true
 				ent.Tag(knowledge.SigPossibleIDOR)
 			}
+		}
+
+		// --- OWNERSHIP IDOR (no structural diff needed, ownership already proven) ---
+		if p.OwnershipBoundary && noCredDenied {
+			p.PossibleIDOR = true
+			ent.Tag(knowledge.SigPossibleIDOR)
 		}
 	}
 }

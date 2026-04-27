@@ -1,6 +1,9 @@
 package behavior
 
-import "cwrap/internal/recon/knowledge"
+import (
+	"cwrap/internal/recon/knowledge"
+	"fmt"
+)
 
 type paramEntry struct {
 	name    string
@@ -20,6 +23,7 @@ func storeResponse(
 	baseBody []byte,
 	baseURL string,
 	kg *knowledge.Knowledge,
+	debug bool,
 ) {
 	entries := make([]paramEntry, 0, len(probe.AddQuery)+len(probe.PathParams))
 	for k, v := range probe.AddQuery {
@@ -74,6 +78,12 @@ func storeResponse(
 		accumEnt.AccumStatuses[k][v][identity] = status
 
 		p := accumEnt.Params[k]
+		if debug {
+			if isPathParam {
+				fmt.Printf("[debug storeResponse] accumEnt=%s param=%s identity=%s status=%d p=%v\n",
+					accumEnt.URL, k, identity, status, p)
+			}
+		}
 		if p != nil && shouldReportIdentity(identity) {
 			if status == 200 {
 				p.IdentityAccess[identity]++
