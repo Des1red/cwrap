@@ -12,9 +12,7 @@ func isProfile(word string) (string, bool) {
 
 func isReconProfile(word string) (string, bool) {
 	switch word {
-	case "http", "web":
-		return word, true
-	case "api":
+	case "http", "web", "api":
 		return word, true
 	}
 	return "", false
@@ -30,10 +28,6 @@ func isContent(word string) (string, bool) {
 
 func isBooleanWord(word string) (string, bool) {
 	switch word {
-	case "follow":
-		return "follow", true
-	case "nofollow":
-		return "nofollow", true
 	case "csrf":
 		return "csrf", true
 	case "auto-cookie":

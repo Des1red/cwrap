@@ -7,9 +7,6 @@ import (
 
 type fetchState struct {
 	profile string
-	content string
-	follow  *bool
-	debug   bool
 }
 
 type FetchHandler struct{}
@@ -21,9 +18,6 @@ func (FetchHandler) Translate(args []string) []string {
 	var s fetchState
 	var out []Token
 
-	followDefault := true
-	s.follow = &followDefault
-
 	for _, t := range tokens {
 
 		switch t.Type {
@@ -33,15 +27,6 @@ func (FetchHandler) Translate(args []string) []string {
 
 		case TokenKeyValue:
 			switch t.Key {
-
-			case "follow":
-				v := t.Value == "true"
-				s.follow = &v
-
-			case "as", "profile":
-				if p, ok := isProfile(t.Value); ok {
-					s.profile = p
-				}
 
 			case "proxy":
 				out = append(out, Token{Type: TokenFlag, Raw: "--proxy\x00" + t.Value})
@@ -58,6 +43,11 @@ func (FetchHandler) Translate(args []string) []string {
 			if _, ok := isContent(t.Value); ok {
 				println("cwrap: fetch cannot use json/form/xml — use send")
 				os.Exit(1)
+			}
+
+			if t.Value == "nofollow" || t.Value == "no-follow" {
+				out = append(out, Token{Type: TokenFlag, Raw: "--no-follow"})
+				continue
 			}
 
 			if tok, ok := resolveSemanticWord(t.Value); ok {
@@ -83,18 +73,6 @@ func emitFetchModifiers(out *[]Token, s *fetchState) {
 
 	if s.profile != "" {
 		*out = append(*out, Token{Type: TokenFlag, Raw: "--as\x00" + s.profile})
-	}
-
-	if s.follow != nil {
-		if *s.follow {
-			*out = append(*out, Token{Type: TokenFlag, Raw: "--follow"})
-		} else {
-			*out = append(*out, Token{Type: TokenFlag, Raw: "--follow=false"})
-		}
-	}
-
-	if s.debug {
-		*out = append(*out, Token{Type: TokenFlag, Raw: "--debug"})
 	}
 }
 

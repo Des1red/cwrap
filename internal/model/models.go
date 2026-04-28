@@ -29,7 +29,7 @@ type Flags struct {
 	Filename string
 	AsImage  string
 
-	Follow bool
+	NoFollow bool
 
 	Head bool
 

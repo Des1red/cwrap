@@ -11,7 +11,6 @@ import (
 type sendState struct {
 	profile string
 	content string
-	debug   bool
 	data    []kv
 }
 
@@ -66,6 +65,10 @@ func (SendHandler) Translate(args []string) []string {
 			if c, ok := isContent(t.Value); ok {
 				s.content = c
 				continue
+			}
+			if t.Value == "follow" || t.Value == "nofollow" || t.Value == "no-follow" {
+				println("cwrap: send does not use follow/nofollow — use --no-follow only if you need redirect control")
+				os.Exit(1)
 			}
 			if tok, ok := resolveSemanticWord(t.Value); ok {
 				out = append(out, tok)
@@ -143,13 +146,8 @@ func stringify(v any) string {
 }
 
 func emitSendModifiers(out *[]Token, s *sendState) {
-
 	if s.profile != "" {
 		*out = append(*out, Token{Type: TokenFlag, Raw: "--as\x00" + s.profile})
-	}
-
-	if s.debug {
-		*out = append(*out, Token{Type: TokenFlag, Raw: "--debug"})
 	}
 }
 

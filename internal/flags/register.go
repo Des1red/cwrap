@@ -30,7 +30,7 @@ func register(fs *flag.FlagSet, f *model.Flags) *rawInput {
 	fs.Var(&r.forms, "f", "multipart form field")
 	fs.StringVar(&f.Filename, "filename", "", "override uploaded file name")
 	fs.StringVar(&f.AsImage, "as-image", "", "treat next file as image (jpeg,png,gif)")
-	fs.BoolVar(&f.Follow, "follow", false, "follow redirects")
+	fs.BoolVar(&f.NoFollow, "no-follow", false, "do not follow redirects")
 	fs.BoolVar(&f.Head, "head", false, "send HEAD request")
 	fs.StringVar(&f.Proxy, "proxy", "", "proxy url")
 	fs.Var(&r.query, "q", "query parameter key=value")

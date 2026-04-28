@@ -13,7 +13,7 @@ func buildOptions(args []string, req model.Request) []string {
 		args = append(args, "--compressed")
 	}
 
-	if req.Flags.Follow {
+	if !req.Flags.NoFollow {
 		args = append(args, "-L")
 	}
 

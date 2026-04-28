@@ -7,8 +7,6 @@ import (
 
 type uploadState struct {
 	profile string
-	debug   bool
-	hasFile bool
 }
 
 type UploadHandler struct{}
@@ -43,6 +41,11 @@ func (UploadHandler) Translate(args []string) []string {
 				println("cwrap: upload only supports multipart form — remove 'json/form/xml'")
 				os.Exit(1)
 			}
+			if t.Value == "follow" || t.Value == "nofollow" || t.Value == "no-follow" {
+				println("cwrap: upload does not use follow/nofollow — use --no-follow only if you need redirect control")
+				os.Exit(1)
+			}
+
 			if tok, ok := resolveSemanticWord(t.Value); ok {
 				out = append(out, tok)
 				continue

@@ -278,7 +278,7 @@ func TestIsContent(t *testing.T) {
 }
 
 func TestIsBooleanWord(t *testing.T) {
-	for _, v := range []string{"follow", "nofollow", "csrf", "auto-cookie"} {
+	for _, v := range []string{"csrf", "auto-cookie"} {
 		if _, ok := isBooleanWord(v); !ok {
 			t.Errorf("expected isBooleanWord(%q) to be valid", v)
 		}
