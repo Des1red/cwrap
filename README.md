@@ -415,3 +415,7 @@ cwrap exploit reports/site-com_2026-04-24_17-14-51.report
 Scan, recon, and exploit are designed to chain. Scan output feeds directly into recon via `--tfile`, and the report produced by recon is the exact input exploit expects.
 
 For the reasoning behind the pipeline design and identity model, see [DESIGN.md](./DESIGN.md).
+
+## Visual examples
+
+See [docs/examples.md](docs/examples.md) for screenshots and command examples.
