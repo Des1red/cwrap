@@ -32,6 +32,10 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 			continue
 		}
 
+		if ent.State.IsSPAFallback {
+			continue
+		}
+
 		if ent.SeenSignal(knowledge.SigAuthBoundary) {
 			hasAuthBoundary = true
 		}
@@ -90,7 +94,7 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 	public := 0
 	for _, u := range urls {
 		ent := k.Entities[u]
-		if ent != nil && ent.Signals.Tags[knowledge.SigPublicAccess] {
+		if ent != nil && !ent.State.IsSPAFallback && ent.Signals.Tags[knowledge.SigPublicAccess] {
 			public++
 		}
 	}

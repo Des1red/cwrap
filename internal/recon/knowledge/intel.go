@@ -7,6 +7,8 @@ type EntityState struct {
 	DiscoveryProbed       bool
 	PathIDProbed          bool
 	IsPathVariant         bool
+	IsParamVariant        bool
+	IsSPAFallback         bool
 	OrganicallyDiscovered bool
 	JSAnalyzed            bool
 }

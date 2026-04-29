@@ -68,6 +68,9 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 	for _, u := range urls {
 		ent := k.Entities[u]
 		if ent != nil && ent.Signals.Tags[knowledge.SigPublicAccess] {
+			if ent.State.IsSPAFallback {
+				continue
+			}
 			publicURLs = append(publicURLs, u)
 		}
 	}
@@ -194,6 +197,10 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 	for _, u := range entityURLsBySignalCount(k) {
 		ent := k.Entities[u]
 		if ent == nil {
+			continue
+		}
+
+		if ent.State.IsSPAFallback {
 			continue
 		}
 

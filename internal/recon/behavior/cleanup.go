@@ -9,6 +9,18 @@ import "cwrap/internal/recon/knowledge"
 // JSON endpoints are the ground truth for auth boundary analysis.
 func (e *Engine) stripSPAShellSignals() {
 	for _, ent := range e.k.Entities {
+		// SPA fallback routes — strip everything
+		if ent.State.IsSPAFallback {
+			delete(ent.Signals.Tags, knowledge.SigPublicAccess)
+			delete(ent.Signals.Tags, knowledge.SigAuthBoundary)
+			delete(ent.Signals.Tags, knowledge.SigRoleBoundary)
+			delete(ent.Signals.Tags, knowledge.SigAdminSurface)
+			delete(ent.Signals.Tags, knowledge.SigCredentiallessTokenIssuance)
+			delete(ent.Signals.Tags, knowledge.SigObjectOwnership)
+			delete(ent.Signals.Tags, knowledge.SigPossibleIDOR)
+			ent.HTTP.AuthLikely = false
+			continue
+		}
 		if ent.Content.LooksLikeHTML && ent.SeenSignal(knowledge.SigPublicAccess) {
 			delete(ent.Signals.Tags, knowledge.SigAuthBoundary)
 			delete(ent.Signals.Tags, knowledge.SigRoleBoundary)

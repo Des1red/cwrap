@@ -52,6 +52,24 @@ func (e *Engine) Expand(ent *knowledge.Entity) {
 		return
 	}
 
+	// Param-variant entities are probe-generated URLs, not canonical endpoints.
+	// Analyzers already run on them in runQueuedProbes — don't expand further.
+	if ent.State.IsParamVariant {
+		return
+	}
+
+	if ent.State.IsSPAFallback {
+		return
+	}
+	// Skip full expansion for any URL that has query params and is not
+	// the scan root — these are always param-variant endpoints regardless
+	// of how they were discovered
+	if ent.URL != e.k.Target {
+		if u, err := url.Parse(ent.URL); err == nil && len(u.Query()) > 0 && !ent.State.OrganicallyDiscovered {
+			return
+		}
+	}
+
 	e.expandMethods(ent)
 	e.expandPathIDs(ent)
 
@@ -96,6 +114,7 @@ func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
 	if ent.State.DiscoveryProbed {
 		return
 	}
+
 	ent.State.DiscoveryProbed = true
 
 	u, err := url.Parse(ent.URL)
@@ -103,6 +122,7 @@ func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
 		return
 	}
 
+	urlHasQuery := len(u.Query()) > 0
 	// item endpoints (path already contains an ID segment) return data fields
 	// in their response body — these describe the object, not the query interface.
 	// Probing them as query params is noise. Only collection endpoints benefit
@@ -159,7 +179,7 @@ func (e *Engine) expandDiscovery(ent *knowledge.Entity) {
 	// Only run if the response body gave us nothing to work with.
 	// This covers endpoints that return HTML or opaque content with
 	// no extractable param schema.
-	if bodyProbed {
+	if bodyProbed || urlHasQuery {
 		return
 	}
 

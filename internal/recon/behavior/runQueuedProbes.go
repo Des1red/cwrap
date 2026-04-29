@@ -35,7 +35,9 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 
 		// Target entity is where state MUST be attributed
 		target := e.k.Entity(probe.URL)
-
+		if len(probe.AddQuery) > 0 && target != root && !target.State.OrganicallyDiscovered {
+			target.State.IsParamVariant = true
+		}
 		// Mark target as seen the first time we actually execute something against it
 		target.State.Seen = true
 		if probe.Reason == knowledge.ReasonPathIDProbe && !target.State.OrganicallyDiscovered {
@@ -118,7 +120,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 				executed = true
 			}
 
-			if methodAllowed(resp.StatusCode) {
+			if methodAllowed(resp.StatusCode) && probe.Method != "OPTIONS" {
 				target.AddMethod(probe.Method)
 			}
 			identityStatuses[id.Name] = resp.StatusCode
@@ -134,7 +136,13 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 
 			probeFP[id.Name] = fpString(resp.StatusCode, body)
 			e.int.Learn(reqID.URL, resp, body)
-
+			// SPA fallback detection — if this entity's response is identical
+			// to the root baseline, it's a catchall route, not a real endpoint
+			if target != root && resp.StatusCode == 200 {
+				if makeFingerprint(resp.StatusCode, body) == e.baseFP {
+					target.State.IsSPAFallback = true
+				}
+			}
 			storeResponse(target, responses, statuses, probe, id.Name, resp.StatusCode, body, e.baseStatus, e.baseBody, base.URL, e.k, e.debug)
 		}
 
