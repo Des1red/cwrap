@@ -3,7 +3,6 @@ package cmd
 import (
 	"cwrap/internal/flags"
 	"cwrap/internal/intent"
-	"cwrap/internal/logger"
 	"cwrap/internal/runner"
 	"fmt"
 	"os"
@@ -11,13 +10,8 @@ import (
 
 func Execute() {
 
-	if len(os.Args) == 1 ||
-		os.Args[1] == "help" ||
-		os.Args[1] == "-h" ||
-		os.Args[1] == "--help" {
-		logger.PrintHelp()
-		return
-	}
+	boot()
+	manFlags()
 
 	req := intent.Parse(os.Args)
 	handler := intent.Resolve(req)

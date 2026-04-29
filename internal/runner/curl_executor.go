@@ -12,6 +12,9 @@ import (
 type CurlExecutor struct{}
 
 func (CurlExecutor) Run(req model.Request) error {
+	if _, err := exec.LookPath("curl"); err != nil {
+		return fmt.Errorf("curl is required for %s but was not found in PATH(please manually install curl)", req.Original)
+	}
 	result := curl.Build(req)
 	logger.PrintCommand(req, result)
 

@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"cwrap/internal/model"
 	"fmt"
 
 	"github.com/Des1red/clihelp"
@@ -8,6 +9,7 @@ import (
 
 func PrintHelp() {
 	fmt.Println("cwrap — intelligent HTTP client with active security analysis")
+	fmt.Println("version " + model.Version)
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  cwrap <command> <url|report> [words] [flags]")

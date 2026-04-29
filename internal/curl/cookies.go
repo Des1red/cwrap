@@ -1,6 +1,7 @@
 package curl
 
 import (
+	"cwrap/internal/model"
 	"cwrap/internal/recon/session"
 	"os"
 	"path/filepath"
@@ -9,9 +10,7 @@ import (
 )
 
 func jarPath() string {
-	dir, _ := os.UserConfigDir()
-	base := filepath.Join(dir, "cwrap")
-	os.MkdirAll(base, 0755)
+	base := model.ConfigDir()
 	return filepath.Join(base, "cookies.txt")
 }
 

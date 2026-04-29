@@ -1,5 +1,10 @@
 package model
 
+import (
+	"os"
+	"path/filepath"
+)
+
 type Request struct {
 	Method        string
 	URL           string
@@ -72,3 +77,13 @@ type QueryParam struct {
 
 const ReportExtension = "report"
 const ReportDirectoryName = "reports"
+
+func ConfigDir() string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		dir = os.Getenv("HOME")
+	}
+	base := filepath.Join(dir, "cwrap")
+	os.MkdirAll(base, 0755)
+	return base
+}

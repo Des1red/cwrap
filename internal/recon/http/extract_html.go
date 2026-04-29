@@ -143,27 +143,30 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 
 				if src != "" {
 					if link, ok := e.normalizeLink(ent.URL, src); ok {
-						e.k.AddEdge(ent.URL, link, knowledge.EdgeDiscoveredFromJS)
 						// skip fetch probe if this is a phantom path-prefix variant —
 						// SPA shells return the same HTML for every route, causing
 						// relative script imports to resolve under arbitrary prefixes
 						// (e.g. /api/js/app.js, /api/logout/js/app.js)
 						if !jsintel.IsPhantomJSURL(e.k, link) {
-							if suffix := jsintel.JSPathSuffix(link); suffix != "" {
-								if !e.k.RegisterJSSuffix(suffix) {
-									// lost the race — another goroutine already registered this suffix
-									break
-								}
-							}
-							// fetch the JS file so jsintel can analyze its content
-							e.k.PushProbe(e.k.Entity(ent.URL), knowledge.Probe{
-								URL:      link,
-								Method:   "GET",
-								Reason:   knowledge.ReasonJSFetch,
-								Priority: 70,
-								Created:  time.Now(),
-							})
+							break
 						}
+
+						if suffix := jsintel.JSPathSuffix(link); suffix != "" {
+							if !e.k.RegisterJSSuffix(suffix) {
+								// lost the race — another goroutine already registered this suffix
+								break
+							}
+						}
+						e.k.AddEdge(ent.URL, link, knowledge.EdgeDiscoveredFromJS)
+						// fetch the JS file so jsintel can analyze its content
+						e.k.PushProbe(e.k.Entity(ent.URL), knowledge.Probe{
+							URL:      link,
+							Method:   "GET",
+							Reason:   knowledge.ReasonJSFetch,
+							Priority: 70,
+							Created:  time.Now(),
+						})
+
 					}
 				} else {
 					var code strings.Builder

@@ -1,6 +1,7 @@
 package session
 
 import (
+	"cwrap/internal/model"
 	"encoding/base64"
 	"encoding/json"
 	"net/url"
@@ -14,9 +15,7 @@ func pathFor(raw string) (string, string) {
 	u, _ := url.Parse(raw)
 	host := u.Hostname()
 
-	dir, _ := os.UserConfigDir()
-	base := filepath.Join(dir, "cwrap", "sessions")
-	os.MkdirAll(base, 0755)
+	base := filepath.Join(model.ConfigDir(), "sessions")
 
 	return filepath.Join(base, host+".json"), host
 }
