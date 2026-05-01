@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -20,6 +21,7 @@ type Knowledge struct {
 	Params               map[string]bool
 	DiscoveredIdentities map[string]map[string]string
 	KnownJSSuffixes      sync.Map
+	StaticAssets         map[string]bool
 }
 
 func New(target string) *Knowledge {
@@ -30,6 +32,7 @@ func New(target string) *Knowledge {
 		EdgeSeen:             make(map[string]bool),
 		Params:               make(map[string]bool),
 		DiscoveredIdentities: make(map[string]map[string]string),
+		StaticAssets:         make(map[string]bool),
 	}
 }
 
@@ -98,4 +101,21 @@ func (k *Knowledge) RegisterJSSuffix(suffix string) bool {
 func (k *Knowledge) HasJSSuffix(suffix string) bool {
 	_, ok := k.KnownJSSuffixes.Load(suffix)
 	return ok
+}
+
+func (k *Knowledge) AddStaticAsset(url string) {
+	if url == "" {
+		return
+	}
+	url = stripQuery(url)
+	k.mu.Lock()
+	k.StaticAssets[url] = true
+	k.mu.Unlock()
+}
+
+func stripQuery(raw string) string {
+	if i := strings.IndexByte(raw, '?'); i != -1 {
+		return raw[:i]
+	}
+	return raw
 }

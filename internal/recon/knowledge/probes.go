@@ -1,6 +1,8 @@
 package knowledge
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"sort"
 	"time"
 )
@@ -13,6 +15,8 @@ type Probe struct {
 	PathParams    map[string]string // path segment param name -> substituted value
 	PathParamBase map[string]string // path segment param name -> original value (for base seeding)
 	Headers       map[string]string
+	Body          []byte
+	ContentType   string
 
 	Reason   string
 	Priority int
@@ -112,5 +116,9 @@ func (p Probe) Key() string {
 		}
 	}
 
+	if len(p.Body) > 0 {
+		sum := sha256.Sum256(p.Body)
+		key += "|body:" + fmt.Sprintf("%x", sum[:8]) // first 8 bytes is enough for dedupe
+	}
 	return key
 }

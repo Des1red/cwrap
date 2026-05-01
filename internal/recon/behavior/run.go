@@ -140,6 +140,14 @@ func (e *Engine) Run(base model.Request, url string) error {
 			break
 		}
 	}
+	// ----------------------------------------
+	//  Form requeue — POST form entities
+	//  with real bodies after discovery settles
+	// ----------------------------------------
+	e.requeueForms(baseReq, url)
+	if err := e.runQueuedProbes(baseReq, url); err != nil {
+		return err
+	}
 	// strip auth signals from SPA shell entities before returning
 	e.stripSPAShellSignals()
 

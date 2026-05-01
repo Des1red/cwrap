@@ -1,6 +1,7 @@
 package http
 
 import (
+	"cwrap/internal/recon/linkutil"
 	"net/url"
 	"strings"
 )
@@ -41,7 +42,7 @@ func (e *Engine) normalizeLink(baseURL, raw string) (string, bool) {
 	abs.Fragment = ""
 
 	// optional: restrict to same host
-	if abs.Host != base.Host {
+	if !linkutil.SameSite(base, abs) {
 		return "", false
 	}
 

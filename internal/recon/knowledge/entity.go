@@ -51,6 +51,7 @@ func NewEntity(url string) *Entity {
 		HTTP: HTTPIntel{
 			Methods: make(map[string]bool),
 			Headers: make(map[string]bool),
+			Tech:    make(map[string]string),
 		},
 		Content: ContentIntel{
 			MIMEs:       make(map[string]int),

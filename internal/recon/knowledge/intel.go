@@ -23,6 +23,8 @@ type HTTPIntel struct {
 	// Optional: set once we know it
 	AuthLikely  bool
 	CSRFPresent bool
+
+	Tech map[string]string // Server, X-Powered-By, X-Generator, etc.
 }
 
 type ContentIntel struct {

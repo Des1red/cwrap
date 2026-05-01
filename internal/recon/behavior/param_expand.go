@@ -49,6 +49,7 @@ func (e *Engine) Expand(ent *knowledge.Entity) {
 	// static assets have no security surface
 	// JS intel (endpoint discovery, secrets) already extracted in e.int.Learn
 	if isStaticAsset(ent) {
+		e.k.AddStaticAsset(ent.URL)
 		return
 	}
 

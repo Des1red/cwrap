@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cwrap/internal/recon/linkutil"
 	"net/url"
 	"strings"
 )
@@ -35,7 +36,7 @@ func (e *Engine) normalizeLink(baseURL, raw string) (string, bool) {
 	abs := base.ResolveReference(ref)
 	abs.Fragment = ""
 
-	if abs.Host != base.Host {
+	if !linkutil.SameSite(base, abs) {
 		return "", false
 	}
 

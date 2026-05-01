@@ -147,7 +147,7 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 						// SPA shells return the same HTML for every route, causing
 						// relative script imports to resolve under arbitrary prefixes
 						// (e.g. /api/js/app.js, /api/logout/js/app.js)
-						if !jsintel.IsPhantomJSURL(e.k, link) {
+						if jsintel.IsPhantomJSURL(e.k, link) {
 							break
 						}
 

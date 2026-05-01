@@ -189,6 +189,13 @@ func deriveFindings(ent *knowledge.Entity) []string {
 		out = append(out, fmt.Sprintf("JS leaks present: %d", len(ent.Content.JSLeaks)))
 	}
 
+	// non-HTTP service
+	if ent.State.ProbeCount > 0 &&
+		len(ent.HTTP.Methods) == 0 &&
+		len(ent.Content.Statuses) == 0 {
+		out = append(out, "Endpoint unreachable over HTTP — may be a non-HTTP service (FTP, SSH, etc.)")
+	}
+
 	out = dedup(out)
 	sort.Strings(out)
 	return out
@@ -265,6 +272,13 @@ func deriveNextSteps(ent *knowledge.Entity) []string {
 			"Test whether issued tokens grant authenticated access to protected endpoints",
 			"Attempt to reuse credentiallessly issued tokens across sessions",
 		)
+	}
+	// non-HTTP service
+	if ent.State.ProbeCount > 0 &&
+		len(ent.HTTP.Methods) == 0 &&
+		len(ent.Content.Statuses) == 0 {
+		out = append(out, "Probe manually — connect with appropriate client (ftp, ssh, nc)")
+		out = append(out, "Check for anonymous access or default credentials")
 	}
 	out = dedup(out)
 	sort.Strings(out)

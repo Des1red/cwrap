@@ -50,39 +50,24 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		req := cloneRequest(base)
 		req.Method = probe.Method
 		req.URL = probe.URL
+		req.Flags.Body = ""
 
 		// overlay probe headers
 		for k, v := range probe.Headers {
 			req.Flags.Headers = upsertHeader(req.Flags.Headers, k, v)
 		}
 
-		// add probe query params (attribute params to TARGET, not root)
-		for k, v := range probe.AddQuery {
-			req.Flags.Query = append(req.Flags.Query, model.QueryParam{Key: k, Value: v})
-
-			// decide source relative to the target URL, not base.URL
-			if extractCurrentValue(probe.URL, k) != "" {
-				target.AddParam(k, knowledge.ParamQuery)
-				e.k.AddParam(k)
-				e.int.ClassifyParam(target, k)
-				target.Tag(knowledge.SigHasQueryParams)
-			} else {
-				target.AddParam(k, knowledge.ParamInjected)
-				p := target.Params[k]
-				if p != nil && p.DiscoveryReason == "" {
-					p.DiscoveryReason = probe.Reason
-				}
-				e.int.ClassifyParam(target, k)
+		// wire probe body
+		if len(probe.Body) > 0 {
+			req.Flags.Body = string(probe.Body)
+			if probe.ContentType != "" {
+				req.Flags.Headers = upsertHeader(req.Flags.Headers, "Content-Type", probe.ContentType)
 			}
 		}
-		for k := range probe.PathParams {
-			target.AddParam(k, knowledge.ParamPath)
-			e.k.AddParam(k)
-			e.int.ClassifyParam(target, k)
-			p := target.Params[k]
-			if p != nil && p.DiscoveryReason == "" {
-				p.DiscoveryReason = probe.Reason
-			}
+
+		// append query params to request (classification happens after identity loop)
+		for k, v := range probe.AddQuery {
+			req.Flags.Query = append(req.Flags.Query, model.QueryParam{Key: k, Value: v})
 		}
 
 		identityStatuses := map[string]int{}
@@ -93,8 +78,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			println("authBoundaryConfirmed:", e.authBoundaryConfirmed)
 		}
 
-		executed := false
-
+		target.State.ProbeCount++
 		for _, id := range e.identities {
 			if e.authBoundaryConfirmed && id.Synthetic {
 				continue
@@ -112,12 +96,6 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			resp, err := transport.Do(reqID)
 			if err != nil {
 				continue
-			}
-
-			// ProbeCount belongs to TARGET endpoint
-			if !executed {
-				target.State.ProbeCount++
-				executed = true
 			}
 
 			if methodAllowed(resp.StatusCode) && probe.Method != "OPTIONS" {
@@ -153,6 +131,34 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		e.detectRoleBoundary(target, identityStatuses)
 		e.detectAuthBoundary(target, identityStatuses)
 		e.detectPublicAccess(target, identityStatuses)
+
+		// classify params only if target responded to at least one identity
+		if len(identityStatuses) > 0 {
+			for k := range probe.AddQuery {
+				if extractCurrentValue(probe.URL, k) != "" {
+					target.AddParam(k, knowledge.ParamQuery)
+					e.k.AddParam(k)
+					e.int.ClassifyParam(target, k)
+					target.Tag(knowledge.SigHasQueryParams)
+				} else {
+					target.AddParam(k, knowledge.ParamInjected)
+					p := target.Params[k]
+					if p != nil && p.DiscoveryReason == "" {
+						p.DiscoveryReason = probe.Reason
+					}
+					e.int.ClassifyParam(target, k)
+				}
+			}
+			for k := range probe.PathParams {
+				target.AddParam(k, knowledge.ParamPath)
+				e.k.AddParam(k)
+				e.int.ClassifyParam(target, k)
+				p := target.Params[k]
+				if p != nil && p.DiscoveryReason == "" {
+					p.DiscoveryReason = probe.Reason
+				}
+			}
+		}
 
 		// Choose a reference fingerprint (prefer a no-creds identity if available)
 		ref := ""

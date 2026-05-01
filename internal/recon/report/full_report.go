@@ -22,6 +22,7 @@ func writeFullReport(w io.Writer, k *knowledge.Knowledge) {
 	writeGlobalStats(w, k)
 	writeDiscoveryTree(w, k)
 	writeEntityDetails(w, k)
+	writeStaticAssets(w, k)
 	writeIdentityVault(w, k)
 
 	fmt.Fprintln(w)
@@ -35,6 +36,7 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 
 	urls := sortedEntityURLs(k)
 	fmt.Fprintf(w, "Entities:          %d\n", len(urls))
+	fmt.Fprintf(w, "Static assets:     %d\n", len(k.StaticAssets))
 	fmt.Fprintf(w, "Edges:             %d\n", len(k.Edges))
 	fmt.Fprintf(w, "Global parameters: %d\n", len(k.Params))
 
@@ -79,6 +81,31 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 		sort.Strings(publicURLs)
 		for _, u := range publicURLs {
 			fmt.Fprintf(w, "  - %s\n", u)
+		}
+	}
+	// Tech fingerprinting — deduplicated across all entities
+	tech := make(map[string]string)
+	for _, u := range urls {
+		ent := k.Entities[u]
+		if ent == nil {
+			continue
+		}
+		for k, v := range ent.HTTP.Tech {
+			if _, seen := tech[k]; !seen {
+				tech[k] = v
+			}
+		}
+	}
+	if len(tech) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Tech:")
+		techKeys := make([]string, 0, len(tech))
+		for k := range tech {
+			techKeys = append(techKeys, k)
+		}
+		sort.Strings(techKeys)
+		for _, k := range techKeys {
+			fmt.Fprintf(w, "  - %s: %s\n", k, tech[k])
 		}
 	}
 
@@ -218,6 +245,19 @@ func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 		}
 		if ent.HTTP.CSRFPresent {
 			fmt.Fprintln(w, "  CSRFPresent: "+strconv.FormatBool(ent.HTTP.CSRFPresent))
+		}
+
+		if len(ent.HTTP.Tech) > 0 {
+			techKeys := make([]string, 0, len(ent.HTTP.Tech))
+			for k := range ent.HTTP.Tech {
+				techKeys = append(techKeys, k)
+			}
+			sort.Strings(techKeys)
+			fmt.Fprint(w, "  Tech:")
+			for _, k := range techKeys {
+				fmt.Fprintf(w, " %s=%s", k, ent.HTTP.Tech[k])
+			}
+			fmt.Fprintln(w)
 		}
 
 		// Content — only print true content type
@@ -553,6 +593,28 @@ func writeIdentityVault(w io.Writer, k *knowledge.Knowledge) {
 		for _, cn := range cnames {
 			fmt.Fprintf(w, "    %s=%s\n", cn, cookies[cn])
 		}
+	}
+	fmt.Fprintln(w)
+}
+
+func writeStaticAssets(w io.Writer, k *knowledge.Knowledge) {
+	if len(k.StaticAssets) == 0 {
+		return
+	}
+
+	fmt.Fprintln(w, "------------------------------------------------")
+	fmt.Fprintln(w, "STATIC ASSETS")
+	fmt.Fprintln(w, "------------------------------------------------")
+	fmt.Fprintf(w, "Count: %d\n\n", len(k.StaticAssets))
+
+	urls := make([]string, 0, len(k.StaticAssets))
+	for u := range k.StaticAssets {
+		urls = append(urls, u)
+	}
+	sort.Strings(urls)
+
+	for _, u := range urls {
+		fmt.Fprintf(w, "  - %s\n", u)
 	}
 	fmt.Fprintln(w)
 }

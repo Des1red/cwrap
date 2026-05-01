@@ -64,6 +64,22 @@ func Learn(ent *knowledge.Entity, resp *http.Response) {
 		}
 	}
 
+	// ---- tech fingerprinting ----
+	techHeaders := []string{
+		"Server",
+		"X-Powered-By",
+		"X-Generator",
+		"X-AspNet-Version",
+		"X-AspNetMvc-Version",
+		"X-Runtime",
+		"Via",
+	}
+	for _, name := range techHeaders {
+		if val := resp.Header.Get(name); val != "" {
+			ent.HTTP.Tech[name] = val
+		}
+	}
+
 	// ---- auth boundary ----
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		ent.HTTP.AuthLikely = true

@@ -3,7 +3,9 @@ package transport
 import (
 	"cwrap/internal/httpcore"
 	"cwrap/internal/model"
+	"io"
 	"net/http"
+	"strings"
 )
 
 func Build(req model.Request) (*http.Request, error) {
@@ -15,7 +17,12 @@ func Build(req model.Request) (*http.Request, error) {
 
 	headers := httpcore.BuildHeaders(req)
 
-	r, err := http.NewRequest(req.Method, finalURL, nil)
+	var bodyReader io.Reader
+	if req.Flags.Body != "" {
+		bodyReader = strings.NewReader(req.Flags.Body)
+	}
+
+	r, err := http.NewRequest(req.Method, finalURL, bodyReader)
 	if err != nil {
 		return nil, err
 	}

@@ -174,6 +174,7 @@ func buildHighRiskHighlights(k *knowledge.Knowledge) []string {
 		if len(ent.Content.JSLeaks) > 0 {
 			out = append(out, fmt.Sprintf("Secrets/material found in JS: %s (%d leak(s))", ent.URL, len(ent.Content.JSLeaks)))
 		}
+
 	}
 
 	// Dedup + cap to keep summary readable

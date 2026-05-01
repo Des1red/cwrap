@@ -47,7 +47,7 @@ var (
 
 	// --- hardcoded hosts / URLs ---
 	reURL            = regexp.MustCompile(`(?i)\b(https?|wss?)://[a-z0-9._-]+(?::\d{2,5})?(?:/[^\s"'<>]{0,200})?`)
-	reInternalDomain = regexp.MustCompile(`(?i)\b[a-z0-9._-]+\.(local|lan|internal|intra|corp|home|test)\b`)
+	reInternalDomain = regexp.MustCompile(`(?i)\b([a-z0-9][a-z0-9-]{3,})\.(local|lan|internal|intra|corp|home|test)\b`)
 	reRFC1918        = regexp.MustCompile(`\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(?::\d{2,5})?\b`)
 )
 
@@ -247,11 +247,17 @@ func Learn(ent *knowledge.Entity, sourceURL string, body []byte) []JSEndpoint {
 		}
 	}
 
-	internalDomains := reInternalDomain.FindAllString(s, -1)
+	internalDomains := reInternalDomain.FindAllStringSubmatch(s, -1)
 	if len(internalDomains) > 0 {
-		ent.Content.JSFindings["host_internal"] += len(internalDomains)
-		for i := 0; i < len(internalDomains) && i < 8; i++ {
-			appendLeak(ent, "host_internal", sourceURL, "domain", internalDomains[i])
+		for _, m := range internalDomains {
+			label := m[1]
+			if label != strings.ToLower(label) {
+				continue // camelCase/PascalCase = code identifier, not a hostname
+			}
+			ent.Content.JSFindings["host_internal"]++
+			if len(ent.Content.JSLeaks) < 8 {
+				appendLeak(ent, "host_internal", sourceURL, "domain", m[0])
+			}
 		}
 	}
 

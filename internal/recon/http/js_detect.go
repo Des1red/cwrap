@@ -53,6 +53,7 @@ func (e *Engine) handleJSEndpoints(
 		}
 
 		if isStaticAssetURL(link) { // check the link string
+			e.k.AddStaticAsset(link)
 			continue
 		}
 
