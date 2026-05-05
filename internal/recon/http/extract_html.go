@@ -40,6 +40,17 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 			case "a":
 				for _, a := range n.Attr {
 					if a.Key == "href" && a.Val != "" {
+						lower := strings.ToLower(a.Val)
+						// capture contact info before normalizeLink drops it
+						if strings.HasPrefix(lower, "mailto:") {
+							e.k.AddEmail(strings.TrimPrefix(a.Val, "mailto:"))
+							continue
+						}
+						if strings.HasPrefix(lower, "tel:") {
+							e.k.AddPhone(strings.TrimPrefix(a.Val, "tel:"))
+							continue
+						}
+
 						if link, ok := e.normalizeLink(ent.URL, a.Val); ok {
 
 							e.k.AddEdge(ent.URL, link, knowledge.EdgeDiscoveredFromHTML)

@@ -22,6 +22,8 @@ type Knowledge struct {
 	DiscoveredIdentities map[string]map[string]string
 	KnownJSSuffixes      sync.Map
 	StaticAssets         map[string]bool
+	Emails               map[string]bool
+	Phones               map[string]bool
 }
 
 func New(target string) *Knowledge {
@@ -33,6 +35,8 @@ func New(target string) *Knowledge {
 		Params:               make(map[string]bool),
 		DiscoveredIdentities: make(map[string]map[string]string),
 		StaticAssets:         make(map[string]bool),
+		Emails:               make(map[string]bool),
+		Phones:               make(map[string]bool),
 	}
 }
 
@@ -118,4 +122,22 @@ func stripQuery(raw string) string {
 		return raw[:i]
 	}
 	return raw
+}
+
+func (k *Knowledge) AddEmail(v string) {
+	if v == "" {
+		return
+	}
+	k.mu.Lock()
+	k.Emails[strings.ToLower(strings.TrimSpace(v))] = true
+	k.mu.Unlock()
+}
+
+func (k *Knowledge) AddPhone(v string) {
+	if v == "" {
+		return
+	}
+	k.mu.Lock()
+	k.Phones[strings.TrimSpace(v)] = true
+	k.mu.Unlock()
 }

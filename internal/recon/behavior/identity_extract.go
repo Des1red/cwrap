@@ -103,6 +103,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		}
 		if id.CSRFToken == "" && prev.CSRFToken != "" {
 			id.CSRFToken = prev.CSRFToken
+			id.CSRFCookieName = prev.CSRFCookieName
 			id.HasCSRF = true
 		}
 		if id.Role == "" && prev.Role != "" {

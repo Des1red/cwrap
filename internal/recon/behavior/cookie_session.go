@@ -1,9 +1,11 @@
 package behavior
 
 import (
+	"cwrap/internal/model"
 	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/recon/session"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -87,4 +89,36 @@ func (e *Engine) captureSession(ent *knowledge.Entity, idMeta Identity, resp *ht
 	}
 
 	e.discoverIdentityFromResponse(resp)
+}
+
+func injectCSRFHeader(req *model.Request, ent *knowledge.Entity, idName string, sessionCookies map[string]string) {
+	// prefer the identity's own tracked CSRF token (most accurate)
+	if kid := ent.Identities[idName]; kid != nil && kid.HasCSRF && kid.CSRFToken != "" {
+		headerName := csrfHeaderName(kid.CSRFCookieName)
+		decoded, err := url.QueryUnescape(kid.CSRFToken)
+		if err != nil {
+			decoded = kid.CSRFToken
+		}
+		req.Flags.Headers = upsertHeader(req.Flags.Headers, headerName, decoded)
+		return
+	}
+	// fallback: scan engine-level session cookies (first probe on a new entity)
+	for name, val := range sessionCookies {
+		ln := strings.ToLower(name)
+		if strings.Contains(ln, "csrf") || strings.Contains(ln, "xsrf") {
+			decoded, err := url.QueryUnescape(val)
+			if err != nil {
+				decoded = val
+			}
+			req.Flags.Headers = upsertHeader(req.Flags.Headers, csrfHeaderName(name), decoded)
+			return
+		}
+	}
+}
+
+func csrfHeaderName(cookieName string) string {
+	if strings.Contains(strings.ToUpper(cookieName), "XSRF") {
+		return "X-XSRF-TOKEN"
+	}
+	return "X-CSRF-TOKEN"
 }

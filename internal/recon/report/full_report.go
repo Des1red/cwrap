@@ -20,6 +20,7 @@ func writeFullReport(w io.Writer, k *knowledge.Knowledge) {
 	fmt.Fprintln(w)
 
 	writeGlobalStats(w, k)
+	writeContactInfo(w, k)
 	writeDiscoveryTree(w, k)
 	writeEntityDetails(w, k)
 	writeStaticAssets(w, k)
@@ -568,6 +569,38 @@ func paramSourceLabel(p *knowledge.ParamIntel, src knowledge.ParamSource) string
 	default:
 		return "unknown"
 	}
+}
+
+func writeContactInfo(w io.Writer, k *knowledge.Knowledge) {
+	if len(k.Emails) == 0 && len(k.Phones) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "------------------------------------------------")
+	fmt.Fprintln(w, "CONTACT INFO")
+	fmt.Fprintln(w, "------------------------------------------------")
+
+	if len(k.Emails) > 0 {
+		emails := make([]string, 0, len(k.Emails))
+		for e := range k.Emails {
+			emails = append(emails, e)
+		}
+		sort.Strings(emails)
+		for _, e := range emails {
+			fmt.Fprintf(w, "  email: %s\n", e)
+		}
+	}
+
+	if len(k.Phones) > 0 {
+		phones := make([]string, 0, len(k.Phones))
+		for p := range k.Phones {
+			phones = append(phones, p)
+		}
+		sort.Strings(phones)
+		for _, p := range phones {
+			fmt.Fprintf(w, "  tel:   %s\n", p)
+		}
+	}
+	fmt.Fprintln(w)
 }
 
 func writeIdentityVault(w io.Writer, k *knowledge.Knowledge) {

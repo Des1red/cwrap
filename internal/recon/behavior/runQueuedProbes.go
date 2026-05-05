@@ -79,8 +79,13 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		}
 
 		target.State.ProbeCount++
+		suppressSynthetic := e.authBoundaryConfirmed &&
+			(probe.Reason == knowledge.ReasonParamDiscovery ||
+				probe.Reason == knowledge.ReasonIDAdjacency ||
+				probe.Reason == knowledge.ReasonIDEnum ||
+				probe.Reason == knowledge.ReasonLinkProbe)
 		for _, id := range e.identities {
-			if e.authBoundaryConfirmed && id.Synthetic {
+			if suppressSynthetic && id.Synthetic {
 				continue
 			}
 			if e.debug {
@@ -92,6 +97,12 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 				reqID.Flags.Headers = removeAuthHeaders(reqID.Flags.Headers)
 			}
 			reqID = id.Apply(reqID)
+
+			// inject CSRF header for mutating methods using already-tracked token
+			if probe.Method == "POST" || probe.Method == "PUT" ||
+				probe.Method == "PATCH" || probe.Method == "DELETE" {
+				injectCSRFHeader(&reqID, target, id.Name, e.sessionCookies)
+			}
 
 			resp, err := transport.Do(reqID)
 			if err != nil {
