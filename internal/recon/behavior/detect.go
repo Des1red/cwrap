@@ -61,15 +61,22 @@ func (e *Engine) detectAuthBoundary(ent *knowledge.Entity, identityStatuses map[
 	}
 }
 
-func (e *Engine) detectPublicAccess(ent *knowledge.Entity, identityStatuses map[string]int) {
-	// public = anonymous gets 200 without sending any credentials
+func (e *Engine) detectPublicAccess(ent *knowledge.Entity, identityStatuses map[string]int, probeFP map[string]string) {
+	if ent.State.IsSPAFallback {
+		return
+	}
 	id := ent.Identities[knowledge.Anonymous]
 	if id == nil {
 		return
 	}
-	if id.Kind == knowledge.IdentityNone && identityStatuses[knowledge.Anonymous] == 200 {
-		ent.Tag(knowledge.SigPublicAccess)
+	if id.Kind != knowledge.IdentityNone || identityStatuses[knowledge.Anonymous] != 200 {
+		return
 	}
+	// suppress if the anonymous response is just the baseline (home page / catchall)
+	if fp := probeFP[knowledge.Anonymous]; fp != "" && fp == fpString(e.baseStatus, e.baseBody) {
+		return
+	}
+	ent.Tag(knowledge.SigPublicAccess)
 }
 
 func (e *Engine) detectRoleBoundary(ent *knowledge.Entity, identityStatuses map[string]int) {

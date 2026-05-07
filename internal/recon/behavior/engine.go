@@ -16,7 +16,7 @@ type Engine struct {
 
 	baseStatus int
 	baseBody   []byte
-	baseFP     fingerprint
+	baseFP     string
 
 	authBoundaryConfirmed bool
 	authConfidence        int

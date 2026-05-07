@@ -1,17 +1,11 @@
 package behavior
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
+	"fmt"
 )
 
-type fingerprint struct {
-	Status int
-	Hash   [20]byte
-}
-
-func makeFingerprint(status int, body []byte) fingerprint {
-	return fingerprint{
-		Status: status,
-		Hash:   sha1.Sum(body),
-	}
+func fpString(status int, body []byte) string {
+	sum := sha256.Sum256(body)
+	return fmt.Sprintf("%d:%x", status, sum)
 }

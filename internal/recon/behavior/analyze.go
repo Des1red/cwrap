@@ -139,7 +139,7 @@ func (e *Engine) analyzeIDOR(
 			fmt.Printf("[IDOR check] param=%s IDLike=%v OwnershipBoundary=%v\n",
 				name, p.IDLike, p.OwnershipBoundary)
 		}
-		noCredDenied := false
+		credDenied := false
 
 		// canonicalized bodies (strong structural diff)
 		var canonBodies [][]byte
@@ -177,13 +177,13 @@ func (e *Engine) analyzeIDOR(
 			// ownership IDOR: some cred identities allowed, others denied on this same value
 			if anyCredStatus(ent, byIDStatus, 200) &&
 				(anyCredStatus(ent, byIDStatus, 403) || anyCredStatus(ent, byIDStatus, 401)) {
-				noCredDenied = true
+				credDenied = true
 			}
 		}
 
 		// --- WEAK IDOR SIGNAL ---
 		// If credentialed responses differ for different values
-		if len(rawFPs) >= 2 && noCredDenied && p.IDLike {
+		if len(rawFPs) >= 2 && credDenied && p.IDLike {
 			p.SuspectIDOR = true
 			p.ObservedChanges["idor-raw-diff"] = true
 		}
@@ -206,14 +206,14 @@ func (e *Engine) analyzeIDOR(
 		if structDiff {
 			p.ObservedChanges["idor-structure-diff"] = true
 
-			if noCredDenied {
+			if credDenied {
 				p.PossibleIDOR = true
 				ent.Tag(knowledge.SigPossibleIDOR)
 			}
 		}
 
 		// --- OWNERSHIP IDOR (no structural diff needed, ownership already proven) ---
-		if p.OwnershipBoundary && noCredDenied {
+		if p.OwnershipBoundary && credDenied {
 			p.PossibleIDOR = true
 			ent.Tag(knowledge.SigPossibleIDOR)
 		}

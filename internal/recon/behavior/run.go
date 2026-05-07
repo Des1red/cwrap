@@ -5,6 +5,7 @@ import (
 	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/recon/session"
 	"cwrap/internal/recon/transport"
+	"net/http"
 	"time"
 )
 
@@ -48,8 +49,9 @@ func (e *Engine) Run(base model.Request, url string) error {
 	}
 
 	// ----------------------------------------
-	//  TRUE BASELINE REQUEST
+	//  Public BASELINE REQUEST
 	// ----------------------------------------
+	// Sessionless baseline used for SPA/catchall fingerprint.
 	resp, err := transport.Do(baseReq)
 	if err != nil {
 		return err
@@ -61,51 +63,59 @@ func (e *Engine) Run(base model.Request, url string) error {
 	}
 
 	// ----------------------------------------
-	//  Detect stale session and retry
+	//
+	//	Detect stale persisted session
+	//
 	// ----------------------------------------
-	if resp.StatusCode == 401 && ent.SessionUsed {
-		if e.debug {
-			println("== Stale session detected (401 on live session) — retrying without session cookies ==")
-		}
-		// clear stale in-memory cookies
-		ent.SessionCookies = make(map[string]string)
-		e.sessionCookies = make(map[string]string)
-		ent.SessionUsed = false
+	var sessionResp *http.Response
+	// Separate check: apply LiveSession once only to verify stored cookies.
+	if ent.SessionUsed {
+		if meta, ok := e.identityMeta(knowledge.LiveSession); ok {
+			sessionReq := meta.Apply(cloneRequest(baseReq))
 
-		// rebuild baseReq without the injected cookie header
-		baseReq = cloneRequest(base)
+			sessionResp, err = transport.Do(sessionReq)
+			if err != nil {
+				return err
+			}
 
-		// re-derive identities from the clean request
-		e.identities = e.deriveIdentities(baseReq)
+			_, err = transport.ReadBody(sessionResp)
+			if err != nil {
+				return err
+			}
 
-		// retry
-		resp, err = transport.Do(baseReq)
-		if err != nil {
-			return err
-		}
-		body, err = transport.ReadBody(resp)
-		if err != nil {
-			return err
-		}
-	}
+			if sessionResp.StatusCode == 401 {
+				if e.debug {
+					println("== Stale session detected — continuing without stored session cookies ==")
+				}
 
-	// Mark entity as seen
-	ent.State.Seen = true
-	if meta, ok := e.identityMeta(knowledge.LiveSession); ok {
-		extractIdentity(ent, meta.Name, resp)
-		// register session role|uid so it's never added as a live identity
-		if id := ent.Identities[knowledge.LiveSession]; id != nil {
-			roleUID := id.Role + "|" + id.UserID
-			if roleUID != "|" {
-				e.knownRoleUIDs[roleUID] = true
+				ent.SessionCookies = make(map[string]string)
+				e.sessionCookies = make(map[string]string)
+				ent.SessionUsed = false
+				sessionResp = nil
+
+				e.identities = e.deriveIdentities(baseReq)
 			}
 		}
-		e.captureSession(ent, meta, resp, base.URL)
+	}
+	// Mark entity as seen
+	ent.State.Seen = true
+	if sessionResp != nil && ent.SessionUsed {
+		if meta, ok := e.identityMeta(knowledge.LiveSession); ok {
+			extractIdentity(ent, meta.Name, sessionResp)
+			// register session role|uid so it's never added as a live identity
+			if id := ent.Identities[knowledge.LiveSession]; id != nil {
+				roleUID := id.Role + "|" + id.UserID
+				if roleUID != "|" {
+					e.knownRoleUIDs[roleUID] = true
+				}
+			}
+			e.captureSession(ent, meta, sessionResp, base.URL)
+		}
 	}
 
 	e.baseStatus = resp.StatusCode
 	e.baseBody = body
-	e.baseFP = makeFingerprint(resp.StatusCode, body)
+	e.baseFP = fpString(resp.StatusCode, body)
 	ent.AddMethod(baseReq.Method)
 	e.int.Learn(baseReq.URL, resp, body)
 	e.Expand(ent)

@@ -579,6 +579,7 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 		if _, seen := e.probedPathTemplates[tmpl]; seen {
 			continue
 		}
+		e.probedPathTemplates[tmpl] = struct{}{}
 
 		tests := []string{"0", "1", "-1"}
 		if id, err := strconv.Atoi(seg); err == nil {
@@ -607,6 +608,4 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 			})
 		}
 	}
-
-	e.probedPathTemplates[tmpl] = struct{}{}
 }
