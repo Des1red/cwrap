@@ -80,10 +80,14 @@ func isExpiredJWT(val string) bool {
 func Save(raw string, s *Store) error {
 	p, _ := pathFor(raw)
 
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return err
+	}
+
 	b, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(p, b, 0644)
+	return os.WriteFile(p, b, 0600)
 }

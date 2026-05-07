@@ -156,19 +156,21 @@ func deriveFindings(ent *knowledge.Entity) []string {
 	}
 	sort.Strings(pnames)
 
+	for _, name := range idorFindingParams(ent) {
+		out = append(out, fmt.Sprintf("Horizontal privilege escalation possible via param: %s", name))
+	}
+
+	for _, name := range suspectIDORFindingParams(ent) {
+		out = append(out, fmt.Sprintf("Suspect IDOR surface via param: %s", name))
+	}
+
 	for _, name := range pnames {
 		p := ent.Params[name]
 		if p == nil {
 			continue
 		}
 
-		if p.PossibleIDOR && p.OwnershipBoundary && p.IDLike {
-			out = append(out, fmt.Sprintf("Horizontal privilege escalation possible via param: %s", name))
-		}
-		if p.SuspectIDOR && p.IDLike {
-			out = append(out, fmt.Sprintf("Suspect IDOR surface via param: %s", name))
-		}
-		if p.Enumerable && p.LikelyObjectAccess {
+		if p.Enumerable && p.LikelyObjectAccess && isRealInputParam(p) {
 			out = append(out, fmt.Sprintf("Object enumeration possible via param: %s", name))
 		}
 		if p.DebugLike {
@@ -178,7 +180,6 @@ func deriveFindings(ent *knowledge.Entity) []string {
 			out = append(out, fmt.Sprintf("Token-like parameter observed: %s", name))
 		}
 
-		// Unauthenticated access hint
 		if p.IdentityAccess != nil && p.IdentityAccess["anonymous"] > 0 && len(p.IdentityDenied) > 0 {
 			out = append(out, fmt.Sprintf("Unauthenticated access observed (identity: anonymous) via param behavior: %s", name))
 		}
@@ -220,22 +221,24 @@ func deriveNextSteps(ent *knowledge.Entity) []string {
 			continue
 		}
 
-		if p.Enumerable {
+		controllable := isRealInputParam(p)
+
+		if p.Enumerable && controllable {
 			out = append(out, "Enumerate "+name+" sequentially")
 		}
-		if p.PossibleIDOR || p.SuspectIDOR {
+		if (p.PossibleIDOR || p.SuspectIDOR) && controllable {
 			out = append(out, "Attempt cross-identity object access via "+name)
 		}
-		if p.IDLike && p.OwnershipBoundary {
+		if p.IDLike && p.OwnershipBoundary && controllable {
 			out = append(out, "Test horizontal privilege escalation using "+name)
 		}
-		if p.AuthBoundary && !p.OwnershipBoundary {
+		if p.AuthBoundary && !p.OwnershipBoundary && controllable {
 			out = append(out, "Test vertical privilege escalation / role boundary using "+name)
 		}
-		if p.TokenLike {
+		if p.TokenLike && controllable {
 			out = append(out, "Attempt token reuse / swapping / fixation using "+name)
 		}
-		if p.DebugLike {
+		if p.DebugLike && controllable {
 			out = append(out, "Probe debug flags / verbose errors using "+name)
 		}
 	}
@@ -283,4 +286,85 @@ func deriveNextSteps(ent *knowledge.Entity) []string {
 	out = dedup(out)
 	sort.Strings(out)
 	return out
+}
+
+func isRealInputParam(p *knowledge.ParamIntel) bool {
+	if p == nil {
+		return false
+	}
+
+	return p.Sources[knowledge.ParamQuery] ||
+		p.Sources[knowledge.ParamPath] ||
+		p.Sources[knowledge.ParamForm]
+}
+
+func isResponseDerivedParam(p *knowledge.ParamIntel) bool {
+	if p == nil {
+		return false
+	}
+
+	return p.Sources[knowledge.ParamJSON] && !isRealInputParam(p)
+}
+
+func idorFindingParams(ent *knowledge.Entity) []string {
+	var primary []string
+	var fallback []string
+
+	for name, p := range ent.Params {
+		if p == nil {
+			continue
+		}
+
+		if !(p.PossibleIDOR && p.OwnershipBoundary && p.IDLike) {
+			continue
+		}
+
+		if isRealInputParam(p) {
+			primary = append(primary, name)
+			continue
+		}
+
+		if isResponseDerivedParam(p) {
+			fallback = append(fallback, name)
+		}
+	}
+
+	sort.Strings(primary)
+	sort.Strings(fallback)
+
+	if len(primary) > 0 {
+		return primary
+	}
+	return fallback
+}
+func suspectIDORFindingParams(ent *knowledge.Entity) []string {
+	var primary []string
+	var fallback []string
+
+	for name, p := range ent.Params {
+		if p == nil {
+			continue
+		}
+
+		if !(p.SuspectIDOR && p.IDLike) {
+			continue
+		}
+
+		if isRealInputParam(p) {
+			primary = append(primary, name)
+			continue
+		}
+
+		if isResponseDerivedParam(p) {
+			fallback = append(fallback, name)
+		}
+	}
+
+	sort.Strings(primary)
+	sort.Strings(fallback)
+
+	if len(primary) > 0 {
+		return primary
+	}
+	return fallback
 }

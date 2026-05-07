@@ -16,12 +16,17 @@ func jarPath() string {
 
 func SyncJarToSession(targetURL string) error {
 	jar := jarPath()
+
 	b, err := os.ReadFile(jar)
 	if err != nil {
 		return nil // no jar yet, nothing to sync
 	}
 
-	store, _ := session.Load(targetURL)
+	store, err := session.Load(targetURL)
+	if err != nil {
+		return err
+	}
+
 	ident := store.Identities["session"]
 	if ident == nil {
 		ident = &session.IdentitySession{
@@ -30,14 +35,17 @@ func SyncJarToSession(targetURL string) error {
 		store.Identities["session"] = ident
 	}
 
-	// Netscape cookie jar format: tab-separated, skip comment lines
 	for _, line := range strings.Split(string(b), "\n") {
-		// handle HttpOnly cookies — Netscape format prefixes domain with #HttpOnly_
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
 		httpOnly := false
 		if strings.HasPrefix(line, "#HttpOnly_") {
-			line = line[len("#HttpOnly_"):]
+			line = strings.TrimPrefix(line, "#HttpOnly_")
 			httpOnly = true
-		} else if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
+		} else if strings.HasPrefix(line, "#") {
 			continue
 		}
 
@@ -45,12 +53,18 @@ func SyncJarToSession(targetURL string) error {
 		if len(fields) < 7 {
 			continue
 		}
+
 		name := fields[5]
 		value := fields[6]
+		if name == "" {
+			continue
+		}
+
 		ident.Cookies[name] = &session.CookieEntry{
 			Name:     name,
 			Value:    value,
 			Source:   "server",
+			Domain:   fields[0],
 			Path:     fields[2],
 			Secure:   fields[3] == "TRUE",
 			HttpOnly: httpOnly,
@@ -71,13 +85,13 @@ func readCSRFCookie(host string) (string, string) {
 	lines := strings.Split(string(data), "\n")
 
 	for _, l := range lines {
-
-		if strings.HasPrefix(l, "#") {
+		if strings.HasPrefix(l, "#HttpOnly_") {
+			l = strings.TrimPrefix(l, "#HttpOnly_")
+		} else if strings.HasPrefix(l, "#") || strings.TrimSpace(l) == "" {
 			continue
 		}
 
 		fields := strings.Fields(l)
-
 		if len(fields) < 7 {
 			continue
 		}
@@ -86,16 +100,15 @@ func readCSRFCookie(host string) (string, string) {
 		name := fields[5]
 		value := fields[6]
 
-		/* match domain */
-
 		if !strings.Contains(host, domain) && !strings.Contains(domain, host) {
 			continue
 		}
 
-		switch strings.ToLower(name) {
-		case "csrf_token", "csrftoken", "xsrf-token", "xsrf", "_csrf":
+		ln := strings.ToLower(name)
+		if strings.Contains(ln, "csrf") || strings.Contains(ln, "xsrf") {
 			return name, value
 		}
+
 	}
 
 	return "", ""

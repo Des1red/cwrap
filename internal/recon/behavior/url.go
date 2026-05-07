@@ -1,6 +1,7 @@
 package behavior
 
 import (
+	"cwrap/internal/model"
 	"cwrap/internal/recon/knowledge"
 	"net/url"
 	"strings"
@@ -45,4 +46,53 @@ func clearSeenPathIDProbeFamily(rootSeen map[string]bool, ent *knowledge.Entity,
 
 	clearByTemplate(rootSeen)
 	clearByTemplate(ent.SeenProbes)
+}
+
+func probeLogURL(req model.Request) string {
+	if len(req.Flags.Query) == 0 {
+		return req.URL
+	}
+
+	u, err := url.Parse(req.URL)
+	if err != nil {
+		return req.URL
+	}
+
+	q := u.Query()
+	for _, p := range req.Flags.Query {
+		if p.Key == "" {
+			continue
+		}
+		q.Set(p.Key, p.Value)
+	}
+
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func (e *Engine) registerURLQueryParams(ent *knowledge.Entity) {
+	if ent == nil || ent.URL == "" {
+		return
+	}
+
+	u, err := url.Parse(ent.URL)
+	if err != nil {
+		return
+	}
+
+	q := u.Query()
+	if len(q) == 0 {
+		return
+	}
+
+	for name := range q {
+		if name == "" {
+			continue
+		}
+
+		ent.AddParam(name, knowledge.ParamQuery)
+		e.k.AddParam(name)
+		e.int.ClassifyParam(ent, name)
+		ent.Tag(knowledge.SigHasQueryParams)
+	}
 }

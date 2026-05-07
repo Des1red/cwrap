@@ -62,7 +62,9 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		if probe.Reason == knowledge.ReasonPathIDProbe && !target.State.OrganicallyDiscovered {
 			target.State.IsPathVariant = true
 		}
-
+		if !target.State.IsParamVariant {
+			e.registerURLQueryParams(target)
+		}
 		req := e.buildProbeRequest(base, probe)
 
 		responses, statuses, identityStatuses, probeFP := e.executeProbeIdentities(req, probe, target, root, base)
@@ -187,6 +189,15 @@ func (e *Engine) executeProbeIdentities(
 		e.captureSession(target, id, resp, base.URL)
 
 		probeFP[id.Name] = fpString(resp.StatusCode, body)
+		target.AddProbeLog(knowledge.ProbeLogEntry{
+			URL:      probeLogURL(reqID),
+			Method:   reqID.Method,
+			Reason:   probe.Reason,
+			Identity: id.Name,
+			Status:   resp.StatusCode,
+			FP:       probeFP[id.Name],
+			Location: resp.Header.Get("Location"),
+		})
 		e.int.Learn(reqID.URL, resp, body)
 
 		if target != root && resp.StatusCode == 200 {
@@ -261,18 +272,27 @@ func (e *Engine) runProbeAnalyzers(
 	responses map[string]map[string]map[string][]byte,
 	statuses map[string]map[string]map[string]int,
 ) {
+
 	e.analyzeParamBehavior(target, target.AccumResponses)
 	e.analyzeAuthBoundary(target, statuses)
 	e.analyzeOwnership(target, statuses)
+	e.analyzeObjectAccessSurface(target, target.AccumStatuses)
 	e.analyzeIDOR(target, responses, statuses)
 	e.analyzeIDOR(target, target.AccumResponses, target.AccumStatuses)
 	e.analyzeMethods(target)
 	e.analyzeCredentiallessIssuance(target)
 
+	promoteRealInputIDOverResponseID(target)
+	demoteResponseDerivedIDORIfRealInputExists(target)
+
 	if probe.Reason == knowledge.ReasonPathIDProbe && probe.SourceURL != "" {
 		sourceEnt := e.k.Entity(probe.SourceURL)
 		e.analyzeParamBehavior(sourceEnt, sourceEnt.AccumResponses)
 		e.analyzeOwnership(sourceEnt, sourceEnt.AccumStatuses)
+		e.analyzeObjectAccessSurface(sourceEnt, sourceEnt.AccumStatuses)
 		e.analyzeIDOR(sourceEnt, sourceEnt.AccumResponses, sourceEnt.AccumStatuses)
+
+		promoteRealInputIDOverResponseID(sourceEnt)
+		demoteResponseDerivedIDORIfRealInputExists(sourceEnt)
 	}
 }

@@ -83,7 +83,9 @@ func (e *Engine) captureSession(ent *knowledge.Entity, idMeta Identity, resp *ht
 
 	if updated {
 		ident.Updated = time.Now()
-		session.Save(rawURL, store)
+		if err := session.Save(rawURL, store); err != nil && e.debug {
+			println("[session] save failed:", err.Error())
+		}
 		// Mark entity session as issued/rotated
 		ent.SessionIssued = true
 	}

@@ -99,6 +99,7 @@ func (e *Engine) Run(base model.Request, url string) error {
 	}
 	// Mark entity as seen
 	ent.State.Seen = true
+	e.registerURLQueryParams(ent)
 	if sessionResp != nil && ent.SessionUsed {
 		if meta, ok := e.identityMeta(knowledge.LiveSession); ok {
 			extractIdentity(ent, meta.Name, sessionResp)

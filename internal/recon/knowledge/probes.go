@@ -30,6 +30,19 @@ type ProbeQueue struct {
 	items []Probe
 }
 
+type ProbeLogEntry struct {
+	URL      string
+	Method   string
+	Reason   string
+	Identity string
+
+	Status   int
+	FP       string
+	Location string
+
+	Count int
+}
+
 func (q *ProbeQueue) Len() int {
 	return len(q.items)
 }
@@ -121,4 +134,31 @@ func (p Probe) Key() string {
 		key += "|body:" + fmt.Sprintf("%x", sum[:8]) // first 8 bytes is enough for dedupe
 	}
 	return key
+}
+
+func (e *Entity) AddProbeLog(p ProbeLogEntry) {
+	if p.URL == "" || p.Method == "" || p.Identity == "" {
+		return
+	}
+
+	if p.Count == 0 {
+		p.Count = 1
+	}
+
+	for i := range e.ProbeLog {
+		old := &e.ProbeLog[i]
+
+		if old.URL == p.URL &&
+			old.Method == p.Method &&
+			old.Reason == p.Reason &&
+			old.Identity == p.Identity &&
+			old.Status == p.Status &&
+			old.Location == p.Location &&
+			old.FP == p.FP {
+			old.Count += p.Count
+			return
+		}
+	}
+
+	e.ProbeLog = append(e.ProbeLog, p)
 }

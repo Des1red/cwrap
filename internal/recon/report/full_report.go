@@ -23,6 +23,7 @@ func writeFullReport(w io.Writer, k *knowledge.Knowledge) {
 	writeContactInfo(w, k)
 	writeDiscoveryTree(w, k)
 	writeEntityDetails(w, k)
+	writeTaggedProbeLog(w, k)
 	writeStaticAssets(w, k)
 	writeIdentityVault(w, k)
 
@@ -650,4 +651,75 @@ func writeStaticAssets(w io.Writer, k *knowledge.Knowledge) {
 		fmt.Fprintf(w, "  - %s\n", u)
 	}
 	fmt.Fprintln(w)
+}
+
+func writeTaggedProbeLog(w io.Writer, k *knowledge.Knowledge) {
+	fmt.Fprintln(w, "------------------------------------------------")
+	fmt.Fprintln(w, "PROBE LOG FOR TAGGED ENTITIES")
+	fmt.Fprintln(w, "------------------------------------------------")
+
+	printed := false
+
+	for _, u := range entityURLsBySignalCount(k) {
+		ent := k.Entities[u]
+		if ent == nil || ent.State.IsSPAFallback {
+			continue
+		}
+
+		sigs := activeSignals(ent)
+		if len(sigs) == 0 || len(ent.ProbeLog) == 0 {
+			continue
+		}
+
+		rows := make([]knowledge.ProbeLogEntry, 0, len(ent.ProbeLog))
+		for _, p := range ent.ProbeLog {
+			if shouldPrintProbeLog(p) {
+				rows = append(rows, p)
+			}
+		}
+
+		if len(rows) == 0 {
+			continue
+		}
+
+		printed = true
+
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "[ENTITY]", ent.URL)
+		fmt.Fprintf(w, "  Signals: %v\n", sigs)
+
+		for _, p := range rows {
+			count := ""
+			if p.Count > 1 {
+				count = fmt.Sprintf(" ×%d", p.Count)
+			}
+
+			loc := ""
+			if p.Location != "" {
+				loc = " -> " + p.Location
+			}
+
+			fmt.Fprintf(
+				w,
+				"  %-6s %-14s %-3d%s %s [%s]%s\n",
+				p.Method,
+				p.Identity,
+				p.Status,
+				count,
+				p.URL,
+				p.Reason,
+				loc,
+			)
+		}
+	}
+
+	if !printed {
+		fmt.Fprintln(w, "(no tagged probe log)")
+	}
+
+	fmt.Fprintln(w)
+}
+
+func shouldPrintProbeLog(p knowledge.ProbeLogEntry) bool {
+	return p.Status != 404 && p.Status < 500
 }

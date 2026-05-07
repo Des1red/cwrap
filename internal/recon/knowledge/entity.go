@@ -22,6 +22,7 @@ type Entity struct {
 	// For active probing: queue of candidate probes for this URL.
 	ProbeQueue ProbeQueue
 	SeenProbes map[string]bool
+	ProbeLog   []ProbeLogEntry
 
 	Identities    map[string]*Identity // name -> identity (for engine logic)
 	IdentityIndex map[string]*Identity // fp -> identity (for dedupe/printing)
@@ -66,6 +67,7 @@ func NewEntity(url string) *Entity {
 		Params:         make(map[string]*ParamIntel),
 		ProbeQueue:     ProbeQueue{},
 		SeenProbes:     make(map[string]bool),
+		ProbeLog:       make([]ProbeLogEntry, 0, 32),
 		Identities:     make(map[string]*Identity),
 		IdentityIndex:  make(map[string]*Identity),
 		SessionCookies: make(map[string]string),
