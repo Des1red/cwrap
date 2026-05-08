@@ -24,7 +24,7 @@ func (e *Engine) analyzeParamBehavior(ent *knowledge.Entity, responses map[strin
 
 		for _, byID := range byVal {
 
-			body, ok := pickCredBody(ent, byID, nil)
+			body, ok := e.pickCredBody(ent, byID, nil)
 			if !ok || len(body) == 0 {
 				continue
 			}

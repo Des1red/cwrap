@@ -3,10 +3,12 @@ package knowledge
 type IdentityKind int
 
 const (
-	LiveSession    = "session"
-	Anonymous      = "anonymous"
-	FakeAdmin      = "fake-admin"
-	CorruptedToken = "corrupted-token"
+	LiveSession                = "session"
+	Anonymous                  = "anonymous"
+	FakeAdmin                  = "fake-admin"
+	CorruptedToken             = "corrupted-token"
+	CorruptedCookieToken       = "corrupted-cookie-token"
+	CorruptedOpaqueCookieToken = "corrupted-opaque-cookie-token"
 )
 
 const (

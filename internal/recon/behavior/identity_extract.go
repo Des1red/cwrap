@@ -16,7 +16,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 	// ---- parse SENT cookies ----
 	if sentCookie {
 		for _, c := range resp.Request.Cookies() {
-			if strings.Count(c.Value, ".") == 2 {
+			if tokens.LooksLikeJWT(c.Value) {
 				extractJWTIntel(id, tokens.ParseJWT(c.Value))
 			}
 		}
@@ -32,7 +32,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		}
 		id.IssuedByServer = true
 		// try parse cookie as JWT
-		if strings.Count(c.Value, ".") == 2 {
+		if tokens.LooksLikeJWT(c.Value) {
 			extractJWTIntel(id, tokens.ParseJWT(c.Value))
 		}
 	}

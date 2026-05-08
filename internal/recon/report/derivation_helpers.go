@@ -149,6 +149,14 @@ func deriveFindings(ent *knowledge.Entity) []string {
 		out = append(out, "Server issues tokens/sessions without credentials — credentialless authentication bypass possible")
 	}
 
+	if ent.SeenSignal(knowledge.SigBrokenTokenValidation) {
+		out = append(out, "Broken token validation — server accepted a tampered/invalid token")
+	}
+
+	if ent.SeenSignal(knowledge.SigWeakOpaqueTokenValidation) {
+		out = append(out, "Weak opaque token/session validation — server accepted a corrupted session/token cookie")
+	}
+
 	// Param-based findings
 	pnames := make([]string, 0, len(ent.Params))
 	for n := range ent.Params {
@@ -260,6 +268,14 @@ func deriveNextSteps(ent *knowledge.Entity) []string {
 		)
 	}
 
+	if ent.SeenSignal(knowledge.SigWeakOpaqueTokenValidation) {
+		out = append(out,
+			"Test session fixation and session replay",
+			"Check whether opaque session IDs are actually validated server-side",
+			"Attempt invalid/modified session cookie reuse across protected endpoints",
+		)
+	}
+
 	// Ownership-phase suggestions
 	if ent.SeenSignal(knowledge.SigObjectOwnership) {
 		out = append(out, "Attempt cross-user object access (IDOR) across identities")
@@ -276,6 +292,15 @@ func deriveNextSteps(ent *knowledge.Entity) []string {
 			"Attempt to reuse credentiallessly issued tokens across sessions",
 		)
 	}
+
+	if ent.SeenSignal(knowledge.SigBrokenTokenValidation) {
+		out = append(out,
+			"Attempt signature stripping on JWT (set alg=none)",
+			"Test token reuse across sessions and users",
+			"Attempt JWT claim tampering (role, user_id elevation)",
+		)
+	}
+
 	// non-HTTP service
 	if ent.State.ProbeCount > 0 &&
 		len(ent.HTTP.Methods) == 0 &&

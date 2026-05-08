@@ -1,29 +1,12 @@
 package tokens
 
 import (
-	"cwrap/internal/exploit/report"
 	"strings"
 )
 
-func ResolveTokenPrincipal(id *report.ReportIdentity, jar map[string]string) (role, uid string) {
-	if id != nil {
-		if id.Role != "" || id.UserID != "" {
-			return id.Role, id.UserID
-		}
-	}
-
-	token := jar["auth_token"]
-	if token == "" {
-		return "", ""
-	}
-
-	role, uid = ParseJWTPrincipalUnsafe(token)
-	return role, uid
-}
-
 func FirstCookieValue(jar map[string]string) string {
 	for _, v := range jar {
-		if strings.Count(v, ".") == 2 {
+		if LooksLikeJWT(v) {
 			return v // prefer JWT
 		}
 	}
@@ -31,4 +14,28 @@ func FirstCookieValue(jar map[string]string) string {
 		return v // fallback to first
 	}
 	return ""
+}
+
+func LooksLikeOpaqueAuthCookie(name, value string) bool {
+	if value == "" || len(value) < 8 {
+		return false
+	}
+
+	if LooksLikeJWT(value) {
+		return false
+	}
+
+	n := strings.ToLower(name)
+
+	return strings.Contains(n, "session") ||
+		strings.Contains(n, "auth") ||
+		strings.Contains(n, "token") ||
+		strings.Contains(n, "remember") ||
+		n == "sid" ||
+		strings.HasSuffix(n, "_sid") ||
+		strings.HasSuffix(n, "-sid")
+}
+
+func LooksLikeJWT(v string) bool {
+	return strings.Count(v, ".") == 2
 }

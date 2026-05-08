@@ -121,3 +121,18 @@ func IsElevatedRole(role string) bool {
 	}
 	return false
 }
+
+func CorruptSignature(token string) (string, bool) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return "", false
+	}
+
+	if parts[2] == "" {
+		parts[2] = "invalid"
+	} else {
+		parts[2] += "invalid"
+	}
+
+	return strings.Join(parts, "."), true
+}

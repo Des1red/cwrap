@@ -4,20 +4,36 @@ import "cwrap/internal/recon/knowledge"
 
 // ---------- identity-agnostic helpers ----------
 
-func isComparableIdentity(name string, id *knowledge.Identity) bool {
-	if id == nil || !id.SentCreds {
+func (e *Engine) isComparableIdentity(name string, id *knowledge.Identity) bool {
+	if !e.shouldCompareIdentity(name, id) {
 		return false
 	}
+
 	if name == knowledge.LiveSession {
 		return false
 	}
+
 	return true
 }
 
-func anyCredStatus(ent *knowledge.Entity, byID map[string]int, want ...int) bool {
+func (e *Engine) shouldCompareIdentity(name string, id *knowledge.Identity) bool {
+	if id == nil || !id.SentCreds {
+		return false
+	}
+
+	for _, meta := range e.identities {
+		if meta.Name == name {
+			return !meta.Synthetic
+		}
+	}
+
+	return false
+}
+
+func (e *Engine) anyCredStatus(ent *knowledge.Entity, byID map[string]int, want ...int) bool {
 	for idName, s := range byID {
 		id := ent.Identities[idName]
-		if !isComparableIdentity(idName, id) {
+		if !e.isComparableIdentity(idName, id) {
 			continue
 		}
 		for _, w := range want {
@@ -73,10 +89,10 @@ func entityHasRealInputIDParam(ent *knowledge.Entity) bool {
 }
 
 // pick a "credentialed" body for this value (prefer a cred identity that succeeded)
-func pickCredBody(ent *knowledge.Entity, bodies map[string][]byte, statuses map[string]int) ([]byte, bool) {
+func (e *Engine) pickCredBody(ent *knowledge.Entity, bodies map[string][]byte, statuses map[string]int) ([]byte, bool) {
 	for idName, body := range bodies {
 		id := ent.Identities[idName]
-		if !isComparableIdentity(idName, id) {
+		if !e.isComparableIdentity(idName, id) {
 			continue
 		}
 		if statuses != nil && statuses[idName] != 200 {
@@ -90,7 +106,7 @@ func pickCredBody(ent *knowledge.Entity, bodies map[string][]byte, statuses map[
 	// fallback: any cred body (even if status map missing)
 	for idName, body := range bodies {
 		id := ent.Identities[idName]
-		if !isComparableIdentity(idName, id) {
+		if !e.isComparableIdentity(idName, id) {
 			continue
 		}
 		if len(body) == 0 {
@@ -192,4 +208,30 @@ func promoteRealInputIDOverResponseID(ent *knowledge.Entity) {
 		p.PossibleIDOR = false
 		p.SuspectIDOR = false
 	}
+}
+
+func corruptedIdentityAccepted(ent *knowledge.Entity, name string) bool {
+	id := ent.Identities[name]
+	if id == nil || !id.SentCreds {
+		return false
+	}
+
+	// Param-level evidence
+	for _, p := range ent.Params {
+		if p == nil {
+			continue
+		}
+		if p.IdentityAccess[name] > 0 {
+			return true
+		}
+	}
+
+	// Endpoint-level evidence
+	for _, log := range ent.ProbeLog {
+		if log.Identity == name && log.Status >= 200 && log.Status < 300 {
+			return true
+		}
+	}
+
+	return false
 }

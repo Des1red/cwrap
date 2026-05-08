@@ -20,6 +20,8 @@ const (
 	SigObjectOwnership
 	SigPossibleIDOR
 	SigCredentiallessTokenIssuance
+	SigBrokenTokenValidation
+	SigWeakOpaqueTokenValidation
 )
 
 func (s Signal) String() string {
@@ -54,6 +56,10 @@ func (s Signal) String() string {
 		return "PossibleIDOR"
 	case SigCredentiallessTokenIssuance:
 		return "CredentiallessTokenIssuance"
+	case SigBrokenTokenValidation:
+		return "BrokenTokenValidation"
+	case SigWeakOpaqueTokenValidation:
+		return "WeakOpaqueTokenValidation"
 	case SigPublicAccess:
 		return "PublicAccess"
 	default:

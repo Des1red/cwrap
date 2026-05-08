@@ -74,7 +74,45 @@ func (e *Engine) deriveIdentities(base model.Request) []Identity {
 			Name:      knowledge.CorruptedToken,
 			Synthetic: true,
 			Apply: func(r model.Request) model.Request {
+				r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
 				r.Flags.Bearer = r.Flags.Bearer + ".invalid"
+				return r
+			},
+		})
+	}
+
+	// corrupted-cookie-token is also added dynamically after session capture.
+	// Initial creation here only covers cookies already known at scan start.
+	baseCookies := mergedBaseCookies(base, e.sessionCookies)
+	if corruptedCookies, ok := corruptJWTCookies(baseCookies); ok {
+		ids = append(ids, Identity{
+			Name:      knowledge.CorruptedCookieToken,
+			Synthetic: true,
+			Apply: func(r model.Request) model.Request {
+				r.Flags.Bearer = ""
+				r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
+
+				if ck := cookieHeader(corruptedCookies); ck != "" {
+					r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
+				}
+
+				return r
+			},
+		})
+	}
+
+	if corruptedCookies, ok := corruptOpaqueCookies(baseCookies); ok {
+		ids = append(ids, Identity{
+			Name:      knowledge.CorruptedOpaqueCookieToken,
+			Synthetic: true,
+			Apply: func(r model.Request) model.Request {
+				r.Flags.Bearer = ""
+				r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
+
+				if ck := cookieHeader(corruptedCookies); ck != "" {
+					r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
+				}
+
 				return r
 			},
 		})
@@ -85,6 +123,8 @@ func (e *Engine) deriveIdentities(base model.Request) []Identity {
 		Name:      knowledge.FakeAdmin,
 		Synthetic: true,
 		Apply: func(r model.Request) model.Request {
+			r.Flags.Bearer = ""
+			r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
 			r.Flags.Headers = upsertHeader(r.Flags.Headers, "X-Forwarded-User", "admin")
 			return r
 		},
@@ -237,7 +277,7 @@ func (e *Engine) discoverIdentityFromResponse(resp *http.Response) {
 
 	for _, c := range resp.Cookies() {
 		newCookies[c.Name] = c.Value
-		if strings.Count(c.Value, ".") == 2 {
+		if tokens.LooksLikeJWT(c.Value) {
 			claims := tokens.ParseJWT(c.Value)
 			if claims != nil {
 				if r, ok := claims["role"].(string); ok {
@@ -261,4 +301,97 @@ func (e *Engine) discoverIdentityFromResponse(resp *http.Response) {
 
 	e.discoveredIdentities[roleUID] = true
 	e.addLiveIdentity(fmt.Sprintf("%s-uid-%s", newRole, newUID), newCookies, roleUID)
+}
+
+func (e *Engine) ensureCorruptedCookieIdentity(base model.Request) {
+	baseCookies := mergedBaseCookies(base, e.sessionCookies)
+
+	corruptedCookies, ok := corruptJWTCookies(baseCookies)
+	if !ok {
+		return
+	}
+
+	for _, id := range e.identities {
+		if id.Name == knowledge.CorruptedCookieToken {
+			return
+		}
+	}
+
+	if e.debug {
+		println("== New synthetic identity discovered:", knowledge.CorruptedCookieToken, "==")
+	}
+
+	e.identities = append(e.identities, Identity{
+		Name:      knowledge.CorruptedCookieToken,
+		Synthetic: true,
+		Apply: func(r model.Request) model.Request {
+			r.Flags.Bearer = ""
+			r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
+
+			if ck := cookieHeader(corruptedCookies); ck != "" {
+				r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
+			}
+
+			return r
+		},
+	})
+
+	e.requeueSeenForNewIdentity()
+}
+
+func (e *Engine) ensureCorruptedOpaqueCookieIdentity(base model.Request) {
+	baseCookies := mergedBaseCookies(base, e.sessionCookies)
+
+	corruptedCookies, ok := corruptOpaqueCookies(baseCookies)
+	if !ok {
+		return
+	}
+
+	for _, id := range e.identities {
+		if id.Name == knowledge.CorruptedOpaqueCookieToken {
+			return
+		}
+	}
+
+	if e.debug {
+		println("== New synthetic identity discovered:", knowledge.CorruptedOpaqueCookieToken, "==")
+	}
+
+	e.identities = append(e.identities, Identity{
+		Name:      knowledge.CorruptedOpaqueCookieToken,
+		Synthetic: true,
+		Apply: func(r model.Request) model.Request {
+			r.Flags.Bearer = ""
+			r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
+
+			if ck := cookieHeader(corruptedCookies); ck != "" {
+				r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
+			}
+
+			return r
+		},
+	})
+
+	e.requeueSeenForNewIdentity()
+}
+
+func (e *Engine) requeueSeenForNewIdentity() {
+	root := e.k.Entity(e.k.Target)
+
+	for _, ent := range e.k.Entities {
+		if ent == nil || !ent.State.Seen {
+			continue
+		}
+
+		if isStaticAsset(ent) || isSessionTerminator(ent.URL) {
+			continue
+		}
+
+		e.k.PushProbe(root, knowledge.Probe{
+			URL:      ent.URL,
+			Method:   "GET",
+			Reason:   knowledge.ReasonIdentityRefresh,
+			Priority: 156,
+		})
+	}
 }

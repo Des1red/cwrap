@@ -95,10 +95,11 @@ func (e *Engine) detectRoleBoundary(ent *knowledge.Entity, identityStatuses map[
 			}
 		}
 
-		if id != nil && id.SentCreds {
-			ent.Tag(knowledge.SigRoleBoundary)
-			return
+		if !e.shouldCompareIdentity(idName, id) {
+			continue
 		}
+		ent.Tag(knowledge.SigRoleBoundary)
+		return
 	}
 }
 

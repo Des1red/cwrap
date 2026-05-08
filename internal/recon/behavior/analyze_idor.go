@@ -43,11 +43,11 @@ func (e *Engine) analyzeIDOR(
 			byIDStatus := statuses[name][val]
 
 			// require at least one credentialed success
-			if !anyCredStatus(ent, byIDStatus, 200) {
+			if !e.anyCredStatus(ent, byIDStatus, 200) {
 				continue
 			}
 
-			body, ok := pickCredBody(ent, byIDBody, byIDStatus)
+			body, ok := e.pickCredBody(ent, byIDBody, byIDStatus)
 			if !ok || len(body) == 0 {
 				continue
 			}
@@ -63,8 +63,8 @@ func (e *Engine) analyzeIDOR(
 			canonBodies = append(canonBodies, n)
 
 			// ownership IDOR: some cred identities allowed, others denied on this same value
-			if anyCredStatus(ent, byIDStatus, 200) &&
-				(anyCredStatus(ent, byIDStatus, 403) || anyCredStatus(ent, byIDStatus, 401)) {
+			if e.anyCredStatus(ent, byIDStatus, 200) &&
+				(e.anyCredStatus(ent, byIDStatus, 403) || e.anyCredStatus(ent, byIDStatus, 401)) {
 				credDenied = true
 			}
 		}

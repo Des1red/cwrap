@@ -22,12 +22,42 @@ func (e *Engine) analyzeCredentiallessIssuance(ent *knowledge.Entity) {
 	}
 }
 
+func (e *Engine) analyzeTokenValidation(ent *knowledge.Entity) {
+	if !e.authBoundaryConfirmed {
+		return
+	}
+
+	if ent.SeenSignal(knowledge.SigPublicAccess) {
+		return
+	}
+
+	anonDenied := false
+	for _, log := range ent.ProbeLog {
+		if log.Identity == knowledge.Anonymous && (log.Status == 401 || log.Status == 403) {
+			anonDenied = true
+			break
+		}
+	}
+
+	if !anonDenied {
+		return
+	}
+
+	if corruptedIdentityAccepted(ent, knowledge.CorruptedToken) ||
+		corruptedIdentityAccepted(ent, knowledge.CorruptedCookieToken) {
+		ent.Tag(knowledge.SigBrokenTokenValidation)
+	}
+	if corruptedIdentityAccepted(ent, knowledge.CorruptedOpaqueCookieToken) {
+		ent.Tag(knowledge.SigWeakOpaqueTokenValidation)
+	}
+}
+
 func (e *Engine) analyzeOwnership(ent *knowledge.Entity, statuses map[string]map[string]map[string]int) {
 	hasRealInputID := entityHasRealInputIDParam(ent)
 
 	authIdentities := []string{}
 	for idName, id := range ent.Identities {
-		if isComparableIdentity(idName, id) {
+		if e.isComparableIdentity(idName, id) {
 			authIdentities = append(authIdentities, idName)
 		}
 	}
@@ -102,7 +132,7 @@ func (e *Engine) analyzeAuthBoundary(ent *knowledge.Entity, statuses map[string]
 				case 401:
 					has401 = true
 				case 403:
-					if id != nil && id.SentCreds {
+					if e.shouldCompareIdentity(idName, id) {
 						if e.debug {
 							println("[DEBUG] 403 authed:", idName, "SentCreds:", id.SentCreds)
 						}
@@ -151,7 +181,7 @@ func (e *Engine) analyzeObjectAccessSurface(
 		for _, byID := range byVal {
 			for idName, status := range byID {
 				id := ent.Identities[idName]
-				if !isComparableIdentity(idName, id) {
+				if !e.isComparableIdentity(idName, id) {
 					continue
 				}
 

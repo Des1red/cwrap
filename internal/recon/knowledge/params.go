@@ -15,6 +15,7 @@ const (
 	ReasonIDAdjacency     = "id adjacency"
 	ReasonIDEnum          = "id enumeration"
 	ReasonIdentityProbe   = "identity probe"
+	ReasonIdentityRefresh = "identity refresh"
 	ReasonMethodProbe     = "method probe"
 	ReasonPathIDProbe     = "path-id-probe"
 	ReasonPathIDSelfProbe = "path-id-self-probe"

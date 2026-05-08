@@ -4,6 +4,7 @@ import (
 	"cwrap/internal/model"
 	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/recon/session"
+	"cwrap/internal/tokens"
 	"net/http"
 	"net/url"
 	"strings"
@@ -123,4 +124,84 @@ func csrfHeaderName(cookieName string) string {
 		return "X-XSRF-TOKEN"
 	}
 	return "X-CSRF-TOKEN"
+}
+
+func cookieMapFromHeaders(headers []model.Header) map[string]string {
+	out := map[string]string{}
+
+	for _, h := range headers {
+		if !strings.EqualFold(h.Name, "Cookie") {
+			continue
+		}
+
+		for _, part := range strings.Split(h.Value, ";") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+
+			k, v, ok := strings.Cut(part, "=")
+			if !ok {
+				continue
+			}
+
+			k = strings.TrimSpace(k)
+			v = strings.TrimSpace(v)
+
+			if k != "" {
+				out[k] = v
+			}
+		}
+	}
+
+	return out
+}
+
+func mergedBaseCookies(base model.Request, sessionCookies map[string]string) map[string]string {
+	out := map[string]string{}
+
+	for k, v := range sessionCookies {
+		out[k] = v
+	}
+
+	for k, v := range cookieMapFromHeaders(base.Flags.Headers) {
+		out[k] = v
+	}
+
+	return out
+}
+
+func corruptJWTCookies(cookies map[string]string) (map[string]string, bool) {
+	out := make(map[string]string, len(cookies))
+	changed := false
+
+	for k, v := range cookies {
+		if corrupted, ok := tokens.CorruptSignature(v); ok {
+			out[k] = corrupted
+			changed = true
+			continue
+		}
+
+		out[k] = v
+	}
+
+	return out, changed
+}
+
+func corruptOpaqueCookies(cookies map[string]string) (map[string]string, bool) {
+	out := make(map[string]string, len(cookies))
+	changed := false
+
+	for k, v := range cookies {
+		out[k] = v
+
+		if !tokens.LooksLikeOpaqueAuthCookie(k, v) {
+			continue
+		}
+
+		out[k] = v + ".invalid"
+		changed = true
+	}
+
+	return out, changed
 }

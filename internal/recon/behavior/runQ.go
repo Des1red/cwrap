@@ -187,6 +187,10 @@ func (e *Engine) executeProbeIdentities(
 
 		extractIdentity(target, id.Name, resp)
 		e.captureSession(target, id, resp, base.URL)
+		if !id.Synthetic {
+			e.ensureCorruptedCookieIdentity(base)
+			e.ensureCorruptedOpaqueCookieIdentity(base)
+		}
 
 		probeFP[id.Name] = fpString(resp.StatusCode, body)
 		target.AddProbeLog(knowledge.ProbeLogEntry{
@@ -281,6 +285,7 @@ func (e *Engine) runProbeAnalyzers(
 	e.analyzeIDOR(target, target.AccumResponses, target.AccumStatuses)
 	e.analyzeMethods(target)
 	e.analyzeCredentiallessIssuance(target)
+	e.analyzeTokenValidation(target)
 
 	promoteRealInputIDOverResponseID(target)
 	demoteResponseDerivedIDORIfRealInputExists(target)
