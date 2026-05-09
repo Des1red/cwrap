@@ -81,9 +81,11 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		ref := e.resolveRef(target, probeFP)
 		e.markEffectiveIdentities(target, probeFP, ref)
 
-		e.runProbeAnalyzers(target, probe, responses, statuses)
+		if !target.State.IsSPAFallback {
+			e.runProbeAnalyzers(target, probe, responses, statuses)
+			e.learnProbeImpact(target, probe, probeFP, ref)
+		}
 
-		e.learnProbeImpact(target, probe, probeFP, ref)
 		e.Expand(target)
 
 		if target != root {
@@ -185,11 +187,13 @@ func (e *Engine) executeProbeIdentities(
 			continue
 		}
 
-		extractIdentity(target, id.Name, resp)
-		e.captureSession(target, id, resp, base.URL)
-		if !id.Synthetic {
-			e.ensureCorruptedCookieIdentity(base)
-			e.ensureCorruptedOpaqueCookieIdentity(base)
+		isFallback := false
+		if target != root && !isBootstrapLikeURL(reqID.URL) {
+			pageFP := buildPageFP(reqID.URL, resp, body)
+			if looksLikeFallbackPage(pageFP, e.basePageFP) {
+				target.State.IsSPAFallback = true
+				isFallback = true
+			}
 		}
 
 		probeFP[id.Name] = fpString(resp.StatusCode, body)
@@ -202,13 +206,20 @@ func (e *Engine) executeProbeIdentities(
 			FP:       probeFP[id.Name],
 			Location: resp.Header.Get("Location"),
 		})
+
+		if isFallback {
+			continue
+		}
+
+		extractIdentity(target, id.Name, resp)
+		e.captureSession(target, id, resp, base.URL)
+		if !id.Synthetic {
+			e.ensureCorruptedCookieIdentity(base)
+			e.ensureCorruptedOpaqueCookieIdentity(base)
+		}
+
 		e.int.Learn(reqID.URL, resp, body)
 
-		if target != root && resp.StatusCode == 200 {
-			if fpString(resp.StatusCode, body) == e.baseFP {
-				target.State.IsSPAFallback = true
-			}
-		}
 		storeResponse(target, responses, statuses, probe, id.Name, resp.StatusCode, body, e.baseStatus, e.baseBody, base.URL, e.k, e.debug)
 	}
 

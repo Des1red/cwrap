@@ -180,6 +180,8 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 
 	// re-queue all currently known entities for this new identity
 	root := e.k.Entity(e.k.Target)
+	reason := knowledge.ReasonLiveIdentityRefresh + ":" + name
+
 	// replace the existing re-queue block for path param entities
 	for _, ent := range e.k.Entities {
 		if ent == nil || !ent.State.Seen {
@@ -202,7 +204,7 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 			URL:        ent.URL,
 			Method:     "GET",
 			PathParams: pathParams,
-			Reason:     knowledge.ReasonIdentityProbe,
+			Reason:     reason,
 			Priority:   155,
 		})
 	}
@@ -238,7 +240,7 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 		e.k.PushProbe(root, knowledge.Probe{
 			URL:      ent.URL,
 			Method:   "GET",
-			Reason:   knowledge.ReasonIdentityProbe,
+			Reason:   reason,
 			Priority: 155, // slightly below identity probes, above normal expansion
 		})
 	}

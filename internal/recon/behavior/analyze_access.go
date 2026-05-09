@@ -1,6 +1,9 @@
 package behavior
 
-import "cwrap/internal/recon/knowledge"
+import (
+	"cwrap/internal/recon/knowledge"
+	"strings"
+)
 
 func (e *Engine) analyzeCredentiallessIssuance(ent *knowledge.Entity) {
 	isStateful := ent.SeenSignal(knowledge.SigStateChanging) ||
@@ -57,13 +60,44 @@ func (e *Engine) analyzeOwnership(ent *knowledge.Entity, statuses map[string]map
 
 	authIdentities := []string{}
 	for idName, id := range ent.Identities {
-		if e.isComparableIdentity(idName, id) {
+		if e.shouldCompareIdentity(idName, id) {
 			authIdentities = append(authIdentities, idName)
 		}
 	}
 
 	if len(authIdentities) < 2 {
 		return
+	}
+
+	if e.debug {
+		println("[OWNERSHIP DEBUG] entity:", ent.URL)
+		println("[OWNERSHIP DEBUG] authIdentities:", strings.Join(authIdentities, ","))
+
+		for name, byVal := range statuses {
+			println("[OWNERSHIP DEBUG] param:", name)
+
+			for val, byID := range byVal {
+				println("[OWNERSHIP DEBUG] value:", val)
+
+				for idName, status := range byID {
+					id := ent.Identities[idName]
+					kind := -1
+					sent := false
+					if id != nil {
+						kind = int(id.Kind)
+						sent = id.SentCreds
+					}
+
+					println("[OWNERSHIP DEBUG]",
+						"id:", idName,
+						"status:", status,
+						"kind:", kind,
+						"sent:", sent,
+						"compare:", e.shouldCompareIdentity(idName, id),
+					)
+				}
+			}
+		}
 	}
 
 	for name, byVal := range statuses {
@@ -153,6 +187,12 @@ func (e *Engine) analyzeAuthBoundary(ent *knowledge.Entity, statuses map[string]
 
 		// role boundary: authenticated identity was denied — permission wall beyond auth
 		if has403Authed {
+			if e.debug {
+				println("[ROLEBOUNDARY analyzeAuthBoundary]",
+					"url:", ent.URL,
+					"param:", name,
+				)
+			}
 			p.AuthBoundary = true
 			p.ObservedChanges["role-wall-403-authenticated"] = true
 			ent.Tag(knowledge.SigRoleBoundary)

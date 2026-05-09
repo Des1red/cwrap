@@ -29,15 +29,29 @@ func testEngine() *Engine {
 	return New(k, mockInterpreter{}, false)
 }
 
-func entWithIdentities(k *knowledge.Knowledge, u string, identities map[string]bool) *knowledge.Entity {
-	ent := k.Entity(u)
+func entWithIdentities(e *Engine, u string, identities map[string]bool) *knowledge.Entity {
+	ent := e.k.Entity(u)
+
 	for name, sentCreds := range identities {
-		id := &knowledge.Identity{Name: name, SentCreds: sentCreds}
-		ent.AddIdentity(id)
+		kind := knowledge.IdentityNone
+		if sentCreds {
+			kind = knowledge.IdentityUser
+		}
+
+		ent.AddIdentity(&knowledge.Identity{
+			Name:      name,
+			SentCreds: sentCreds,
+			Kind:      kind,
+		})
+
+		e.identities = append(e.identities, Identity{
+			Name:      name,
+			Synthetic: false,
+		})
 	}
+
 	return ent
 }
-
 func mustParseURL(t *testing.T, raw string) *url.URL {
 	t.Helper()
 	u, err := url.Parse(raw)
@@ -244,7 +258,7 @@ func TestParseJWT_InvalidFormat(t *testing.T) {
 
 func TestDetectAuthBoundary_AuthedSuccessUnauthDenied(t *testing.T) {
 	e := testEngine()
-	ent := entWithIdentities(e.k, "http://example.com/api", map[string]bool{
+	ent := entWithIdentities(e, "http://example.com/api", map[string]bool{
 		"authed-user": true,
 		"anonymous":   false,
 	})
@@ -261,7 +275,7 @@ func TestDetectAuthBoundary_AuthedSuccessUnauthDenied(t *testing.T) {
 
 func TestDetectAuthBoundary_403UnauthAlsoTriggers(t *testing.T) {
 	e := testEngine()
-	ent := entWithIdentities(e.k, "http://example.com/api", map[string]bool{
+	ent := entWithIdentities(e, "http://example.com/api", map[string]bool{
 		"user": true,
 		"anon": false,
 	})
@@ -275,7 +289,7 @@ func TestDetectAuthBoundary_403UnauthAlsoTriggers(t *testing.T) {
 
 func TestDetectAuthBoundary_NoAuthedSuccess(t *testing.T) {
 	e := testEngine()
-	ent := entWithIdentities(e.k, "http://example.com/api", map[string]bool{
+	ent := entWithIdentities(e, "http://example.com/api", map[string]bool{
 		"authed-user": true,
 		"anonymous":   false,
 	})
@@ -293,7 +307,7 @@ func TestDetectAuthBoundary_NoAuthedSuccess(t *testing.T) {
 
 func TestDetectRoleBoundary_AuthedGets403(t *testing.T) {
 	e := testEngine()
-	ent := entWithIdentities(e.k, "http://example.com/admin", map[string]bool{
+	ent := entWithIdentities(e, "http://example.com/admin", map[string]bool{
 		"role-member": true,
 	})
 
@@ -306,7 +320,7 @@ func TestDetectRoleBoundary_AuthedGets403(t *testing.T) {
 
 func TestDetectRoleBoundary_UnauthGets403NoTag(t *testing.T) {
 	e := testEngine()
-	ent := entWithIdentities(e.k, "http://example.com/admin", map[string]bool{
+	ent := entWithIdentities(e, "http://example.com/admin", map[string]bool{
 		"anonymous": false,
 	})
 
@@ -323,9 +337,11 @@ func TestDetectRoleBoundary_UnauthGets403NoTag(t *testing.T) {
 
 func TestAnalyzeOwnership_MixedAccessSetsOwnershipBoundary(t *testing.T) {
 	e := testEngine()
-	ent := e.k.Entity("http://example.com/api/posts/1")
-	ent.AddIdentity(&knowledge.Identity{Name: "user-alice", SentCreds: true})
-	ent.AddIdentity(&knowledge.Identity{Name: "user-bob", SentCreds: true})
+	ent := entWithIdentities(e, "http://example.com/api/posts/1", map[string]bool{
+		"user-alice": true,
+		"user-bob":   true,
+	})
+
 	ent.AddParam("post_id", knowledge.ParamPath)
 	ent.Params["post_id"].IDLike = true
 
@@ -345,9 +361,11 @@ func TestAnalyzeOwnership_MixedAccessSetsOwnershipBoundary(t *testing.T) {
 
 func TestAnalyzeOwnership_BothSucceedNoOwnershipBoundary(t *testing.T) {
 	e := testEngine()
-	ent := e.k.Entity("http://example.com/api/posts/1")
-	ent.AddIdentity(&knowledge.Identity{Name: "user-alice", SentCreds: true})
-	ent.AddIdentity(&knowledge.Identity{Name: "user-bob", SentCreds: true})
+	ent := entWithIdentities(e, "http://example.com/api/posts/1", map[string]bool{
+		"user-alice": true,
+		"user-bob":   true,
+	})
+
 	ent.AddParam("post_id", knowledge.ParamPath)
 	ent.Params["post_id"].IDLike = true
 
@@ -364,8 +382,10 @@ func TestAnalyzeOwnership_BothSucceedNoOwnershipBoundary(t *testing.T) {
 
 func TestAnalyzeOwnership_OnlyOneAuthIdentitySkipped(t *testing.T) {
 	e := testEngine()
-	ent := e.k.Entity("http://example.com/api/posts/1")
-	ent.AddIdentity(&knowledge.Identity{Name: "user-alice", SentCreds: true})
+	ent := entWithIdentities(e, "http://example.com/api/posts/1", map[string]bool{
+		"user-alice": true,
+	})
+
 	ent.AddParam("post_id", knowledge.ParamPath)
 	ent.Params["post_id"].IDLike = true
 

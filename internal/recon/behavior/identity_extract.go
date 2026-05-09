@@ -98,9 +98,7 @@ func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
 		if prev.Effective {
 			id.Effective = true
 		}
-		if prev.SentCreds {
-			id.SentCreds = true
-		}
+
 		if id.CSRFToken == "" && prev.CSRFToken != "" {
 			id.CSRFToken = prev.CSRFToken
 			id.CSRFCookieName = prev.CSRFCookieName

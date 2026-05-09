@@ -98,6 +98,15 @@ func (e *Engine) detectRoleBoundary(ent *knowledge.Entity, identityStatuses map[
 		if !e.shouldCompareIdentity(idName, id) {
 			continue
 		}
+		if e.debug {
+			println("[ROLEBOUNDARY detectRoleBoundary]",
+				"url:", ent.URL,
+				"identity:", idName,
+				"status:", status,
+				"kind:", int(id.Kind),
+				"sentCreds:", id.SentCreds,
+			)
+		}
 		ent.Tag(knowledge.SigRoleBoundary)
 		return
 	}

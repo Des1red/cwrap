@@ -17,6 +17,7 @@ type Engine struct {
 	baseStatus int
 	baseBody   []byte
 	baseFP     string
+	basePageFP PageFP
 
 	authBoundaryConfirmed bool
 	authConfidence        int

@@ -21,6 +21,10 @@ func (e *Engine) shouldCompareIdentity(name string, id *knowledge.Identity) bool
 		return false
 	}
 
+	if id.Kind == knowledge.IdentityNone || id.Kind == knowledge.IdentityInvalid {
+		return false
+	}
+
 	for _, meta := range e.identities {
 		if meta.Name == name {
 			return !meta.Synthetic

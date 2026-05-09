@@ -23,7 +23,7 @@ func writeFullReport(w io.Writer, k *knowledge.Knowledge) {
 	writeContactInfo(w, k)
 	writeDiscoveryTree(w, k)
 	writeEntityDetails(w, k)
-	writeTaggedProbeLog(w, k)
+	//writeTaggedProbeLog(w, k)
 	writeStaticAssets(w, k)
 	writeIdentityVault(w, k)
 

@@ -11,17 +11,18 @@ const (
 )
 
 const (
-	ReasonParamDiscovery  = "param discovery"
-	ReasonIDAdjacency     = "id adjacency"
-	ReasonIDEnum          = "id enumeration"
-	ReasonIdentityProbe   = "identity probe"
-	ReasonIdentityRefresh = "identity refresh"
-	ReasonMethodProbe     = "method probe"
-	ReasonPathIDProbe     = "path-id-probe"
-	ReasonPathIDSelfProbe = "path-id-self-probe"
-	ReasonLinkProbe       = "link"
-	ReasonRedirect        = "redirect"
-	ReasonJSFetch         = "js-fetch"
+	ReasonParamDiscovery      = "param discovery"
+	ReasonIDAdjacency         = "id adjacency"
+	ReasonIDEnum              = "id enumeration"
+	ReasonIdentityProbe       = "identity probe"
+	ReasonIdentityRefresh     = "identity refresh"
+	ReasonLiveIdentityRefresh = "live identity refresh"
+	ReasonMethodProbe         = "method probe"
+	ReasonPathIDProbe         = "path-id-probe"
+	ReasonPathIDSelfProbe     = "path-id-self-probe"
+	ReasonLinkProbe           = "link"
+	ReasonRedirect            = "redirect"
+	ReasonJSFetch             = "js-fetch"
 )
 
 const (

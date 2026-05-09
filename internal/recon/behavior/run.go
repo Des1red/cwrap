@@ -117,6 +117,8 @@ func (e *Engine) Run(base model.Request, url string) error {
 	e.baseStatus = resp.StatusCode
 	e.baseBody = body
 	e.baseFP = fpString(resp.StatusCode, body)
+	e.basePageFP = buildPageFP(baseReq.URL, resp, body)
+
 	ent.AddMethod(baseReq.Method)
 	e.int.Learn(baseReq.URL, resp, body)
 	e.Expand(ent)

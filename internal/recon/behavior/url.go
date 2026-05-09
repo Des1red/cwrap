@@ -96,3 +96,12 @@ func (e *Engine) registerURLQueryParams(ent *knowledge.Entity) {
 		ent.Tag(knowledge.SigHasQueryParams)
 	}
 }
+
+func isBootstrapLikeURL(raw string) bool {
+	l := strings.ToLower(raw)
+
+	return strings.Contains(l, "/login") ||
+		strings.Contains(l, "/signin") ||
+		strings.Contains(l, "/sign-in") ||
+		strings.Contains(l, "/auth/login")
+}

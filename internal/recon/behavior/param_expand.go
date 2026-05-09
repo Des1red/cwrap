@@ -357,17 +357,6 @@ func (e *Engine) expandIdentity(ent *knowledge.Entity) {
 		Priority: 150,
 	})
 
-	// invalid bearer
-	e.pushProbe(ent, knowledge.Probe{
-		URL:    ent.URL,
-		Method: "GET",
-		Headers: map[string]string{
-			"Authorization": "Bearer invalid",
-		},
-		Reason:   knowledge.ReasonIdentityProbe,
-		Priority: 150,
-	})
-
 	// role confusion attempts
 	roleHeaders := []string{"X-User-Role", "X-Forwarded-User"}
 
@@ -575,12 +564,19 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 			SourceURL:     ent.URL,
 		})
 
-		// neighbor probes — only once per template
-		if _, seen := e.probedPathTemplates[tmpl]; seen {
+		// Do not let generated path variants create more neighbors.
+		// They still get the self-probe above, but they do not expand the family.
+		if ent.State.IsPathVariant {
 			continue
 		}
-		e.probedPathTemplates[tmpl] = struct{}{}
 
+		// neighbor probes — only once per template
+		familyKey := pathIDProbeFamilyKey(tmpl, name, seg)
+
+		if _, seen := e.probedPathTemplates[familyKey]; seen {
+			continue
+		}
+		e.probedPathTemplates[familyKey] = struct{}{}
 		tests := []string{"0", "1", "-1"}
 		if id, err := strconv.Atoi(seg); err == nil {
 			tests = append(tests,
@@ -608,4 +604,8 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 			})
 		}
 	}
+}
+
+func pathIDProbeFamilyKey(tmpl, name, baseVal string) string {
+	return tmpl + "|" + name + "=" + baseVal
 }
