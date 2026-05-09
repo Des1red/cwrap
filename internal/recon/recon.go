@@ -37,6 +37,6 @@ func Run(req model.Request) error {
 		return err
 	}
 
-	report.CreateSummary(k)
+	report.CreateSummary(k, req.Flags.Debug)
 	return nil
 }

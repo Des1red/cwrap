@@ -7,8 +7,11 @@ import (
 	"strings"
 )
 
-func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response) {
-	id := &knowledge.Identity{Name: name}
+func extractIdentity(ent *knowledge.Entity, name string, resp *http.Response, synthetic bool) {
+	id := &knowledge.Identity{
+		Name:      name,
+		Synthetic: synthetic,
+	}
 
 	// ---- what client SENT ----
 	sentAuth := resp.Request.Header.Get("Authorization") != ""

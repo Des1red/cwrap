@@ -154,9 +154,21 @@ func (e *Engine) executeProbeIdentities(
 			probe.Reason == knowledge.ReasonLinkProbe)
 
 	for _, id := range e.identities {
-		if suppressSynthetic && id.Synthetic {
+		switch probe.IdentityKind {
+		case knowledge.ProbeIdentitySynthetic:
+			if !id.Synthetic {
+				continue
+			}
+		case knowledge.ProbeIdentityLive:
+			if id.Synthetic {
+				continue
+			}
+		}
+
+		if probe.IdentityKind != knowledge.ProbeIdentitySynthetic && suppressSynthetic && id.Synthetic {
 			continue
 		}
+
 		if e.debug {
 			println("[PROBE]", probe.URL, "as identity:", id.Name)
 		}
@@ -198,20 +210,21 @@ func (e *Engine) executeProbeIdentities(
 
 		probeFP[id.Name] = fpString(resp.StatusCode, body)
 		target.AddProbeLog(knowledge.ProbeLogEntry{
-			URL:      probeLogURL(reqID),
-			Method:   reqID.Method,
-			Reason:   probe.Reason,
-			Identity: id.Name,
-			Status:   resp.StatusCode,
-			FP:       probeFP[id.Name],
-			Location: resp.Header.Get("Location"),
+			URL:          probeLogURL(reqID),
+			Method:       reqID.Method,
+			Reason:       probe.Reason,
+			Identity:     id.Name,
+			IdentityKind: probe.IdentityKind,
+			Status:       resp.StatusCode,
+			FP:           probeFP[id.Name],
+			Location:     resp.Header.Get("Location"),
 		})
 
 		if isFallback {
 			continue
 		}
 
-		extractIdentity(target, id.Name, resp)
+		extractIdentity(target, id.Name, resp, id.Synthetic)
 		e.captureSession(target, id, resp, base.URL)
 		if !id.Synthetic {
 			e.ensureCorruptedCookieIdentity(base)

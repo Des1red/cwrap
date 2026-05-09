@@ -3,118 +3,8 @@ package report
 import (
 	"cwrap/internal/recon/knowledge"
 	"fmt"
-	"io"
 	"sort"
 )
-
-// ---- derivation helpers ----
-
-func sortedEntityURLs(k *knowledge.Knowledge) []string {
-	urls := make([]string, 0, len(k.Entities))
-	for u := range k.Entities {
-		urls = append(urls, u)
-	}
-	sort.Strings(urls)
-	return urls
-}
-
-func sortedKeys(m map[string]bool) []string {
-	if len(m) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(m))
-	for k, on := range m {
-		if on {
-			out = append(out, k)
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-func entityURLsBySignalCount(k *knowledge.Knowledge) []string {
-	urls := make([]string, 0, len(k.Entities))
-	for u := range k.Entities {
-		urls = append(urls, u)
-	}
-	sort.Slice(urls, func(i, j int) bool {
-		si := signalCount(k.Entities[urls[i]])
-		sj := signalCount(k.Entities[urls[j]])
-		if si != sj {
-			return si > sj // more signals first
-		}
-		return urls[i] < urls[j] // stable alpha fallback
-	})
-	return urls
-}
-
-func signalCount(ent *knowledge.Entity) int {
-	if ent == nil {
-		return 0
-	}
-	n := 0
-	for _, on := range ent.Signals.Tags {
-		if on {
-			n++
-		}
-	}
-	return n
-}
-
-func activeSignals(ent *knowledge.Entity) []string {
-	if ent == nil || len(ent.Signals.Tags) == 0 {
-		return nil
-	}
-	var out []string
-	for s, on := range ent.Signals.Tags {
-		if on {
-			out = append(out, s.String())
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-func identityKindLabel(k knowledge.IdentityKind) string {
-	switch k {
-	case knowledge.IdentityUnknown:
-		return "IdentityUnknown"
-	case knowledge.IdentityNone:
-		return "IdentityNone"
-	case knowledge.IdentityBootstrap:
-		return "IdentityBootstrap"
-	case knowledge.IdentityUser:
-		return "IdentityUser"
-	case knowledge.IdentityElevated:
-		return "IdentityElevated"
-	case knowledge.IdentityInvalid:
-		return "IdentityInvalid"
-	default:
-		return "IdentityKind(?)"
-	}
-}
-
-func emptyAsNone(s string) string {
-	if s == "" {
-		return "(none)"
-	}
-	return s
-}
-
-func writeStringIntMap(w io.Writer, prefix string, m map[string]int) {
-	if len(m) == 0 {
-		fmt.Fprintln(w, prefix+"(none)")
-		return
-	}
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		fmt.Fprintf(w, "%s%s: %d\n", prefix, k, m[k])
-	}
-}
 
 func deriveFindings(ent *knowledge.Entity) []string {
 	var out []string
@@ -313,24 +203,6 @@ func deriveNextSteps(ent *knowledge.Entity) []string {
 	return out
 }
 
-func isRealInputParam(p *knowledge.ParamIntel) bool {
-	if p == nil {
-		return false
-	}
-
-	return p.Sources[knowledge.ParamQuery] ||
-		p.Sources[knowledge.ParamPath] ||
-		p.Sources[knowledge.ParamForm]
-}
-
-func isResponseDerivedParam(p *knowledge.ParamIntel) bool {
-	if p == nil {
-		return false
-	}
-
-	return p.Sources[knowledge.ParamJSON] && !isRealInputParam(p)
-}
-
 func idorFindingParams(ent *knowledge.Entity) []string {
 	var primary []string
 	var fallback []string
@@ -362,6 +234,7 @@ func idorFindingParams(ent *knowledge.Entity) []string {
 	}
 	return fallback
 }
+
 func suspectIDORFindingParams(ent *knowledge.Entity) []string {
 	var primary []string
 	var fallback []string
@@ -392,4 +265,12 @@ func suspectIDORFindingParams(ent *knowledge.Entity) []string {
 		return primary
 	}
 	return fallback
+}
+
+func isResponseDerivedParam(p *knowledge.ParamIntel) bool {
+	if p == nil {
+		return false
+	}
+
+	return p.Sources[knowledge.ParamJSON] && !isRealInputParam(p)
 }

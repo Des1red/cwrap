@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+type ProbeIdentityKind int
+
+const (
+	ProbeIdentityAny ProbeIdentityKind = iota
+	ProbeIdentitySynthetic
+	ProbeIdentityLive
+)
+
 type Probe struct {
 	URL    string
 	Method string
@@ -18,8 +26,9 @@ type Probe struct {
 	Body          []byte
 	ContentType   string
 
-	Reason   string
-	Priority int
+	Reason       string
+	Priority     int
+	IdentityKind ProbeIdentityKind
 
 	Created time.Time
 
@@ -31,10 +40,11 @@ type ProbeQueue struct {
 }
 
 type ProbeLogEntry struct {
-	URL      string
-	Method   string
-	Reason   string
-	Identity string
+	URL          string
+	Method       string
+	Reason       string
+	Identity     string
+	IdentityKind ProbeIdentityKind
 
 	Status   int
 	FP       string
@@ -93,6 +103,7 @@ func (q *ProbeQueue) PopBest() (Probe, bool) {
 func (p Probe) Key() string {
 
 	key := p.Method + "|" + p.URL + "|" + p.Reason
+	key += fmt.Sprintf("|ik:%d", p.IdentityKind)
 
 	if len(p.AddQuery) > 0 {
 		keys := make([]string, 0, len(p.AddQuery))
@@ -152,6 +163,7 @@ func (e *Entity) AddProbeLog(p ProbeLogEntry) {
 			old.Method == p.Method &&
 			old.Reason == p.Reason &&
 			old.Identity == p.Identity &&
+			old.IdentityKind == p.IdentityKind &&
 			old.Status == p.Status &&
 			old.Location == p.Location &&
 			old.FP == p.FP {

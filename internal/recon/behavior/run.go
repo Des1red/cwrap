@@ -102,7 +102,7 @@ func (e *Engine) Run(base model.Request, url string) error {
 	e.registerURLQueryParams(ent)
 	if sessionResp != nil && ent.SessionUsed {
 		if meta, ok := e.identityMeta(knowledge.LiveSession); ok {
-			extractIdentity(ent, meta.Name, sessionResp)
+			extractIdentity(ent, meta.Name, sessionResp, meta.Synthetic)
 			// register session role|uid so it's never added as a live identity
 			if id := ent.Identities[knowledge.LiveSession]; id != nil {
 				roleUID := id.Role + "|" + id.UserID

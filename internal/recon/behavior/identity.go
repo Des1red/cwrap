@@ -201,11 +201,12 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 		}
 		// push with PathParams so storeResponse populates IdentityAccess/IdentityDenied
 		e.k.PushProbe(root, knowledge.Probe{
-			URL:        ent.URL,
-			Method:     "GET",
-			PathParams: pathParams,
-			Reason:     reason,
-			Priority:   155,
+			URL:          ent.URL,
+			Method:       "GET",
+			PathParams:   pathParams,
+			Reason:       reason,
+			Priority:     155,
+			IdentityKind: knowledge.ProbeIdentityLive,
 		})
 	}
 	// clear probed path templates so expandPathIDs re-runs on organically
@@ -238,10 +239,11 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 		// to rerun under the new identity
 		clearSeenPathIDProbeFamily(root.SeenProbes, ent, ent.URL)
 		e.k.PushProbe(root, knowledge.Probe{
-			URL:      ent.URL,
-			Method:   "GET",
-			Reason:   reason,
-			Priority: 155, // slightly below identity probes, above normal expansion
+			URL:          ent.URL,
+			Method:       "GET",
+			Reason:       reason,
+			Priority:     155, // slightly below identity probes, above normal expansion
+			IdentityKind: knowledge.ProbeIdentityLive,
 		})
 	}
 }
@@ -390,10 +392,11 @@ func (e *Engine) requeueSeenForNewIdentity() {
 		}
 
 		e.k.PushProbe(root, knowledge.Probe{
-			URL:      ent.URL,
-			Method:   "GET",
-			Reason:   knowledge.ReasonIdentityRefresh,
-			Priority: 156,
+			URL:          ent.URL,
+			Method:       "GET",
+			Reason:       knowledge.ReasonIdentityRefresh,
+			Priority:     156,
+			IdentityKind: knowledge.ProbeIdentitySynthetic,
 		})
 	}
 }

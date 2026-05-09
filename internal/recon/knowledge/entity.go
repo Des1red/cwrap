@@ -132,11 +132,12 @@ func (e *Entity) AddIdentity(id *Identity) {
 
 func identityFingerprint(id *Identity) string {
 	return fmt.Sprintf(
-		"%d|%s|%v|%v|%v",
+		"%d|%s|%v|%v|%v|%v",
 		id.Kind,
 		id.AuthScheme,
 		id.CookieNames,
 		id.HasCSRF,
 		id.Rejected,
+		id.Synthetic,
 	)
 }

@@ -25,6 +25,7 @@ const (
 	IdentityTagRejected    = "rejected"
 	IdentityTagIssuedToken = "issued-token"
 	IdentityTagEffective   = "effective"
+	IdentityTagSynthetic   = "synthetic"
 
 	IdentityTagCSRF           = "csrf"
 	IdentityTagCSRFToken      = "csrf-token"
@@ -33,12 +34,13 @@ const (
 )
 
 type Identity struct {
-	Name     string
-	Kind     IdentityKind
-	Role     string
-	UserID   string
-	Expiry   string
-	TokenJTI string
+	Name      string
+	Kind      IdentityKind
+	Role      string
+	UserID    string
+	Expiry    string
+	TokenJTI  string
+	Synthetic bool
 
 	// Mechanism fingerprint
 	CookieNames []string
