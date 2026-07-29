@@ -12,7 +12,6 @@ import (
 )
 
 func install() {
-	log.Println("First time run detected. Initializing first boot.")
 	ok1 := createconfig()
 	ok2 := createbinary()
 	if ok1 && ok2 {

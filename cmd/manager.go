@@ -9,7 +9,11 @@ import (
 )
 
 func boot() {
-	bootstrap.Init()
+	bootstrap.Init(false)
+}
+
+func uninstall() {
+	bootstrap.Uninstall()
 }
 
 func manFlags() {
@@ -19,6 +23,12 @@ func manFlags() {
 		os.Args[1] == "--help" {
 		logger.PrintHelp()
 		os.Exit(0)
+	}
+	if len(os.Args) > 1 && os.Args[1] == "--uninstall" {
+		uninstall()
+	}
+	if len(os.Args) > 1 && os.Args[1] == "--install" {
+		bootstrap.Init(true)
 	}
 	if os.Args[1] == "version" || os.Args[1] == "--version" {
 		fmt.Println(model.Version)

@@ -9,9 +9,8 @@ import (
 )
 
 func Execute() {
-
-	boot()
 	manFlags()
+	boot()
 
 	req := intent.Parse(os.Args)
 	handler := intent.Resolve(req)

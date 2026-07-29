@@ -2,12 +2,19 @@
 package bootstrap
 
 import (
+	"fmt"
 	"os"
 )
 
-func Init() {
+// bootstrap.go
+func Init(force bool) {
 	if ok := checkIfInstalled(); ok {
-		return
+		if !force {
+			return
+		}
+		fmt.Println("cwrap already installed, reinstalling.")
+	} else {
+		fmt.Println("First time run detected. Initializing first boot.")
 	}
 	install()
 }
