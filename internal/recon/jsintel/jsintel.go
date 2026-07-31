@@ -13,6 +13,7 @@ var (
 	reAWS    = regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`)
 	rePEM    = regexp.MustCompile(`-----BEGIN (?:RSA |EC |OPENSSH |)?PRIVATE KEY-----`)
 	reAssign = regexp.MustCompile(`(?i)\b(api[_-]?key|client[_-]?secret|secret|token|bearer|authorization|private[_-]?key|password)\b\s*[:=]\s*["']([^"'\n\r]{6,})["']`)
+	reEmail  = regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`)
 
 	// --- endpoint discovery ---
 	// fetch("/path")  -> method unknown (assume GET)
@@ -57,7 +58,7 @@ type JSEndpoint struct {
 	Kind   string // "fetch", "axios", "xhr", "literal"
 }
 
-func Learn(ent *knowledge.Entity, sourceURL string, body []byte) []JSEndpoint {
+func Learn(k *knowledge.Knowledge, ent *knowledge.Entity, sourceURL string, body []byte) []JSEndpoint {
 	if ent == nil {
 		return nil
 	}
@@ -116,6 +117,16 @@ func Learn(ent *knowledge.Entity, sourceURL string, body []byte) []JSEndpoint {
 		appendLeak(ent, "firebase", sourceURL, "firebase_config", "Firebase configuration block detected")
 	}
 
+	emails := reEmail.FindAllString(s, -1)
+	if len(emails) > 0 {
+		ent.Content.JSFindings["email"] += len(emails)
+		for _, email := range emails {
+			appendLeak(ent, "email", sourceURL, "", email)
+			if k != nil {
+				k.AddEmail(email)
+			}
+		}
+	}
 	// ----------------------------
 	// Endpoint discovery
 	// ----------------------------

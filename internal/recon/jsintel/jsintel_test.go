@@ -7,10 +7,12 @@ import (
 
 const sourceURL = "http://example.com/app.js"
 
-func newEnt() *knowledge.Entity {
-	return knowledge.NewEntity(sourceURL)
-}
+func newTestContext() (*knowledge.Knowledge, *knowledge.Entity) {
+	k := knowledge.New("http://example.com")
+	ent := k.Entity(sourceURL)
 
+	return k, ent
+}
 func hasLeak(ent *knowledge.Entity, kind, key string) bool {
 	for _, l := range ent.Content.JSLeaks {
 		if l.Kind == kind && (key == "" || l.Key == key) {
@@ -34,10 +36,10 @@ func hasEndpoint(eps []JSEndpoint, method, path string) bool {
 // -------------------------------------------------------
 
 func TestLearn_FetchEndpointDiscovered(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`fetch("/api/users")`)
 
-	eps := Learn(ent, sourceURL, body)
+	eps := Learn(k, ent, sourceURL, body)
 
 	if !hasEndpoint(eps, "GET", "/api/users") {
 		t.Error("expected fetch endpoint GET /api/users")
@@ -48,8 +50,8 @@ func TestLearn_FetchEndpointDiscovered(t *testing.T) {
 }
 
 func TestLearn_FetchSingleQuote(t *testing.T) {
-	ent := newEnt()
-	eps := Learn(ent, sourceURL, []byte(`fetch('/api/posts')`))
+	k, ent := newTestContext()
+	eps := Learn(k, ent, sourceURL, []byte(`fetch('/api/posts')`))
 	if !hasEndpoint(eps, "GET", "/api/posts") {
 		t.Error("expected fetch with single quotes to be discovered")
 	}
@@ -60,24 +62,24 @@ func TestLearn_FetchSingleQuote(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_AxiosGetDiscovered(t *testing.T) {
-	ent := newEnt()
-	eps := Learn(ent, sourceURL, []byte(`axios.get("/api/users")`))
+	k, ent := newTestContext()
+	eps := Learn(k, ent, sourceURL, []byte(`axios.get("/api/users")`))
 	if !hasEndpoint(eps, "GET", "/api/users") {
 		t.Error("expected axios GET endpoint")
 	}
 }
 
 func TestLearn_AxiosPostDiscovered(t *testing.T) {
-	ent := newEnt()
-	eps := Learn(ent, sourceURL, []byte(`axios.post("/api/users", data)`))
+	k, ent := newTestContext()
+	eps := Learn(k, ent, sourceURL, []byte(`axios.post("/api/users", data)`))
 	if !hasEndpoint(eps, "POST", "/api/users") {
 		t.Error("expected axios POST endpoint")
 	}
 }
 
 func TestLearn_AxiosDeleteDiscovered(t *testing.T) {
-	ent := newEnt()
-	eps := Learn(ent, sourceURL, []byte(`axios.delete("/api/users/1")`))
+	k, ent := newTestContext()
+	eps := Learn(k, ent, sourceURL, []byte(`axios.delete("/api/users/1")`))
 	if !hasEndpoint(eps, "DELETE", "/api/users/1") {
 		t.Error("expected axios DELETE endpoint")
 	}
@@ -88,16 +90,16 @@ func TestLearn_AxiosDeleteDiscovered(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_XHREndpointDiscovered(t *testing.T) {
-	ent := newEnt()
-	eps := Learn(ent, sourceURL, []byte(`xhr.open("POST", "/api/login")`))
+	k, ent := newTestContext()
+	eps := Learn(k, ent, sourceURL, []byte(`xhr.open("POST", "/api/login")`))
 	if !hasEndpoint(eps, "POST", "/api/login") {
 		t.Error("expected XHR POST endpoint")
 	}
 }
 
 func TestLearn_XHRGetDiscovered(t *testing.T) {
-	ent := newEnt()
-	eps := Learn(ent, sourceURL, []byte(`xhr.open("GET", "/api/status")`))
+	k, ent := newTestContext()
+	eps := Learn(k, ent, sourceURL, []byte(`xhr.open("GET", "/api/status")`))
 	if !hasEndpoint(eps, "GET", "/api/status") {
 		t.Error("expected XHR GET endpoint")
 	}
@@ -108,17 +110,17 @@ func TestLearn_XHRGetDiscovered(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_PathLiteralDiscovered(t *testing.T) {
-	ent := newEnt()
-	eps := Learn(ent, sourceURL, []byte(`var url = "/api/admin/users"`))
+	k, ent := newTestContext()
+	eps := Learn(k, ent, sourceURL, []byte(`var url = "/api/admin/users"`))
 	if !hasEndpoint(eps, "GET", "/api/admin/users") {
 		t.Error("expected path literal /api/admin/users to be discovered")
 	}
 }
 
 func TestLearn_PathLiteralFilteredForNonInteresting(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	// paths not matching the sensitive prefix filter should not appear
-	eps := Learn(ent, sourceURL, []byte(`var url = "/static/logo.png"`))
+	eps := Learn(k, ent, sourceURL, []byte(`var url = "/static/logo.png"`))
 	if hasEndpoint(eps, "GET", "/static/logo.png") {
 		t.Error("non-interesting path /static/logo.png should not be discovered")
 	}
@@ -129,13 +131,13 @@ func TestLearn_PathLiteralFilteredForNonInteresting(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_DuplicateEndpointsDeduped(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`
 		fetch("/api/users")
 		fetch("/api/users")
 		axios.get("/api/users")
 	`)
-	eps := Learn(ent, sourceURL, body)
+	eps := Learn(k, ent, sourceURL, body)
 
 	count := 0
 	for _, ep := range eps {
@@ -153,10 +155,10 @@ func TestLearn_DuplicateEndpointsDeduped(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_JWTDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`var token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if !ent.SeenSignal(knowledge.SigSensitiveKeyword) {
 		t.Error("expected SigSensitiveKeyword for JWT")
@@ -174,10 +176,10 @@ func TestLearn_JWTDetected(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_AWSKeyDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`const accessKey = "AKIAIOSFODNN7EXAMPLE"`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if !ent.SeenSignal(knowledge.SigSensitiveKeyword) {
 		t.Error("expected SigSensitiveKeyword for AWS key")
@@ -192,10 +194,10 @@ func TestLearn_AWSKeyDetected(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_PEMKeyDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`var key = "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0..."`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if !ent.SeenSignal(knowledge.SigSensitiveKeyword) {
 		t.Error("expected SigSensitiveKeyword for PEM key")
@@ -210,10 +212,10 @@ func TestLearn_PEMKeyDetected(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_APIKeyAssignmentDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`var api_key = "sk-supersecretvalue123"`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if !ent.SeenSignal(knowledge.SigSensitiveKeyword) {
 		t.Error("expected SigSensitiveKeyword for api_key assignment")
@@ -224,10 +226,10 @@ func TestLearn_APIKeyAssignmentDetected(t *testing.T) {
 }
 
 func TestLearn_PasswordAssignmentDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`const password = "hunter2secret"`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if !hasLeak(ent, "keyword", "password") {
 		t.Error("expected keyword leak with key=password")
@@ -239,10 +241,10 @@ func TestLearn_PasswordAssignmentDetected(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_RoleComparisonDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`if (user.role === "admin") { showPanel(); }`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["role_check"] < 1 {
 		t.Error("expected role_check finding")
@@ -253,10 +255,10 @@ func TestLearn_RoleComparisonDetected(t *testing.T) {
 }
 
 func TestLearn_IsAdminBoolDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`if (isAdmin === true) { renderAdminUI(); }`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["priv_flag"] < 1 {
 		t.Error("expected priv_flag finding for isAdmin")
@@ -264,10 +266,10 @@ func TestLearn_IsAdminBoolDetected(t *testing.T) {
 }
 
 func TestLearn_PrivGateDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`if (claims.role && isAdmin) { next(); }`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["priv_gate"] < 1 {
 		t.Error("expected priv_gate finding")
@@ -279,10 +281,10 @@ func TestLearn_PrivGateDetected(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_ProcessEnvDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`const url = process.env.API_URL`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["env_ref"] < 1 {
 		t.Error("expected env_ref finding for process.env")
@@ -293,10 +295,10 @@ func TestLearn_ProcessEnvDetected(t *testing.T) {
 }
 
 func TestLearn_ViteEnvDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`const key = import.meta.env.VITE_API_KEY`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["env_ref"] < 1 {
 		t.Error("expected env_ref finding for import.meta.env")
@@ -304,10 +306,10 @@ func TestLearn_ViteEnvDetected(t *testing.T) {
 }
 
 func TestLearn_PublicEnvDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`const key = NEXT_PUBLIC_API_URL`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["env_public"] < 1 {
 		t.Error("expected env_public finding for NEXT_PUBLIC_*")
@@ -319,10 +321,10 @@ func TestLearn_PublicEnvDetected(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_InternalDomainDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`const api = "http://backend.internal/api"`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["host_internal"] < 1 {
 		t.Error("expected host_internal finding")
@@ -333,10 +335,10 @@ func TestLearn_InternalDomainDetected(t *testing.T) {
 }
 
 func TestLearn_RFC1918IPDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`const host = "192.168.1.100:8080"`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["host_private_ip"] < 1 {
 		t.Error("expected host_private_ip finding")
@@ -344,10 +346,10 @@ func TestLearn_RFC1918IPDetected(t *testing.T) {
 }
 
 func TestLearn_HardcodedURLDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`const endpoint = "https://api.example.com/v1/users"`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["host_url"] < 1 {
 		t.Error("expected host_url finding")
@@ -359,10 +361,10 @@ func TestLearn_HardcodedURLDetected(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_FeatureTokenDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`if (FEATURE_DARK_MODE) { applyTheme(); }`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["feature_token"] < 1 {
 		t.Error("expected feature_token finding")
@@ -370,10 +372,10 @@ func TestLearn_FeatureTokenDetected(t *testing.T) {
 }
 
 func TestLearn_FeatureFlagBlockDetected(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	body := []byte(`const flags = { darkMode: true, betaFeature: false }`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	if ent.Content.JSFindings["feature_block"] < 1 {
 		t.Error("expected feature_block finding")
@@ -385,15 +387,15 @@ func TestLearn_FeatureFlagBlockDetected(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_NilEntityReturnsNil(t *testing.T) {
-	eps := Learn(nil, sourceURL, []byte(`fetch("/api/users")`))
+	eps := Learn(nil, nil, sourceURL, []byte(`fetch("/api/users")`))
 	if eps != nil {
 		t.Error("expected nil return for nil entity")
 	}
 }
 
 func TestLearn_EmptyBodyNoFindings(t *testing.T) {
-	ent := newEnt()
-	eps := Learn(ent, sourceURL, []byte{})
+	k, ent := newTestContext()
+	eps := Learn(k, ent, sourceURL, []byte{})
 
 	if len(eps) != 0 {
 		t.Errorf("expected no endpoints from empty body, got %d", len(eps))
@@ -408,14 +410,14 @@ func TestLearn_EmptyBodyNoFindings(t *testing.T) {
 // -------------------------------------------------------
 
 func TestLearn_DuplicateLeaksDeduplicated(t *testing.T) {
-	ent := newEnt()
+	k, ent := newTestContext()
 	// same AWS key appears twice
 	body := []byte(`
 		const key1 = "AKIAIOSFODNN7EXAMPLE"
 		const key2 = "AKIAIOSFODNN7EXAMPLE"
 	`)
 
-	Learn(ent, sourceURL, body)
+	Learn(k, ent, sourceURL, body)
 
 	count := 0
 	for _, l := range ent.Content.JSLeaks {
@@ -425,5 +427,32 @@ func TestLearn_DuplicateLeaksDeduplicated(t *testing.T) {
 	}
 	if count != 1 {
 		t.Errorf("expected 1 deduplicated aws_key leak, got %d", count)
+	}
+}
+
+// -------------------------------------------------------
+// Email leaks
+// -------------------------------------------------------
+
+func TestLearn_EmailAddedToKnowledge(t *testing.T) {
+	k, ent := newTestContext()
+
+	body := []byte(`
+		const owner = "admin@example.com"
+		const duplicate = "admin@example.com"
+	`)
+
+	Learn(k, ent, sourceURL, body)
+
+	if !k.Emails["admin@example.com"] {
+		t.Error("expected email in global knowledge")
+	}
+
+	if len(k.Emails) != 1 {
+		t.Errorf("expected 1 deduplicated email, got %d", len(k.Emails))
+	}
+
+	if !hasLeak(ent, "email", "") {
+		t.Error("expected email leak attached to entity")
 	}
 }
