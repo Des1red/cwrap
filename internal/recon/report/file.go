@@ -12,10 +12,14 @@ import (
 
 // CreateFileReport writes the full report (tree + deep per-entity analysis) to a file.
 // No hidden data, no exceptions.
-func CreateFileReport(k *knowledge.Knowledge, debug bool) (string, error) {
+func CreateFileReport(
+	k *knowledge.Knowledge,
+	debug bool,
+) (string, error) {
 	if k == nil {
 		return "", fmt.Errorf("nil knowledge")
 	}
+
 	if err := ensureDir(); err != nil {
 		return "", err
 	}
@@ -24,9 +28,16 @@ func CreateFileReport(k *knowledge.Knowledge, debug bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
 
 	writeFullReport(f, k, debug)
+
+	if err := f.Close(); err != nil {
+		return path, fmt.Errorf("close report file: %w", err)
+	}
+
+	if _, _, err := writeAbnormalResponses(k, path); err != nil {
+		return path, err
+	}
 
 	return path, nil
 }

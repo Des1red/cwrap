@@ -4,16 +4,17 @@ import "cwrap/internal/recon/knowledge"
 
 // learnProbeImpact increases Interest for params whose injected values changed behavior.
 // probeFP: identityName -> fingerprint(status+bodyhash)
-// ref: reference fingerprint (usually no-cred fp for the probe)
-func (e *Engine) learnProbeImpact(ent *knowledge.Entity, probe knowledge.Probe, probeFP map[string]string, ref string) {
-	if ref == "" || len(probe.AddQuery) == 0 {
+// reference contains the deterministic no-credential response for this probe.
+func (e *Engine) learnProbeImpact(ent *knowledge.Entity, probe knowledge.Probe, probeFP map[string]string, reference probeReference, hasReference bool) {
+	if !hasReference ||
+		(len(probe.AddQuery) == 0 && len(probe.PathParams) == 0) {
 		return
 	}
 
 	// Did ANY identity differ from the reference for this probe?
 	changed := false
 	for _, fp := range probeFP {
-		if fp != "" && fp != ref {
+		if fp != "" && fp != reference.Fingerprint {
 			changed = true
 			break
 		}

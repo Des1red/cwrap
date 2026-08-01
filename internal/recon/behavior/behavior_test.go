@@ -1,6 +1,7 @@
 package behavior
 
 import (
+	"bytes"
 	"cwrap/internal/recon/canonicalize"
 	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/tokens"
@@ -416,10 +417,26 @@ func TestLearnProbeImpact_ChangedFingerprintIncreasesInterest(t *testing.T) {
 		AddQuery: map[string]string{"id": "1"},
 	}
 
-	e.learnProbeImpact(ent, probe, map[string]string{
-		"baseline": "200:aaaa",
-		"authed":   "200:bbbb",
-	}, "200:aaaa")
+	reference := probeReference{
+		Identity:    "baseline",
+		Fingerprint: "200:aaaa",
+		Evidence: probeResponseEvidence{
+			Body:        []byte(`{"error":"unauthorized"}`),
+			ContentType: "application/json",
+			Status:      200,
+		},
+	}
+
+	e.learnProbeImpact(
+		ent,
+		probe,
+		map[string]string{
+			"baseline": "200:aaaa",
+			"authed":   "200:bbbb",
+		},
+		reference,
+		true,
+	)
 
 	p := ent.Params["id"]
 	if p.Interest < 1 {
@@ -441,10 +458,26 @@ func TestLearnProbeImpact_SameFingerprintNoChange(t *testing.T) {
 		AddQuery: map[string]string{"id": "1"},
 	}
 
-	e.learnProbeImpact(ent, probe, map[string]string{
-		"baseline": "200:aaaa",
-		"authed":   "200:aaaa",
-	}, "200:aaaa")
+	reference := probeReference{
+		Identity:    "baseline",
+		Fingerprint: "200:aaaa",
+		Evidence: probeResponseEvidence{
+			Body:        []byte(`{"result":"same"}`),
+			ContentType: "application/json",
+			Status:      200,
+		},
+	}
+
+	e.learnProbeImpact(
+		ent,
+		probe,
+		map[string]string{
+			"baseline": "200:aaaa",
+			"authed":   "200:aaaa",
+		},
+		reference,
+		true,
+	)
 
 	if ent.Params["id"].Interest != 0 {
 		t.Error("expected no Interest change when fingerprints are identical")
@@ -462,12 +495,219 @@ func TestLearnProbeImpact_InjectedOnlyParamSkipped(t *testing.T) {
 		AddQuery: map[string]string{"injected_param": "1"},
 	}
 
-	e.learnProbeImpact(ent, probe, map[string]string{
-		"baseline": "200:aaaa",
-		"authed":   "200:bbbb",
-	}, "200:aaaa")
+	reference := probeReference{
+		Identity:    "baseline",
+		Fingerprint: "200:aaaa",
+		Evidence: probeResponseEvidence{
+			Body:        []byte(`{"result":"baseline"}`),
+			ContentType: "application/json",
+			Status:      200,
+		},
+	}
+
+	e.learnProbeImpact(
+		ent,
+		probe,
+		map[string]string{
+			"baseline": "200:aaaa",
+			"authed":   "200:bbbb",
+		},
+		reference,
+		true,
+	)
 
 	if ent.Params["injected_param"].Interest != 0 {
 		t.Error("expected no Interest change for injected-only param")
+	}
+}
+
+func TestLearnProbeImpact_NoReferenceNoChange(t *testing.T) {
+	e := testEngine()
+	ent := e.k.Entity("http://example.com/api/users")
+	ent.AddParam("id", knowledge.ParamJSON)
+
+	probe := knowledge.Probe{
+		URL:      "http://example.com/api/users",
+		Method:   "GET",
+		AddQuery: map[string]string{"id": "1"},
+	}
+
+	e.learnProbeImpact(
+		ent,
+		probe,
+		map[string]string{
+			"baseline": "200:aaaa",
+			"authed":   "200:bbbb",
+		},
+		probeReference{},
+		false,
+	)
+
+	if ent.Params["id"].Interest != 0 {
+		t.Error("expected no Interest change without a valid reference")
+	}
+}
+
+func TestLearnProbeImpact_PathParamIncreasesInterest(t *testing.T) {
+	e := testEngine()
+
+	source := e.k.Entity("http://example.com/api/users/1")
+	source.AddParam("user_id", knowledge.ParamPath)
+	source.Params["user_id"].IDLike = true
+
+	target := e.k.Entity("http://example.com/api/users/2")
+
+	probe := knowledge.Probe{
+		URL:           target.URL,
+		Method:        "GET",
+		PathParams:    map[string]string{"user_id": "2"},
+		PathParamBase: map[string]string{"user_id": "1"},
+		SourceURL:     source.URL,
+	}
+
+	reference := probeReference{
+		Identity:    "anonymous",
+		Fingerprint: "200:aaaa",
+		Evidence: probeResponseEvidence{
+			Body:        []byte(`{"id":1}`),
+			ContentType: "application/json",
+			Status:      200,
+		},
+	}
+
+	e.learnProbeImpact(
+		target,
+		probe,
+		map[string]string{
+			"anonymous": "200:aaaa",
+			"session":   "200:bbbb",
+		},
+		reference,
+		true,
+	)
+
+	if source.Params["user_id"].Interest != 1 {
+		t.Fatalf(
+			"expected path param Interest=1, got %d",
+			source.Params["user_id"].Interest,
+		)
+	}
+
+	if !source.Params["user_id"].ObservedChanges["input-affects-response"] {
+		t.Error("expected input-affects-response change for path param")
+	}
+}
+
+// -------------------------------------------------------
+// analyzeAbnormalResponses
+// -------------------------------------------------------
+
+func TestAnalyzeAbnormalResponses_LargerDifferentResponseRecorded(t *testing.T) {
+	e := testEngine()
+
+	targetURL := "http://example.com/api/users"
+	target := e.k.Entity(targetURL)
+
+	e.identities = []Identity{
+		{Name: "anonymous"},
+		{Name: "session"},
+	}
+
+	referenceBody := []byte(`{"error":"unauthorized"}`)
+	candidateBody := bytes.Repeat([]byte("A"), 12*1024)
+
+	referenceFP := fpString(401, referenceBody)
+	candidateFP := fpString(200, candidateBody)
+
+	reference := probeReference{
+		Identity:    "anonymous",
+		Fingerprint: referenceFP,
+		Evidence: probeResponseEvidence{
+			URL:         targetURL,
+			Method:      "GET",
+			Body:        referenceBody,
+			ContentType: "application/json",
+			Status:      401,
+		},
+	}
+
+	evidence := map[string]probeResponseEvidence{
+		"anonymous": reference.Evidence,
+		"session": {
+			URL:         targetURL,
+			Method:      "GET",
+			Body:        candidateBody,
+			ContentType: "application/json",
+			Status:      200,
+		},
+	}
+
+	probeFP := map[string]string{
+		"anonymous": referenceFP,
+		"session":   candidateFP,
+	}
+
+	e.analyzeAbnormalResponses(
+		target,
+		probeFP,
+		evidence,
+		reference,
+		true,
+	)
+
+	if len(target.AbnormalResponses) != 1 {
+		t.Fatalf(
+			"expected 1 abnormal response, got %d",
+			len(target.AbnormalResponses),
+		)
+	}
+
+	got := target.AbnormalResponses[0]
+
+	if got.URL != targetURL {
+		t.Errorf("expected URL %q, got %q", targetURL, got.URL)
+	}
+
+	if got.Method != "GET" {
+		t.Errorf("expected method GET, got %q", got.Method)
+	}
+
+	if got.Identity != "session" {
+		t.Errorf("expected identity session, got %q", got.Identity)
+	}
+
+	if got.Status != 200 {
+		t.Errorf("expected status 200, got %d", got.Status)
+	}
+
+	if got.ContentType != "application/json" {
+		t.Errorf(
+			"expected content type application/json, got %q",
+			got.ContentType,
+		)
+	}
+
+	if got.BodySize != len(candidateBody) {
+		t.Errorf(
+			"expected body size %d, got %d",
+			len(candidateBody),
+			got.BodySize,
+		)
+	}
+
+	if got.Fingerprint != candidateFP {
+		t.Errorf(
+			"expected fingerprint %q, got %q",
+			candidateFP,
+			got.Fingerprint,
+		)
+	}
+
+	if !bytes.Equal(got.Body, candidateBody) {
+		t.Error("stored abnormal body does not match candidate body")
+	}
+
+	if got.Reason == "" {
+		t.Error("expected abnormal response reason")
 	}
 }

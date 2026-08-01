@@ -13,10 +13,22 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 	fmt.Fprintln(w, "------------------------------------------------")
 
 	urls := sortedEntityURLs(k)
+
+	abnormalResponseCount := 0
+	for _, u := range urls {
+		ent := k.Entities[u]
+		if ent == nil {
+			continue
+		}
+
+		abnormalResponseCount += len(ent.AbnormalResponses)
+	}
+
 	fmt.Fprintf(w, "Entities:          %d\n", len(urls))
 	fmt.Fprintf(w, "Static assets:     %d\n", len(k.StaticAssets))
 	fmt.Fprintf(w, "Edges:             %d\n", len(k.Edges))
 	fmt.Fprintf(w, "Global parameters: %d\n", len(k.Params))
+	fmt.Fprintf(w, "Abnormal responses:  %d\n", abnormalResponseCount)
 
 	sigCounts := make(map[string]int)
 	for _, u := range urls {

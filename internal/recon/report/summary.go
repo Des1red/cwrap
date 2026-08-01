@@ -14,16 +14,17 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 
 	// Global counts / flags
 	var (
-		entityCount         = len(urls)
-		edgeCount           = len(k.Edges)
-		globalParamCnt      = len(k.Params)
-		hasAuthBoundary     = false
-		hasRoleBoundary     = false
-		hasOwnership        = false
-		hasCredlessIssuance = false
-		possibleIDOR        = 0
-		adminSurface        = 0
-		jsLeakCount         = 0
+		entityCount           = len(urls)
+		edgeCount             = len(k.Edges)
+		globalParamCnt        = len(k.Params)
+		hasAuthBoundary       = false
+		hasRoleBoundary       = false
+		hasOwnership          = false
+		hasCredlessIssuance   = false
+		possibleIDOR          = 0
+		adminSurface          = 0
+		jsLeakCount           = 0
+		abnormalResponseCount = 0
 	)
 
 	for _, u := range urls {
@@ -63,7 +64,7 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 		if ent.SeenSignal(knowledge.SigAdminSurface) || strings.Contains(strings.ToLower(ent.URL), "admin") {
 			adminSurface++
 		}
-
+		abnormalResponseCount += len(ent.AbnormalResponses)
 		jsLeakCount += len(ent.Content.JSLeaks)
 	}
 
@@ -89,6 +90,7 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 	fmt.Fprintf(w, "IDOR surfaces:       %d\n", possibleIDOR)
 	fmt.Fprintf(w, "Admin surfaces:      %d\n", adminSurface)
 	fmt.Fprintf(w, "JS leaks:            %d\n", jsLeakCount)
+	fmt.Fprintf(w, "Abnormal responses: %d\n", abnormalResponseCount)
 	fmt.Fprintf(w, "Credentialless issuance: %v\n", yesNo(hasCredlessIssuance))
 
 	public := 0

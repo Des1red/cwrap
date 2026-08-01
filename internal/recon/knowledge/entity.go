@@ -34,6 +34,9 @@ type Entity struct {
 	// accumulated across all probes for structural behavior analysis
 	AccumResponses map[string]map[string]map[string][]byte
 	AccumStatuses  map[string]map[string]map[string]int
+
+	AbnormalResponses     []AbnormalResponse
+	SeenAbnormalResponses map[string]bool
 }
 
 func (e *Entity) Tag(s Signal) {
@@ -64,15 +67,17 @@ func NewEntity(url string) *Entity {
 		Signals: Signals{
 			Tags: make(map[Signal]bool),
 		},
-		Params:         make(map[string]*ParamIntel),
-		ProbeQueue:     ProbeQueue{},
-		SeenProbes:     make(map[string]bool),
-		ProbeLog:       make([]ProbeLogEntry, 0, 32),
-		Identities:     make(map[string]*Identity),
-		IdentityIndex:  make(map[string]*Identity),
-		SessionCookies: make(map[string]string),
-		AccumResponses: make(map[string]map[string]map[string][]byte),
-		AccumStatuses:  make(map[string]map[string]map[string]int),
+		Params:                make(map[string]*ParamIntel),
+		ProbeQueue:            ProbeQueue{},
+		SeenProbes:            make(map[string]bool),
+		ProbeLog:              make([]ProbeLogEntry, 0, 32),
+		Identities:            make(map[string]*Identity),
+		IdentityIndex:         make(map[string]*Identity),
+		SessionCookies:        make(map[string]string),
+		AccumResponses:        make(map[string]map[string]map[string][]byte),
+		AccumStatuses:         make(map[string]map[string]map[string]int),
+		AbnormalResponses:     make([]AbnormalResponse, 0),
+		SeenAbnormalResponses: make(map[string]bool),
 	}
 }
 

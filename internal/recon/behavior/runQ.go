@@ -67,8 +67,7 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 		}
 		req := e.buildProbeRequest(base, probe)
 
-		responses, statuses, identityStatuses, probeFP := e.executeProbeIdentities(req, probe, target, root, base)
-
+		responses, statuses, identityStatuses, probeFP, evidence := e.executeProbeIdentities(req, probe, target, root, base)
 		e.detectEndpointAuthGate(identityStatuses, probeFP)
 		e.detectRoleBoundary(target, identityStatuses)
 		e.detectAuthBoundary(target, identityStatuses)
@@ -78,12 +77,40 @@ func (e *Engine) runQueuedProbes(base model.Request, url string) error {
 			e.classifyProbeParams(probe, target)
 		}
 
-		ref := e.resolveRef(target, probeFP)
-		e.markEffectiveIdentities(target, probeFP, ref)
+		reference, hasReference := e.resolveProbeReference(
+			target,
+			probeFP,
+			evidence,
+		)
+
+		e.markEffectiveIdentities(
+			target,
+			probeFP,
+			reference,
+			hasReference,
+		)
 
 		if !target.State.IsSPAFallback {
-			e.runProbeAnalyzers(target, probe, responses, statuses)
-			e.learnProbeImpact(target, probe, probeFP, ref)
+			e.analyzeAbnormalResponses(
+				target,
+				probeFP,
+				evidence,
+				reference,
+				hasReference,
+			)
+			e.runProbeAnalyzers(
+				target,
+				probe,
+				responses,
+				statuses,
+			)
+			e.learnProbeImpact(
+				target,
+				probe,
+				probeFP,
+				reference,
+				hasReference,
+			)
 		}
 
 		e.Expand(target)
@@ -135,11 +162,13 @@ func (e *Engine) executeProbeIdentities(
 	statuses map[string]map[string]map[string]int,
 	identityStatuses map[string]int,
 	probeFP map[string]string,
+	evidence map[string]probeResponseEvidence,
 ) {
 	responses = map[string]map[string]map[string][]byte{}
 	statuses = map[string]map[string]map[string]int{}
 	identityStatuses = map[string]int{}
 	probeFP = map[string]string{}
+	evidence = map[string]probeResponseEvidence{}
 
 	if e.debug {
 		println("== Running probe:", probe.Method, probe.URL)
@@ -224,6 +253,14 @@ func (e *Engine) executeProbeIdentities(
 			continue
 		}
 
+		evidence[id.Name] = probeResponseEvidence{
+			URL:         probeLogURL(reqID),
+			Method:      reqID.Method,
+			Body:        body,
+			ContentType: resp.Header.Get("Content-Type"),
+			Status:      resp.StatusCode,
+		}
+
 		extractIdentity(target, id.Name, resp, id.Synthetic)
 		e.captureSession(target, id, resp, base.URL)
 		if !id.Synthetic {
@@ -266,28 +303,66 @@ func (e *Engine) classifyProbeParams(probe knowledge.Probe, target *knowledge.En
 	}
 }
 
-func (e *Engine) resolveRef(target *knowledge.Entity, probeFP map[string]string) string {
-	for name, fp := range probeFP {
-		kid := target.Identities[name]
-		if kid != nil && !kid.SentCreds && fp != "" {
-			return fp
+func (e *Engine) resolveProbeReference(
+	target *knowledge.Entity,
+	probeFP map[string]string,
+	evidence map[string]probeResponseEvidence,
+) (probeReference, bool) {
+	// Prefer a response from an identity that sent no credentials.
+	for _, id := range e.identities {
+		fp := probeFP[id.Name]
+		ev, ok := evidence[id.Name]
+
+		if fp == "" || !ok {
+			continue
+		}
+
+		kid := target.Identities[id.Name]
+		if kid != nil && !kid.SentCreds {
+			return probeReference{
+				Identity:    id.Name,
+				Fingerprint: fp,
+				Evidence:    ev,
+			}, true
 		}
 	}
-	for _, fp := range probeFP {
-		if fp != "" {
-			return fp
+
+	// Fall back to the first executed identity with complete evidence.
+	for _, id := range e.identities {
+		fp := probeFP[id.Name]
+		ev, ok := evidence[id.Name]
+
+		if fp == "" || !ok {
+			continue
 		}
+
+		return probeReference{
+			Identity:    id.Name,
+			Fingerprint: fp,
+			Evidence:    ev,
+		}, true
 	}
-	return ""
+
+	return probeReference{}, false
 }
 
-func (e *Engine) markEffectiveIdentities(target *knowledge.Entity, probeFP map[string]string, ref string) {
+func (e *Engine) markEffectiveIdentities(
+	target *knowledge.Entity,
+	probeFP map[string]string,
+	reference probeReference,
+	hasReference bool,
+) {
+	if !hasReference {
+		return
+	}
+
 	for name, fp := range probeFP {
 		kid := target.Identities[name]
 		if kid == nil {
 			continue
 		}
-		if fp != "" && ref != "" && fp != ref {
+
+		if fp != "" && fp != reference.Fingerprint {
 			kid.Effective = true
 			target.Tag(knowledge.SigStateChanging)
 		}
