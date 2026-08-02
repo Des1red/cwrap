@@ -444,3 +444,167 @@ func TestExtractEndpointsHybridResolvesFunctionArgument(t *testing.T) {
 		)
 	}
 }
+
+func TestExtractEndpointsHybridResolvesVariableArgument(t *testing.T) {
+	source := []byte(`
+		const endpoint = "/api/users";
+
+		function request(url) {
+			return fetch(url);
+		}
+
+		request(endpoint);
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
+	}
+
+	if len(result.Endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 endpoint, got %d: %#v",
+			len(result.Endpoints),
+			result.Endpoints,
+		)
+	}
+
+	endpoint := result.Endpoints[0]
+
+	if endpoint.Path != "/api/users" {
+		t.Fatalf("expected /api/users, got %q", endpoint.Path)
+	}
+
+	if endpoint.Kind != "fetch-dataflow-ast" {
+		t.Fatalf(
+			"expected fetch-dataflow-ast, got %q",
+			endpoint.Kind,
+		)
+	}
+}
+
+func TestExtractEndpointsHybridResolvesObjectPropertyArgument(
+	t *testing.T,
+) {
+	source := []byte(`
+		async function request(options) {
+			return fetch(options.url);
+		}
+
+		request({
+			url: "/api/users",
+		});
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
+	}
+
+	if len(result.Endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 endpoint, got %d: %#v",
+			len(result.Endpoints),
+			result.Endpoints,
+		)
+	}
+
+	endpoint := result.Endpoints[0]
+
+	if endpoint.Method != "GET" {
+		t.Fatalf("expected GET, got %q", endpoint.Method)
+	}
+
+	if endpoint.Path != "/api/users" {
+		t.Fatalf("expected /api/users, got %q", endpoint.Path)
+	}
+
+	if endpoint.Kind != "fetch-object-dataflow-ast" {
+		t.Fatalf(
+			"expected fetch-object-dataflow-ast, got %q",
+			endpoint.Kind,
+		)
+	}
+}
+
+func TestExtractEndpointsHybridResolvesFetchMethodParameter(
+	t *testing.T,
+) {
+	source := []byte(`
+		function request(url, method) {
+			return fetch(url, { method });
+		}
+
+		request("/api/users", "POST");
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
+	}
+
+	if len(result.Endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 endpoint, got %d: %#v",
+			len(result.Endpoints),
+			result.Endpoints,
+		)
+	}
+
+	endpoint := result.Endpoints[0]
+
+	if endpoint.Method != "POST" {
+		t.Fatalf("expected POST, got %q", endpoint.Method)
+	}
+
+	if endpoint.Path != "/api/users" {
+		t.Fatalf("expected /api/users, got %q", endpoint.Path)
+	}
+}
+
+func TestExtractEndpointsHybridResolvesObjectMethodProperty(
+	t *testing.T,
+) {
+	source := []byte(`
+		function request(options) {
+			return fetch(options.url, {
+				method: options.method,
+			});
+		}
+
+		request({
+			url: "/api/users",
+			method: "POST",
+		});
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
+	}
+
+	if len(result.Endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 endpoint, got %d: %#v",
+			len(result.Endpoints),
+			result.Endpoints,
+		)
+	}
+
+	endpoint := result.Endpoints[0]
+
+	if endpoint.Method != "POST" {
+		t.Fatalf("expected POST, got %q", endpoint.Method)
+	}
+
+	if endpoint.Path != "/api/users" {
+		t.Fatalf("expected /api/users, got %q", endpoint.Path)
+	}
+
+	if endpoint.Kind != "fetch-object-dataflow-ast" {
+		t.Fatalf(
+			"expected fetch-object-dataflow-ast, got %q",
+			endpoint.Kind,
+		)
+	}
+}
