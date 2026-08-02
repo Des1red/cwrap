@@ -1,0 +1,406 @@
+package jsintel
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestParseJavaScriptTreeValidSource(t *testing.T) {
+	source := []byte(`
+		const endpoint = "/api/users";
+		fetch(endpoint);
+	`)
+
+	tree, err := parseJavaScriptTree(source)
+	if err != nil {
+		t.Fatalf("parseJavaScriptTree returned error: %v", err)
+	}
+	defer tree.Close()
+
+	root := tree.RootNode()
+
+	if root == nil {
+		t.Fatal("expected non-null root node")
+	}
+
+	if root.Kind() != "program" {
+		t.Fatalf("expected root kind program, got %q", root.Kind())
+	}
+
+	if root.HasError() {
+		t.Fatal("expected valid JavaScript tree without errors")
+	}
+}
+
+func TestParseJavaScriptTreeMalformedSourceStillReturnsTree(t *testing.T) {
+	source := []byte(`
+		const endpoint = "/api/users";
+		fetch(endpoint);
+
+		function broken( {
+	`)
+
+	tree, err := parseJavaScriptTree(source)
+	if err != nil {
+		t.Fatalf("expected tree despite malformed source, got error: %v", err)
+	}
+	defer tree.Close()
+
+	root := tree.RootNode()
+
+	if root == nil {
+		t.Fatal("expected non-null root node")
+	}
+
+	if !root.HasError() {
+		t.Fatal("expected malformed source to produce error nodes")
+	}
+}
+
+func TestParseJavaScriptTreeEmptySource(t *testing.T) {
+	tree, err := parseJavaScriptTree(nil)
+	if err != nil {
+		t.Fatalf("parseJavaScriptTree returned error: %v", err)
+	}
+	defer tree.Close()
+
+	root := tree.RootNode()
+
+	if root == nil {
+		t.Fatal("expected non-null root node")
+	}
+
+	if root.Kind() != "program" {
+		t.Fatalf("expected root kind program, got %q", root.Kind())
+	}
+}
+
+func TestFindHTTPCallScopesFetchFunction(t *testing.T) {
+	source := []byte(`
+		function loadUsers() {
+			const base = "/api";
+			const endpoint = base + "/users";
+
+			return fetch(endpoint);
+		}
+	`)
+
+	scopes, err := findHTTPCallScopes(source)
+	if err != nil {
+		t.Fatalf("findHTTPCallScopes returned error: %v", err)
+	}
+
+	if len(scopes) != 1 {
+		t.Fatalf("expected 1 scope, got %d", len(scopes))
+	}
+
+	if scopes[0].Kind != "function_declaration" {
+		t.Fatalf(
+			"expected function_declaration, got %q",
+			scopes[0].Kind,
+		)
+	}
+
+	if !strings.Contains(scopes[0].Source, `const base = "/api"`) {
+		t.Fatalf(
+			"expected complete function scope, got:\n%s",
+			scopes[0].Source,
+		)
+	}
+
+	if !strings.Contains(scopes[0].Source, "fetch(endpoint)") {
+		t.Fatalf(
+			"expected fetch call in scope, got:\n%s",
+			scopes[0].Source,
+		)
+	}
+}
+
+func TestFindHTTPCallScopesAxiosInstance(t *testing.T) {
+	source := []byte(`
+		const loadUsers = async () => {
+			const api = axios.create({
+				baseURL: "https://api.example.com"
+			});
+
+			return api.get("/users");
+		};
+	`)
+
+	scopes, err := findHTTPCallScopes(source)
+	if err != nil {
+		t.Fatalf("findHTTPCallScopes returned error: %v", err)
+	}
+
+	if len(scopes) != 1 {
+		t.Fatalf("expected 1 scope, got %d", len(scopes))
+	}
+
+	if scopes[0].Kind != "arrow_function" {
+		t.Fatalf(
+			"expected arrow_function, got %q",
+			scopes[0].Kind,
+		)
+	}
+
+	if !strings.Contains(scopes[0].Source, `api.get("/users")`) {
+		t.Fatalf(
+			"expected Axios call in scope, got:\n%s",
+			scopes[0].Source,
+		)
+	}
+}
+
+func TestFindHTTPCallScopesDeduplicatesSameFunction(t *testing.T) {
+	source := []byte(`
+		function syncUsers() {
+			fetch("/api/users");
+			axios.post("/api/sync");
+		}
+	`)
+
+	scopes, err := findHTTPCallScopes(source)
+	if err != nil {
+		t.Fatalf("findHTTPCallScopes returned error: %v", err)
+	}
+
+	if len(scopes) != 1 {
+		t.Fatalf(
+			"expected one deduplicated function scope, got %d",
+			len(scopes),
+		)
+	}
+}
+
+func TestExtractEndpointsFromTreeScopesFetchConstant(t *testing.T) {
+	source := []byte(`
+		function loadUsers() {
+			const base = "/api";
+			const endpoint = base + "/users";
+
+			return fetch(endpoint);
+		}
+	`)
+
+	scopes, err := findHTTPCallScopes(source)
+	if err != nil {
+		t.Fatalf("findHTTPCallScopes returned error: %v", err)
+	}
+
+	endpoints, parsed, failed :=
+		extractEndpointsFromTreeScopes(scopes)
+
+	if parsed != 1 {
+		t.Fatalf("expected 1 parsed scope, got %d", parsed)
+	}
+
+	if failed != 0 {
+		t.Fatalf("expected 0 failed scopes, got %d", failed)
+	}
+
+	if len(endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 endpoint, got %d: %#v",
+			len(endpoints),
+			endpoints,
+		)
+	}
+
+	endpoint := endpoints[0]
+
+	if endpoint.Method != "GET" {
+		t.Fatalf("expected GET, got %q", endpoint.Method)
+	}
+
+	if endpoint.Path != "/api/users" {
+		t.Fatalf(
+			"expected /api/users, got %q",
+			endpoint.Path,
+		)
+	}
+
+	if endpoint.Kind != "fetch-ast" {
+		t.Fatalf(
+			"expected fetch-ast, got %q",
+			endpoint.Kind,
+		)
+	}
+}
+
+func TestExtractEndpointsFromTreeScopesAxiosInstance(t *testing.T) {
+	source := []byte(`
+		const loadUsers = async () => {
+			const api = axios.create({
+				baseURL: "https://api.example.com"
+			});
+
+			return api.get("/users");
+		};
+	`)
+
+	scopes, err := findHTTPCallScopes(source)
+	if err != nil {
+		t.Fatalf("findHTTPCallScopes returned error: %v", err)
+	}
+
+	endpoints, parsed, failed :=
+		extractEndpointsFromTreeScopes(scopes)
+
+	if parsed != 1 {
+		t.Fatalf("expected 1 parsed scope, got %d", parsed)
+	}
+
+	if failed != 0 {
+		t.Fatalf("expected 0 failed scopes, got %d", failed)
+	}
+
+	if len(endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 endpoint, got %d: %#v",
+			len(endpoints),
+			endpoints,
+		)
+	}
+
+	endpoint := endpoints[0]
+
+	if endpoint.Method != "GET" {
+		t.Fatalf("expected GET, got %q", endpoint.Method)
+	}
+
+	if endpoint.Path != "https://api.example.com/users" {
+		t.Fatalf(
+			"unexpected endpoint path %q",
+			endpoint.Path,
+		)
+	}
+
+	if endpoint.Kind != "axios-instance-ast" {
+		t.Fatalf(
+			"expected axios-instance-ast, got %q",
+			endpoint.Kind,
+		)
+	}
+}
+
+func TestExtractEndpointsFromTreeScopesDeduplicatesEndpoints(
+	t *testing.T,
+) {
+	source := []byte(`
+		function first() {
+			fetch("/api/users");
+		}
+
+		function second() {
+			fetch("/api/users");
+		}
+	`)
+
+	scopes, err := findHTTPCallScopes(source)
+	if err != nil {
+		t.Fatalf("findHTTPCallScopes returned error: %v", err)
+	}
+
+	endpoints, parsed, failed :=
+		extractEndpointsFromTreeScopes(scopes)
+
+	if parsed != 2 {
+		t.Fatalf("expected 2 parsed scopes, got %d", parsed)
+	}
+
+	if failed != 0 {
+		t.Fatalf("expected 0 failed scopes, got %d", failed)
+	}
+
+	if len(endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 deduplicated endpoint, got %d: %#v",
+			len(endpoints),
+			endpoints,
+		)
+	}
+}
+
+func TestExtractEndpointsFromTreeScopesContinuesAfterBrokenCode(
+	t *testing.T,
+) {
+	source := []byte(`
+		function valid() {
+			const endpoint = "/api/health";
+			fetch(endpoint);
+		}
+
+		function broken( {
+			axios.get("/api/broken");
+		}
+	`)
+
+	scopes, err := findHTTPCallScopes(source)
+	if err != nil {
+		t.Fatalf("findHTTPCallScopes returned error: %v", err)
+	}
+
+	endpoints, parsed, failed :=
+		extractEndpointsFromTreeScopes(scopes)
+
+	if parsed == 0 {
+		t.Fatal("expected at least one parsed scope")
+	}
+
+	found := false
+
+	for _, endpoint := range endpoints {
+		if endpoint.Method == "GET" &&
+			endpoint.Path == "/api/health" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf(
+			"expected valid endpoint despite broken code: %#v",
+			endpoints,
+		)
+	}
+
+	_ = failed
+}
+
+func TestFindHTTPCallScopesRejectsIndexedDBOpen(t *testing.T) {
+	source := []byte(`
+		function openDatabase() {
+			return indexedDB.open("app-database", 1);
+		}
+	`)
+
+	scopes, err := findHTTPCallScopes(source)
+	if err != nil {
+		t.Fatalf("findHTTPCallScopes returned error: %v", err)
+	}
+
+	if len(scopes) != 0 {
+		t.Fatalf(
+			"expected indexedDB.open to be ignored, got %d scopes",
+			len(scopes),
+		)
+	}
+}
+
+func TestFindHTTPCallScopesAcceptsXHR(t *testing.T) {
+	source := []byte(`
+		function loadUsers() {
+			const xhr = new XMLHttpRequest();
+			xhr.open("GET", "/api/users");
+		}
+	`)
+
+	scopes, err := findHTTPCallScopes(source)
+	if err != nil {
+		t.Fatalf("findHTTPCallScopes returned error: %v", err)
+	}
+
+	if len(scopes) != 1 {
+		t.Fatalf("expected 1 XHR scope, got %d", len(scopes))
+	}
+}

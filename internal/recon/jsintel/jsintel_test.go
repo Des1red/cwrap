@@ -85,6 +85,57 @@ func TestLearn_AxiosDeleteDiscovered(t *testing.T) {
 	}
 }
 
+func TestDiscoverEndpointsUsesTreeSitterRecovery(
+	t *testing.T,
+) {
+	source := `
+		function valid() {
+			const base = "/api";
+			const endpoint = base + "/users";
+
+			return fetch(endpoint);
+		}
+
+		function broken( {
+	`
+
+	ent := &knowledge.Entity{}
+	ent.Content.JSFindings = make(map[string]int)
+
+	endpoints := discoverEndpoints(ent, source)
+
+	found := false
+
+	for _, endpoint := range endpoints {
+		if endpoint.Method == "GET" &&
+			endpoint.Path == "/api/users" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf(
+			"expected recovered GET /api/users, got %#v",
+			endpoints,
+		)
+	}
+
+	if ent.Content.JSFindings["ast_parse_error"] != 1 {
+		t.Fatalf(
+			"expected ast_parse_error=1, got %d",
+			ent.Content.JSFindings["ast_parse_error"],
+		)
+	}
+
+	if ent.Content.JSFindings["ast_recovered"] != 1 {
+		t.Fatalf(
+			"expected ast_recovered=1, got %d",
+			ent.Content.JSFindings["ast_recovered"],
+		)
+	}
+}
+
 // -------------------------------------------------------
 // Endpoint discovery — XHR
 // -------------------------------------------------------
