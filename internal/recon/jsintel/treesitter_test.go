@@ -404,3 +404,43 @@ func TestFindHTTPCallScopesAcceptsXHR(t *testing.T) {
 		t.Fatalf("expected 1 XHR scope, got %d", len(scopes))
 	}
 }
+
+func TestExtractEndpointsHybridResolvesFunctionArgument(t *testing.T) {
+	source := []byte(`
+		function request(url) {
+			return fetch(url);
+		}
+
+		request("/api/users");
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
+	}
+
+	if len(result.Endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 endpoint, got %d: %#v",
+			len(result.Endpoints),
+			result.Endpoints,
+		)
+	}
+
+	endpoint := result.Endpoints[0]
+
+	if endpoint.Method != "GET" {
+		t.Fatalf("expected GET, got %q", endpoint.Method)
+	}
+
+	if endpoint.Path != "/api/users" {
+		t.Fatalf("expected /api/users, got %q", endpoint.Path)
+	}
+
+	if endpoint.Kind != "fetch-dataflow-ast" {
+		t.Fatalf(
+			"expected fetch-dataflow-ast, got %q",
+			endpoint.Kind,
+		)
+	}
+}

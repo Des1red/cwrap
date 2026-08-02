@@ -20,7 +20,43 @@ func extractEndpointsHybrid(
 	source []byte,
 ) (hybridEndpointResult, error) {
 	endpoints, gojaErr := extractEndpointsAST(string(source))
+
 	if gojaErr == nil {
+		dataFlowEndpoints, dataFlowErr :=
+			extractEndpointsDataFlow(source)
+
+		if dataFlowErr == nil {
+			seen := make(map[string]bool)
+
+			merged := make(
+				[]JSEndpoint,
+				0,
+				len(endpoints)+len(dataFlowEndpoints),
+			)
+
+			for _, endpoint := range endpoints {
+				appendJSEndpoint(
+					&merged,
+					seen,
+					endpoint.Method,
+					endpoint.Path,
+					endpoint.Kind,
+				)
+			}
+
+			for _, endpoint := range dataFlowEndpoints {
+				appendJSEndpoint(
+					&merged,
+					seen,
+					endpoint.Method,
+					endpoint.Path,
+					endpoint.Kind,
+				)
+			}
+
+			endpoints = merged
+		}
+
 		return hybridEndpointResult{
 			Endpoints: endpoints,
 		}, nil
@@ -41,6 +77,12 @@ func extractEndpointsHybrid(
 		FailedScopes: failed,
 		Recovered:    true,
 	}, gojaErr
+}
+
+func extractEndpointsDataFlow(
+	source []byte,
+) ([]JSEndpoint, error) {
+	return nil, nil
 }
 
 func parseJavaScriptTree(source []byte) (*tree_sitter.Tree, error) {
