@@ -13,6 +13,7 @@ type dataFlowFunction struct {
 	FetchMethodParam    string
 	FetchURLProperty    string
 	FetchMethodProperty string
+	FetchMethods        []string
 }
 
 type dataFlowCallValues struct {
@@ -68,20 +69,22 @@ func extractEndpointsDataFlow(
 			stringValues,
 		)
 
-		method := resolveDataFlowMethod(target, callValues)
+		methods := resolveDataFlowMethods(target, callValues)
 
 		path, kind, ok := resolveDataFlowPath(target, callValues)
 		if !ok {
 			return
 		}
 
-		appendJSEndpoint(
-			&endpoints,
-			seen,
-			method,
-			path,
-			kind,
-		)
+		for _, method := range methods {
+			appendJSEndpoint(
+				&endpoints,
+				seen,
+				method,
+				path,
+				kind,
+			)
+		}
 	})
 
 	return endpoints, nil

@@ -6,29 +6,31 @@ import (
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-func resolveDataFlowMethod(
+func resolveDataFlowMethods(
 	target dataFlowFunction,
 	values dataFlowCallValues,
-) string {
-	method := "GET"
+) []string {
+	if len(target.FetchMethods) > 0 {
+		return target.FetchMethods
+	}
 
 	if target.FetchMethodProperty != "" {
 		properties := values.Objects[target.FetchMethodParam]
 
 		if resolved, exists :=
 			properties[target.FetchMethodProperty]; exists {
-			return strings.ToUpper(resolved)
+			return []string{strings.ToUpper(resolved)}
 		}
 	}
 
 	if target.FetchMethodParam != "" {
 		if resolved, exists :=
 			values.Scalars[target.FetchMethodParam]; exists {
-			return strings.ToUpper(resolved)
+			return []string{strings.ToUpper(resolved)}
 		}
 	}
 
-	return method
+	return []string{"GET"}
 }
 
 func resolveDataFlowPath(

@@ -608,3 +608,129 @@ func TestExtractEndpointsHybridResolvesObjectMethodProperty(
 		)
 	}
 }
+
+func TestExtractEndpointsHybridResolvesArrowFunctionArgument(
+	t *testing.T,
+) {
+	source := []byte(`
+		const request = (url, method) => {
+			return fetch(url, { method });
+		};
+
+		request("/api/users", "POST");
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
+	}
+
+	if len(result.Endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 endpoint, got %d: %#v",
+			len(result.Endpoints),
+			result.Endpoints,
+		)
+	}
+
+	endpoint := result.Endpoints[0]
+
+	if endpoint.Method != "POST" {
+		t.Fatalf("expected POST, got %q", endpoint.Method)
+	}
+
+	if endpoint.Path != "/api/users" {
+		t.Fatalf("expected /api/users, got %q", endpoint.Path)
+	}
+
+	if endpoint.Kind != "fetch-dataflow-ast" {
+		t.Fatalf(
+			"expected fetch-dataflow-ast, got %q",
+			endpoint.Kind,
+		)
+	}
+}
+
+func TestExtractEndpointsHybridResolvesConciseArrowFunction(
+	t *testing.T,
+) {
+	source := []byte(`
+		const request = (url, method) =>
+			fetch(url, { method });
+
+		request("/api/users", "POST");
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
+	}
+
+	if len(result.Endpoints) != 1 {
+		t.Fatalf(
+			"expected 1 endpoint, got %d: %#v",
+			len(result.Endpoints),
+			result.Endpoints,
+		)
+	}
+
+	endpoint := result.Endpoints[0]
+
+	if endpoint.Method != "POST" {
+		t.Fatalf("expected POST, got %q", endpoint.Method)
+	}
+
+	if endpoint.Path != "/api/users" {
+		t.Fatalf("expected /api/users, got %q", endpoint.Path)
+	}
+
+	if endpoint.Kind != "fetch-dataflow-ast" {
+		t.Fatalf(
+			"expected fetch-dataflow-ast, got %q",
+			endpoint.Kind,
+		)
+	}
+}
+
+func TestExtractEndpointsHybridResolvesConditionalFetchMethod(
+	t *testing.T,
+) {
+	source := []byte(`
+		const request = (url, token) =>
+			fetch(url, {
+				method: token ? "POST" : "DELETE",
+			});
+
+		request("/api/session", token);
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	methods := make(map[string]bool)
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/session" {
+			methods[endpoint.Method] = true
+		}
+	}
+
+	if !methods["POST"] {
+		t.Fatalf(
+			"expected POST endpoint, got %#v",
+			result.Endpoints,
+		)
+	}
+
+	if !methods["DELETE"] {
+		t.Fatalf(
+			"expected DELETE endpoint, got %#v",
+			result.Endpoints,
+		)
+	}
+}

@@ -3,6 +3,7 @@ package http
 import (
 	"cwrap/internal/recon/knowledge"
 	"cwrap/testutil"
+	"net/http"
 	"testing"
 )
 
@@ -322,5 +323,32 @@ func TestLearn_HTMLExtractsFormParams(t *testing.T) {
 		if !p.Sources[knowledge.ParamForm] {
 			t.Errorf("param %q expected source ParamForm", name)
 		}
+	}
+}
+
+func TestLooksLikeJSRejectsHTMLFallback(
+	t *testing.T,
+) {
+	resp := &http.Response{
+		Header: http.Header{
+			"Content-Type": []string{
+				"text/html; charset=utf-8",
+			},
+		},
+	}
+
+	body := []byte(`
+		<!doctype html>
+		<html>
+			<script src="/assets/index-new.js"></script>
+		</html>
+	`)
+
+	if looksLikeJS(
+		"https://example.com/assets/index-old.js",
+		resp,
+		body,
+	) {
+		t.Fatal("expected HTML fallback to be rejected as JavaScript")
 	}
 }

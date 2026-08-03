@@ -8,21 +8,28 @@ import (
 	"time"
 )
 
-func looksLikeJS(url string, resp *http.Response) bool {
-	ct := resp.Header.Get("Content-Type")
-	lct := strings.ToLower(ct)
+func looksLikeJS(
+	url string,
+	resp *http.Response,
+	body []byte,
+) bool {
+	contentType := strings.ToLower(
+		resp.Header.Get("Content-Type"),
+	)
 
-	if strings.Contains(lct, "javascript") || strings.Contains(lct, "ecmascript") {
+	if strings.Contains(contentType, "text/html") ||
+		looksLikeHTMLBody(body) {
+		return false
+	}
+
+	if strings.Contains(contentType, "javascript") ||
+		strings.Contains(contentType, "ecmascript") {
 		return true
 	}
 
-	// fallback: URL suffix
-	u := strings.ToLower(url)
-	if strings.Contains(u, ".js") {
-		return true
-	}
+	url = strings.ToLower(url)
 
-	return false
+	return strings.Contains(url, ".js")
 }
 
 func isStaticAssetURL(u string) bool {

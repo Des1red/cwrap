@@ -45,9 +45,22 @@ func (e *Engine) learn(url string, resp *http.Response, body []byte) {
 	}
 
 	// JS intelligence
-	if looksLikeJS(url, resp) && !ent.State.JSAnalyzed {
+	if looksLikeJS(url, resp, body) &&
+		!ent.State.JSAnalyzed {
+
 		ent.State.JSAnalyzed = true
-		jsEndpoints := jsintel.Learn(e.k, ent, url, body)
-		e.handleJSEndpoints(ent, url, jsEndpoints)
+
+		jsEndpoints := jsintel.Learn(
+			e.k,
+			ent,
+			url,
+			body,
+		)
+
+		e.handleJSEndpoints(
+			ent,
+			url,
+			jsEndpoints,
+		)
 	}
 }

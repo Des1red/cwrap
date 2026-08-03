@@ -217,3 +217,40 @@ func treeStringLiteral(
 
 	return raw[1 : len(raw)-1], true
 }
+
+func collectDataFlowParameters(
+	parametersNode *tree_sitter.Node,
+	source []byte,
+) []string {
+	parameters := make([]string, 0)
+
+	if parametersNode == nil {
+		return parameters
+	}
+
+	for index := uint(0); index < parametersNode.NamedChildCount(); index++ {
+
+		parameter := parametersNode.NamedChild(index)
+		if parameter == nil ||
+			parameter.Kind() != "identifier" {
+			continue
+		}
+
+		parameters = append(
+			parameters,
+			strings.TrimSpace(parameter.Utf8Text(source)),
+		)
+	}
+
+	return parameters
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+
+	return false
+}

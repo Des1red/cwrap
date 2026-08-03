@@ -11,42 +11,20 @@ type hybridEndpointResult struct {
 func extractEndpointsHybrid(
 	source []byte,
 ) (hybridEndpointResult, error) {
-	endpoints, gojaErr := extractEndpointsAST(string(source))
+	astEndpoints, gojaErr :=
+		extractEndpointsAST(string(source))
+
+	dataFlowEndpoints, dataFlowErr :=
+		extractEndpointsDataFlow(source)
 
 	if gojaErr == nil {
-		dataFlowEndpoints, dataFlowErr :=
-			extractEndpointsDataFlow(source)
+		endpoints := astEndpoints
 
 		if dataFlowErr == nil {
-			seen := make(map[string]bool)
-
-			merged := make(
-				[]JSEndpoint,
-				0,
-				len(endpoints)+len(dataFlowEndpoints),
+			endpoints = mergeJSEndpoints(
+				astEndpoints,
+				dataFlowEndpoints,
 			)
-
-			for _, endpoint := range endpoints {
-				appendJSEndpoint(
-					&merged,
-					seen,
-					endpoint.Method,
-					endpoint.Path,
-					endpoint.Kind,
-				)
-			}
-
-			for _, endpoint := range dataFlowEndpoints {
-				appendJSEndpoint(
-					&merged,
-					seen,
-					endpoint.Method,
-					endpoint.Path,
-					endpoint.Kind,
-				)
-			}
-
-			endpoints = merged
 		}
 
 		return hybridEndpointResult{
@@ -62,6 +40,13 @@ func extractEndpointsHybrid(
 	recovered, parsed, failed :=
 		extractEndpointsFromTreeScopes(scopes)
 
+	if dataFlowErr == nil {
+		recovered = mergeJSEndpoints(
+			recovered,
+			dataFlowEndpoints,
+		)
+	}
+
 	return hybridEndpointResult{
 		Endpoints:    recovered,
 		Scopes:       len(scopes),
@@ -69,4 +54,25 @@ func extractEndpointsHybrid(
 		FailedScopes: failed,
 		Recovered:    true,
 	}, gojaErr
+}
+
+func mergeJSEndpoints(
+	groups ...[]JSEndpoint,
+) []JSEndpoint {
+	merged := make([]JSEndpoint, 0)
+	seen := make(map[string]bool)
+
+	for _, endpoints := range groups {
+		for _, endpoint := range endpoints {
+			appendJSEndpoint(
+				&merged,
+				seen,
+				endpoint.Method,
+				endpoint.Path,
+				endpoint.Kind,
+			)
+		}
+	}
+
+	return merged
 }

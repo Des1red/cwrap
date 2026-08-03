@@ -14,55 +14,96 @@ func findNamedDataFlowFunctions(
 	functions := make(map[string]dataFlowFunction)
 
 	walkTree(root, func(node *tree_sitter.Node) {
-		if node.Kind() != "function_declaration" {
-			return
-		}
+		switch node.Kind() {
+		case "function_declaration":
+			nameNode := node.ChildByFieldName("name")
+			parametersNode := node.ChildByFieldName("parameters")
+			bodyNode := node.ChildByFieldName("body")
 
-		nameNode := node.ChildByFieldName("name")
-		parametersNode := node.ChildByFieldName("parameters")
-		bodyNode := node.ChildByFieldName("body")
-
-		if nameNode == nil ||
-			parametersNode == nil ||
-			bodyNode == nil {
-			return
-		}
-
-		name := strings.TrimSpace(nameNode.Utf8Text(source))
-		if name == "" {
-			return
-		}
-
-		parameters := make([]string, 0)
-
-		for index := uint(0); index < parametersNode.NamedChildCount(); index++ {
-
-			parameter := parametersNode.NamedChild(index)
-			if parameter == nil ||
-				parameter.Kind() != "identifier" {
-				continue
+			if nameNode == nil ||
+				parametersNode == nil ||
+				bodyNode == nil {
+				return
 			}
 
-			parameters = append(
-				parameters,
-				strings.TrimSpace(parameter.Utf8Text(source)),
-			)
-		}
-		fetchURLParam,
-			fetchMethodParam,
-			fetchURLProperty,
-			fetchMethodProperty :=
-			findFetchDataFlowParameters(
-				bodyNode,
+			name := strings.TrimSpace(nameNode.Utf8Text(source))
+			if name == "" {
+				return
+			}
+
+			parameters := collectDataFlowParameters(
+				parametersNode,
 				source,
-				parameters,
 			)
-		functions[name] = dataFlowFunction{
-			Parameters:          parameters,
-			FetchURLParam:       fetchURLParam,
-			FetchMethodParam:    fetchMethodParam,
-			FetchURLProperty:    fetchURLProperty,
-			FetchMethodProperty: fetchMethodProperty,
+
+			fetchURLParam,
+				fetchMethodParam,
+				fetchURLProperty,
+				fetchMethodProperty,
+				fetchMethods :=
+				findFetchDataFlowParameters(
+					bodyNode,
+					source,
+					parameters,
+				)
+
+			functions[name] = dataFlowFunction{
+				Parameters:          parameters,
+				FetchURLParam:       fetchURLParam,
+				FetchMethodParam:    fetchMethodParam,
+				FetchURLProperty:    fetchURLProperty,
+				FetchMethodProperty: fetchMethodProperty,
+				FetchMethods:        fetchMethods,
+			}
+		case "variable_declarator":
+			nameNode := node.ChildByFieldName("name")
+			valueNode := node.ChildByFieldName("value")
+
+			if nameNode == nil || valueNode == nil {
+				return
+			}
+
+			if nameNode.Kind() != "identifier" ||
+				valueNode.Kind() != "arrow_function" {
+				return
+			}
+
+			name := strings.TrimSpace(nameNode.Utf8Text(source))
+			if name == "" {
+				return
+			}
+
+			parametersNode := valueNode.ChildByFieldName("parameters")
+			bodyNode := valueNode.ChildByFieldName("body")
+
+			if parametersNode == nil || bodyNode == nil {
+				return
+			}
+
+			parameters := collectDataFlowParameters(
+				parametersNode,
+				source,
+			)
+
+			fetchURLParam,
+				fetchMethodParam,
+				fetchURLProperty,
+				fetchMethodProperty,
+				fetchMethods :=
+				findFetchDataFlowParameters(
+					bodyNode,
+					source,
+					parameters,
+				)
+
+			functions[name] = dataFlowFunction{
+				Parameters:          parameters,
+				FetchURLParam:       fetchURLParam,
+				FetchMethodParam:    fetchMethodParam,
+				FetchURLProperty:    fetchURLProperty,
+				FetchMethodProperty: fetchMethodProperty,
+				FetchMethods:        fetchMethods,
+			}
 		}
 	})
 
@@ -73,7 +114,7 @@ func findFetchDataFlowParameters(
 	body *tree_sitter.Node,
 	source []byte,
 	parameters []string,
-) (string, string, string, string) {
+) (string, string, string, string, []string) {
 	parameterSet := make(map[string]bool)
 
 	for _, parameter := range parameters {
@@ -85,6 +126,7 @@ func findFetchDataFlowParameters(
 		methodParameter string
 		urlProperty     string
 		methodProperty  string
+		staticMethods   = make([]string, 0)
 	)
 
 	walkTree(body, func(node *tree_sitter.Node) {
@@ -199,6 +241,25 @@ func findFetchDataFlowParameters(
 						methodParameter = name
 						methodProperty = propertyName
 					}
+				case "ternary_expression":
+					consequence := value.ChildByFieldName("consequence")
+					alternative := value.ChildByFieldName("alternative")
+
+					for _, candidate := range []*tree_sitter.Node{
+						consequence,
+						alternative,
+					} {
+						method, ok := treeStringLiteral(candidate, source)
+						if !ok {
+							continue
+						}
+
+						method = strings.ToUpper(method)
+
+						if !containsString(staticMethods, method) {
+							staticMethods = append(staticMethods, method)
+						}
+					}
 				}
 			}
 		}
@@ -207,7 +268,8 @@ func findFetchDataFlowParameters(
 	return urlParameter,
 		methodParameter,
 		urlProperty,
-		methodProperty
+		methodProperty,
+		staticMethods
 }
 
 func findStringVariables(
