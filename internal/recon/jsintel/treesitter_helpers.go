@@ -72,7 +72,11 @@ func isHTTPCallNode(
 	name := strings.TrimSpace(function.Utf8Text(source))
 	lower := strings.ToLower(name)
 
-	if lower == "fetch" || lower == "axios" {
+	if isFetchCall(function, source) {
+		return true
+	}
+
+	if lower == "axios" {
 		return true
 	}
 
@@ -108,6 +112,34 @@ func isHTTPCallNode(
 	}
 
 	return false
+}
+
+func isFetchCall(
+	function *tree_sitter.Node,
+	source []byte,
+) bool {
+	if function == nil {
+		return false
+	}
+
+	if function.Kind() == "identifier" {
+		return strings.TrimSpace(
+			function.Utf8Text(source),
+		) == "fetch"
+	}
+
+	if function.Kind() != "member_expression" {
+		return false
+	}
+
+	property := function.ChildByFieldName("property")
+	if property == nil {
+		return false
+	}
+
+	return strings.TrimSpace(
+		property.Utf8Text(source),
+	) == "fetch"
 }
 
 func isXHRLikeOpenCall(
@@ -253,4 +285,104 @@ func containsString(values []string, target string) bool {
 	}
 
 	return false
+}
+
+func buildDataFlowFunction(
+	parametersNode *tree_sitter.Node,
+	bodyNode *tree_sitter.Node,
+	source []byte,
+) dataFlowFunction {
+	parameters := collectDataFlowParameters(
+		parametersNode,
+		source,
+	)
+
+	result := findFetchDataFlowParameters(
+		bodyNode,
+		source,
+		parameters,
+	)
+
+	result.Parameters = parameters
+
+	return result
+}
+
+func addConditionalMethods(
+	value *tree_sitter.Node,
+	source []byte,
+	methods *[]string,
+) {
+	consequence := value.ChildByFieldName("consequence")
+	alternative := value.ChildByFieldName("alternative")
+
+	for _, candidate := range []*tree_sitter.Node{
+		consequence,
+		alternative,
+	} {
+		method, ok := treeStringLiteral(candidate, source)
+		if !ok {
+			continue
+		}
+
+		method = strings.ToUpper(method)
+
+		if !containsString(*methods, method) {
+			*methods = append(*methods, method)
+		}
+	}
+}
+
+func registerDataFlowClassMethod(
+	class *dataFlowClass,
+	methodName string,
+	parametersNode *tree_sitter.Node,
+	bodyNode *tree_sitter.Node,
+	source []byte,
+) {
+	target := buildDataFlowFunction(
+		parametersNode,
+		bodyNode,
+		source,
+	)
+
+	if target.RequestURLParam == "this" ||
+		target.RequestMethodParam == "this" {
+
+		class.Methods[methodName] = target
+		return
+	}
+
+	parameters := collectDataFlowParameters(
+		parametersNode,
+		source,
+	)
+
+	fieldParameters := make(map[string]string)
+
+	findConstructorBindings(
+		bodyNode,
+		source,
+		parameters,
+		fieldParameters,
+	)
+
+	if len(fieldParameters) == 0 {
+		return
+	}
+
+	class.Mutators[methodName] = dataFlowMutator{
+		Parameters:      parameters,
+		FieldParameters: fieldParameters,
+	}
+}
+
+func mapKeys[T any](values map[string]T) []string {
+	keys := make([]string, 0, len(values))
+
+	for key := range values {
+		keys = append(keys, key)
+	}
+
+	return keys
 }

@@ -14,6 +14,17 @@ func resolveDataFlowMethods(
 		return target.FetchMethods
 	}
 
+	if target.RequestMethodProperty != "" {
+		properties := values.Objects[target.RequestMethodParam]
+
+		if resolved, exists :=
+			properties[target.RequestMethodProperty]; exists {
+			return []string{
+				strings.ToUpper(resolved),
+			}
+		}
+	}
+
 	if target.FetchMethodProperty != "" {
 		properties := values.Objects[target.FetchMethodParam]
 
@@ -37,6 +48,22 @@ func resolveDataFlowPath(
 	target dataFlowFunction,
 	values dataFlowCallValues,
 ) (string, string, bool) {
+	if target.FetchStaticPath != "" {
+		return target.FetchStaticPath,
+			"fetch-request-dataflow-ast",
+			true
+	}
+
+	if target.RequestURLProperty != "" {
+		properties := values.Objects[target.RequestURLParam]
+
+		path, exists := properties[target.RequestURLProperty]
+
+		return path,
+			"fetch-request-object-dataflow-ast",
+			exists
+	}
+
 	if target.FetchURLProperty != "" {
 		properties := values.Objects[target.FetchURLParam]
 
@@ -58,10 +85,7 @@ func resolveDataFlowCallValues(
 	source []byte,
 	stringValues map[string]string,
 ) dataFlowCallValues {
-	result := dataFlowCallValues{
-		Scalars: make(map[string]string),
-		Objects: make(map[string]map[string]string),
-	}
+	result := newDataFlowCallValues()
 
 	if arguments == nil {
 		return result
@@ -159,4 +183,65 @@ func resolveObjectStringProperties(
 	}
 
 	return values
+}
+
+func resolveLocalObjectNode(
+	body *tree_sitter.Node,
+	node *tree_sitter.Node,
+	source []byte,
+) *tree_sitter.Node {
+	if node == nil {
+		return nil
+	}
+
+	if node.Kind() == "object" {
+		return node
+	}
+
+	if node.Kind() != "identifier" {
+		return node
+	}
+
+	targetName := strings.TrimSpace(
+		node.Utf8Text(source),
+	)
+
+	if targetName == "" {
+		return node
+	}
+
+	var resolved *tree_sitter.Node
+
+	walkTree(body, func(candidate *tree_sitter.Node) {
+		if resolved != nil ||
+			candidate.Kind() != "variable_declarator" {
+			return
+		}
+
+		nameNode := candidate.ChildByFieldName("name")
+		valueNode := candidate.ChildByFieldName("value")
+
+		if nameNode == nil || valueNode == nil {
+			return
+		}
+
+		if nameNode.Kind() != "identifier" ||
+			valueNode.Kind() != "object" {
+			return
+		}
+
+		name := strings.TrimSpace(
+			nameNode.Utf8Text(source),
+		)
+
+		if name == targetName {
+			resolved = valueNode
+		}
+	})
+
+	if resolved != nil {
+		return resolved
+	}
+
+	return node
 }

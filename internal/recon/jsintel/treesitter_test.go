@@ -734,3 +734,427 @@ func TestExtractEndpointsHybridResolvesConditionalFetchMethod(
 		)
 	}
 }
+
+func TestExtractEndpointsHybridResolvesRequestConstructor(
+	t *testing.T,
+) {
+	source := []byte(`
+		const request = () => {
+			fetch(new Request("/api/users", {
+				method: "POST",
+			}));
+		};
+
+		request();
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	found := false
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf(
+			"expected POST /api/users, got %#v",
+			result.Endpoints,
+		)
+	}
+}
+
+func TestExtractEndpointsHybridResolvesDynamicRequestProperties(
+	t *testing.T,
+) {
+	source := []byte(`
+		function request(config) {
+			return fetch(new Request(config.url, {
+				method: config.method,
+			}));
+		}
+
+		request({
+			url: "/api/users",
+			method: "POST",
+		});
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	found := false
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf(
+			"expected POST /api/users, got %#v",
+			result.Endpoints,
+		)
+	}
+}
+
+func TestExtractEndpointsHybridResolvesRequestInstanceFields(
+	t *testing.T,
+) {
+	source := []byte(`
+		class Client {
+			constructor(url, method) {
+				this.url = url;
+				this.method = method;
+			}
+
+			send() {
+				return fetch(new Request(this.url, {
+					method: this.method,
+				}));
+			}
+		}
+
+		const client = new Client(
+			"/api/users",
+			"POST",
+		);
+
+		client.send();
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	found := false
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf(
+			"expected POST /api/users, got %#v",
+			result.Endpoints,
+		)
+	}
+}
+
+func TestExtractEndpointsHybridResolvesPrototypeInstanceFields(
+	t *testing.T,
+) {
+	source := []byte(`
+		function Client(url, method) {
+			this.url = url;
+			this.method = method;
+		}
+
+		Client.prototype.send = function() {
+			return fetch(new Request(this.url, {
+				method: this.method,
+			}));
+		};
+
+		const client = new Client(
+			"/api/users",
+			"POST",
+		);
+
+		client.send();
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"expected POST /api/users, got %#v",
+		result.Endpoints,
+	)
+}
+
+func TestExtractEndpointsHybridResolvesRequestOptionsVariable(
+	t *testing.T,
+) {
+	source := []byte(`
+		function Client(url, method) {
+			this.url = url;
+			this.method = method;
+		}
+
+		Client.prototype.send = function() {
+			const options = {
+				method: this.method,
+			};
+
+			return fetch(
+				new Request(this.url, options),
+			);
+		};
+
+		const client = new Client(
+			"/api/users",
+			"POST",
+		);
+
+		client.send();
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"expected POST /api/users, got %#v",
+		result.Endpoints,
+	)
+}
+
+func TestExtractEndpointsHybridResolvesMemberFetchCall(
+	t *testing.T,
+) {
+	source := []byte(`
+		class Client {
+			constructor(url, method) {
+				this.url = url;
+				this.method = method;
+				this.transport = window;
+			}
+
+			send() {
+				const options = {
+					method: this.method,
+				};
+
+				return (this.transport || window).fetch(
+					new Request(this.url, options),
+				);
+			}
+		}
+
+		const client = new Client(
+			"/api/users",
+			"POST",
+		);
+
+		client.send();
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"expected POST /api/users, got %#v",
+		result.Endpoints,
+	)
+}
+
+func TestExtractEndpointsHybridResolvesInstanceMutatorMethod(
+	t *testing.T,
+) {
+	source := []byte(`
+		function Client() {}
+
+		Client.prototype.open = function(method, url) {
+			this.method = method;
+			this.url = url;
+		};
+
+		Client.prototype.send = function() {
+			const options = {
+				method: this.method,
+			};
+
+			return window.fetch(
+				new Request(this.url, options),
+			);
+		};
+
+		const client = new Client();
+
+		client.open("POST", "/api/users");
+		client.send();
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"expected POST /api/users, got %#v",
+		result.Endpoints,
+	)
+}
+
+func TestExtractEndpointsHybridResolvesPrototypeAlias(
+	t *testing.T,
+) {
+	source := []byte(`
+		function Client() {}
+
+		let proto = Client.prototype;
+
+		proto.open = function(method, url) {
+			this.method = method;
+			this.url = url;
+		};
+
+		proto.send = function() {
+			const options = {
+				method: this.method,
+			};
+
+			return window.fetch(
+				new Request(this.url, options),
+			);
+		};
+
+		const client = new Client();
+
+		client.open("POST", "/api/users");
+		client.send();
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"expected POST /api/users, got %#v",
+		result.Endpoints,
+	)
+}
+
+func TestExtractEndpointsHybridResolvesAssignedPrototypeAlias(
+	t *testing.T,
+) {
+	source := []byte(`
+		function Client() {}
+
+		let proto;
+		proto = Client.prototype;
+
+		proto.open = function(method, url) {
+			this.method = method;
+			this.url = url;
+		};
+
+		proto.send = function() {
+			const options = {
+				method: this.method,
+			};
+
+			return window.fetch(
+				new Request(this.url, options),
+			);
+		};
+
+		const client = new Client();
+
+		client.open("POST", "/api/users");
+		client.send();
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"expected POST /api/users, got %#v",
+		result.Endpoints,
+	)
+}
