@@ -7,6 +7,7 @@ import (
 
 func discoverEndpoints(
 	ent *knowledge.Entity,
+	sourceURL string,
 	source string,
 ) []JSEndpoint {
 	seen := make(map[string]bool)
@@ -30,6 +31,33 @@ func discoverEndpoints(
 		}
 	} else {
 		ent.Content.JSFindings["ast_parsed"]++
+	}
+
+	flowCount := 0
+
+	for _, flow := range result.HTTPFlows {
+		added := ent.AddJSHTTPFlow(
+			knowledge.JSHTTPFlow{
+				Source:         sourceURL,
+				Function:       flow.Function,
+				Sink:           flow.Sink,
+				URLSource:      flow.URLSource,
+				MethodSource:   flow.MethodSource,
+				ResolvedURL:    flow.ResolvedURL,
+				ResolvedMethod: flow.ResolvedMethod,
+				DynamicURL:     flow.DynamicURL,
+				DynamicMethod:  flow.DynamicMethod,
+				Confidence:     flow.Confidence,
+			},
+		)
+
+		if added {
+			flowCount++
+		}
+	}
+
+	if flowCount > 0 {
+		ent.Content.JSFindings["http_flow"] += flowCount
 	}
 
 	for _, endpoint := range result.Endpoints {

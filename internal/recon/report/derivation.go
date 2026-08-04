@@ -172,8 +172,14 @@ func deriveNextSteps(ent *knowledge.Entity) []string {
 	}
 
 	// JS leaks suggestions
-	if len(ent.Content.JSLeaks) > 0 || len(ent.Content.JSFindings) > 0 {
-		out = append(out, "Review JS findings for secrets, endpoints, role gates, and client-side auth assumptions")
+	if len(ent.Content.JSLeaks) > 0 ||
+		len(ent.Content.JSHTTPFlows) > 0 ||
+		len(reportableJSFindingKeys(ent)) > 0 {
+
+		out = append(
+			out,
+			"Review JS leaks, dynamic HTTP flows, role gates, and client-side auth assumptions",
+		)
 	}
 
 	if ent.SeenSignal(knowledge.SigCredentiallessTokenIssuance) {

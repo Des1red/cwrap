@@ -1,7 +1,9 @@
 package jsintel
 
 type hybridEndpointResult struct {
-	Endpoints    []JSEndpoint
+	Endpoints []JSEndpoint
+	HTTPFlows []JSHTTPFlow
+
 	Scopes       int
 	ParsedScopes int
 	FailedScopes int
@@ -14,21 +16,25 @@ func extractEndpointsHybrid(
 	astEndpoints, gojaErr :=
 		extractEndpointsAST(string(source))
 
-	dataFlowEndpoints, dataFlowErr :=
+	dataFlowResult, dataFlowErr :=
 		extractEndpointsDataFlow(source)
 
 	if gojaErr == nil {
 		endpoints := astEndpoints
+		var flows []JSHTTPFlow
 
 		if dataFlowErr == nil {
 			endpoints = mergeJSEndpoints(
 				astEndpoints,
-				dataFlowEndpoints,
+				dataFlowResult.Endpoints,
 			)
+
+			flows = dataFlowResult.HTTPFlows
 		}
 
 		return hybridEndpointResult{
 			Endpoints: endpoints,
+			HTTPFlows: flows,
 		}, nil
 	}
 
@@ -40,15 +46,20 @@ func extractEndpointsHybrid(
 	recovered, parsed, failed :=
 		extractEndpointsFromTreeScopes(scopes)
 
+	var flows []JSHTTPFlow
+
 	if dataFlowErr == nil {
 		recovered = mergeJSEndpoints(
 			recovered,
-			dataFlowEndpoints,
+			dataFlowResult.Endpoints,
 		)
+
+		flows = dataFlowResult.HTTPFlows
 	}
 
 	return hybridEndpointResult{
 		Endpoints:    recovered,
+		HTTPFlows:    flows,
 		Scopes:       len(scopes),
 		ParsedScopes: parsed,
 		FailedScopes: failed,

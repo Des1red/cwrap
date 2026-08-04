@@ -13,15 +13,16 @@ func findDataFlowBindings(
 ) map[string]dataFlowBinding {
 	bindings := make(map[string]dataFlowBinding)
 
-	registerFunctionBindings(
-		root,
-		source,
-		bindings,
-	)
-
 	classes := findDataFlowClasses(
 		root,
 		source,
+	)
+
+	registerFunctionBindings(
+		root,
+		source,
+		classes,
+		bindings,
 	)
 
 	registerInstanceBindings(
@@ -38,15 +39,82 @@ func findDataFlowBindings(
 func registerFunctionBindings(
 	root *tree_sitter.Node,
 	source []byte,
+	classes map[string]dataFlowClass,
 	bindings map[string]dataFlowBinding,
 ) {
-	for name, target := range findNamedDataFlowFunctions(root, source) {
+	functions := findNamedDataFlowFunctions(
+		root,
+		source,
+	)
 
+	for name, target := range functions {
 		bindings[name] = dataFlowBinding{
 			Target: target,
 			Values: newDataFlowCallValues(),
 		}
 	}
+
+	walkTree(root, func(node *tree_sitter.Node) {
+		var nameNode *tree_sitter.Node
+		var parametersNode *tree_sitter.Node
+		var bodyNode *tree_sitter.Node
+
+		switch node.Kind() {
+		case "function_declaration":
+			nameNode = node.ChildByFieldName("name")
+			parametersNode = node.ChildByFieldName("parameters")
+			bodyNode = node.ChildByFieldName("body")
+
+		case "variable_declarator":
+			valueNode := node.ChildByFieldName("value")
+			if valueNode == nil ||
+				valueNode.Kind() != "arrow_function" {
+				return
+			}
+
+			nameNode = node.ChildByFieldName("name")
+			parametersNode =
+				valueNode.ChildByFieldName("parameters")
+			bodyNode =
+				valueNode.ChildByFieldName("body")
+
+		default:
+			return
+		}
+
+		if nameNode == nil ||
+			parametersNode == nil ||
+			bodyNode == nil {
+			return
+		}
+
+		name := strings.TrimSpace(
+			nameNode.Utf8Text(source),
+		)
+		if name == "" {
+			return
+		}
+
+		parameters := collectDataFlowParameters(
+			parametersNode,
+			source,
+		)
+
+		delegated, ok := findDelegatedDataFlowFunction(
+			bodyNode,
+			source,
+			parameters,
+			classes,
+		)
+		if !ok {
+			return
+		}
+
+		bindings[name] = dataFlowBinding{
+			Target: delegated,
+			Values: newDataFlowCallValues(),
+		}
+	})
 }
 
 func findDataFlowClasses(
@@ -128,6 +196,7 @@ func findDataFlowClasses(
 				parameters,
 				body,
 				source,
+				classes,
 			)
 		}
 
@@ -293,6 +362,7 @@ func findDataFlowClasses(
 			parametersNode,
 			bodyNode,
 			source,
+			classes,
 		)
 
 		classes[className] = class
@@ -369,59 +439,24 @@ func registerInstanceBindings(
 	instances := make(map[string]dataFlowInstance)
 
 	// First pass: create instances and bind constructor fields.
-	walkTree(root, func(node *tree_sitter.Node) {
-		if node.Kind() != "variable_declarator" {
-			return
-		}
-
-		nameNode := node.ChildByFieldName("name")
-		valueNode := node.ChildByFieldName("value")
-
+	registerInstance := func(
+		nameNode *tree_sitter.Node,
+		valueNode *tree_sitter.Node,
+	) {
 		if nameNode == nil ||
 			valueNode == nil ||
-			nameNode.Kind() != "identifier" ||
-			valueNode.Kind() != "new_expression" {
+			nameNode.Kind() != "identifier" {
 			return
 		}
 
-		constructor :=
-			valueNode.ChildByFieldName("constructor")
-
-		arguments :=
-			valueNode.ChildByFieldName("arguments")
-
-		if constructor == nil || arguments == nil {
-			return
-		}
-
-		className := strings.TrimSpace(
-			constructor.Utf8Text(source),
-		)
-
-		class, exists := classes[className]
-		if !exists {
-			return
-		}
-
-		constructorTarget := dataFlowFunction{
-			Parameters: class.ConstructorParameters,
-		}
-
-		constructorValues := resolveDataFlowCallValues(
-			constructorTarget,
-			arguments,
+		instance, ok := resolveNewDataFlowInstance(
+			valueNode,
 			source,
 			stringValues,
+			classes,
 		)
-
-		fields := make(map[string]string)
-
-		for field, parameter := range class.FieldParameters {
-			if value, exists :=
-				constructorValues.Scalars[parameter]; exists {
-
-				fields[field] = value
-			}
+		if !ok {
+			return
 		}
 
 		instanceName := strings.TrimSpace(
@@ -432,9 +467,22 @@ func registerInstanceBindings(
 			return
 		}
 
-		instances[instanceName] = dataFlowInstance{
-			ClassName: className,
-			Fields:    fields,
+		instances[instanceName] = instance
+	}
+
+	walkTree(root, func(node *tree_sitter.Node) {
+		switch node.Kind() {
+		case "variable_declarator":
+			registerInstance(
+				node.ChildByFieldName("name"),
+				node.ChildByFieldName("value"),
+			)
+
+		case "assignment_expression":
+			registerInstance(
+				node.ChildByFieldName("left"),
+				node.ChildByFieldName("right"),
+			)
 		}
 	})
 

@@ -20,8 +20,11 @@ func Learn(k *knowledge.Knowledge, ent *knowledge.Entity, sourceURL string, body
 	// ----------------------------
 	// Endpoint discovery
 	// ----------------------------
-	endpoints := discoverEndpoints(ent, source)
-
+	endpoints := discoverEndpoints(
+		ent,
+		sourceURL,
+		source,
+	)
 	// ----------------------------
 	// Roles / privilege surfaces
 	// ----------------------------

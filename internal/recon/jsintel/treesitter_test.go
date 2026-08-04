@@ -1158,3 +1158,262 @@ func TestExtractEndpointsHybridResolvesAssignedPrototypeAlias(
 		result.Endpoints,
 	)
 }
+
+func TestExtractEndpointsHybridResolvesFactoryCreatedInstance(t *testing.T) {
+	source := []byte(`
+		function Client() {
+			this.method = "GET";
+			this.url = "";
+		}
+
+		let proto = Client.prototype;
+
+		proto.open = function(method, url) {
+			this.method = method;
+			this.url = url;
+		};
+
+		proto.send = function() {
+			return fetch(
+				new Request(this.url, {
+					method: this.method,
+				}),
+			);
+		};
+
+		function Factory() {}
+
+		Factory.prototype.create = function() {
+			return new Client();
+		};
+
+		const factory = new Factory();
+		const client = factory.create();
+
+		client.open("POST", "/api/users");
+		client.send();
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"expected POST /api/users, got %#v",
+		result.Endpoints,
+	)
+}
+
+func TestExtractEndpointsHybridResolvesFactoryStoredInConstructorField(
+	t *testing.T,
+) {
+	source := []byte(`
+		function Client() {
+			this.method = "GET";
+			this.url = "";
+		}
+
+		let clientProto = Client.prototype;
+
+		clientProto.open = function(method, url) {
+			this.method = method;
+			this.url = url;
+		};
+
+		clientProto.send = function() {
+			return fetch(
+				new Request(this.url, {
+					method: this.method,
+				}),
+			);
+		};
+
+		function Factory() {}
+
+		Factory.prototype.create = function() {
+			return new Client();
+		};
+
+		function Wrapper(factory) {
+			this.factory = factory;
+			this.client = null;
+		}
+
+		Wrapper.prototype.request = function(url, method) {
+			this.client = this.factory.create();
+			this.client.open(method, String(url));
+			this.client.send();
+		};
+
+		let wrapper;
+		const enabled = true;
+		wrapper = enabled
+			? new Wrapper(new Factory())
+			: new Wrapper(null);
+
+		wrapper.request(
+			"/api/users",
+			"POST",
+		);
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"expected POST /api/users, got %#v",
+		result.Endpoints,
+	)
+}
+
+func TestExtractEndpointsHybridResolvesReturnedInstanceStoredInObjectField(
+	t *testing.T,
+) {
+	source := []byte(`
+		function Client() {}
+
+		Client.prototype.request = function(url, method) {
+			return fetch(url, {
+				method: method,
+			});
+		};
+
+		function createClient() {
+			return new Client();
+		}
+
+		function Transport() {
+			this.client = null;
+			this.url = "";
+			this.method = "GET";
+		}
+
+		Transport.prototype.send = function(url, method) {
+			this.url = url;
+			this.method = method;
+			this.client = createClient();
+			this.client.request(
+				this.url,
+				this.method,
+			);
+		};
+
+		const transport = new Transport();
+
+		transport.send(
+			"/api/users",
+			"POST",
+		);
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	for _, endpoint := range result.Endpoints {
+		if endpoint.Path == "/api/users" &&
+			endpoint.Method == "POST" {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"expected POST /api/users, got %#v",
+		result.Endpoints,
+	)
+}
+
+func TestExtractEndpointsHybridRecordsDynamicHTTPFlow(
+	t *testing.T,
+) {
+	source := []byte(`
+		function request(url, method) {
+			return fetch(url, {
+				method: method,
+			});
+		}
+
+		request(runtimeURL, runtimeMethod);
+	`)
+
+	result, err := extractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf(
+			"extractEndpointsHybrid returned error: %v",
+			err,
+		)
+	}
+
+	if len(result.Endpoints) != 0 {
+		t.Fatalf(
+			"expected no concrete endpoints, got %#v",
+			result.Endpoints,
+		)
+	}
+
+	if len(result.HTTPFlows) != 1 {
+		t.Fatalf(
+			"expected one symbolic HTTP flow, got %#v",
+			result.HTTPFlows,
+		)
+	}
+
+	flow := result.HTTPFlows[0]
+
+	if flow.Function != "request" {
+		t.Fatalf(
+			"expected function request, got %q",
+			flow.Function,
+		)
+	}
+
+	if flow.Sink != "fetch" {
+		t.Fatalf(
+			"expected fetch sink, got %q",
+			flow.Sink,
+		)
+	}
+
+	if flow.URLSource != "runtimeURL" ||
+		!flow.DynamicURL {
+		t.Fatalf(
+			"unexpected URL flow: %#v",
+			flow,
+		)
+	}
+
+	if flow.MethodSource != "runtimeMethod" ||
+		!flow.DynamicMethod {
+		t.Fatalf(
+			"unexpected method flow: %#v",
+			flow,
+		)
+	}
+}

@@ -102,7 +102,11 @@ func TestDiscoverEndpointsUsesTreeSitterRecovery(
 	ent := &knowledge.Entity{}
 	ent.Content.JSFindings = make(map[string]int)
 
-	endpoints := discoverEndpoints(ent, source)
+	endpoints := discoverEndpoints(
+		ent,
+		sourceURL,
+		source,
+	)
 
 	found := false
 
@@ -505,5 +509,65 @@ func TestLearn_EmailAddedToKnowledge(t *testing.T) {
 
 	if !hasLeak(ent, "email", "") {
 		t.Error("expected email leak attached to entity")
+	}
+}
+
+func TestLearnStoresDynamicHTTPFlow(t *testing.T) {
+	k, ent := newTestContext()
+
+	body := []byte(`
+		function request(url, method) {
+			return fetch(url, {
+				method: method,
+			});
+		}
+
+		request(runtimeURL, runtimeMethod);
+	`)
+
+	endpoints := Learn(
+		k,
+		ent,
+		sourceURL,
+		body,
+	)
+
+	if len(endpoints) != 0 {
+		t.Fatalf(
+			"expected no concrete endpoints, got %#v",
+			endpoints,
+		)
+	}
+
+	if len(ent.Content.JSHTTPFlows) != 1 {
+		t.Fatalf(
+			"expected one stored HTTP flow, got %#v",
+			ent.Content.JSHTTPFlows,
+		)
+	}
+
+	flow := ent.Content.JSHTTPFlows[0]
+
+	if flow.Source != sourceURL {
+		t.Fatalf(
+			"expected source %q, got %q",
+			sourceURL,
+			flow.Source,
+		)
+	}
+
+	if flow.URLSource != "runtimeURL" ||
+		flow.MethodSource != "runtimeMethod" {
+		t.Fatalf(
+			"unexpected stored flow: %#v",
+			flow,
+		)
+	}
+
+	if ent.Content.JSFindings["http_flow"] != 1 {
+		t.Fatalf(
+			"expected http_flow=1, got %d",
+			ent.Content.JSFindings["http_flow"],
+		)
 	}
 }

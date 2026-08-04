@@ -339,6 +339,7 @@ func registerDataFlowClassMethod(
 	parametersNode *tree_sitter.Node,
 	bodyNode *tree_sitter.Node,
 	source []byte,
+	classes map[string]dataFlowClass,
 ) {
 	target := buildDataFlowFunction(
 		parametersNode,
@@ -346,9 +347,13 @@ func registerDataFlowClassMethod(
 		source,
 	)
 
-	if target.RequestURLParam == "this" ||
-		target.RequestMethodParam == "this" {
+	hasEndpoint := target.FetchStaticPath != "" ||
+		target.FetchURLParam != "" ||
+		target.FetchURLProperty != "" ||
+		target.RequestURLParam != "" ||
+		target.RequestURLProperty != ""
 
+	if hasEndpoint {
 		class.Methods[methodName] = target
 		return
 	}
@@ -357,6 +362,17 @@ func registerDataFlowClassMethod(
 		parametersNode,
 		source,
 	)
+
+	if delegated, ok := findDelegatedDataFlowFunction(
+		bodyNode,
+		source,
+		parameters,
+		classes,
+	); ok {
+		class.Methods[methodName] = delegated
+		delete(class.Mutators, methodName)
+		return
+	}
 
 	fieldParameters := make(map[string]string)
 
@@ -385,4 +401,135 @@ func mapKeys[T any](values map[string]T) []string {
 	}
 
 	return keys
+}
+
+func dataFlowArgumentSource(
+	target dataFlowFunction,
+	arguments *tree_sitter.Node,
+	source []byte,
+	parameter string,
+	property string,
+) string {
+	if parameter == "" {
+		return ""
+	}
+
+	index := -1
+
+	for position, name := range target.Parameters {
+		if name == parameter {
+			index = position
+			break
+		}
+	}
+
+	if index < 0 ||
+		arguments == nil ||
+		uint(index) >= arguments.NamedChildCount() {
+		if property != "" {
+			return parameter + "." + property
+		}
+
+		return parameter
+	}
+
+	argument := arguments.NamedChild(uint(index))
+	if argument == nil {
+		return ""
+	}
+
+	value := strings.TrimSpace(
+		argument.Utf8Text(source),
+	)
+
+	if property != "" {
+		value += "." + property
+	}
+
+	return value
+}
+
+func dataFlowURLSource(
+	target dataFlowFunction,
+	arguments *tree_sitter.Node,
+	source []byte,
+) string {
+	if target.FetchStaticPath != "" {
+		return target.FetchStaticPath
+	}
+
+	if target.RequestURLParam != "" {
+		return dataFlowArgumentSource(
+			target,
+			arguments,
+			source,
+			target.RequestURLParam,
+			target.RequestURLProperty,
+		)
+	}
+
+	return dataFlowArgumentSource(
+		target,
+		arguments,
+		source,
+		target.FetchURLParam,
+		target.FetchURLProperty,
+	)
+}
+
+func dataFlowMethodSource(
+	target dataFlowFunction,
+	arguments *tree_sitter.Node,
+	source []byte,
+) string {
+	if len(target.FetchMethods) > 0 {
+		return strings.Join(target.FetchMethods, "|")
+	}
+
+	if target.RequestMethodParam != "" {
+		return dataFlowArgumentSource(
+			target,
+			arguments,
+			source,
+			target.RequestMethodParam,
+			target.RequestMethodProperty,
+		)
+	}
+
+	return dataFlowArgumentSource(
+		target,
+		arguments,
+		source,
+		target.FetchMethodParam,
+		target.FetchMethodProperty,
+	)
+}
+
+func normalizeHTTPMethod(value string) (string, bool) {
+	method := strings.ToUpper(
+		strings.TrimSpace(value),
+	)
+
+	switch method {
+	case "GET", "POST", "PUT", "DELETE",
+		"PATCH", "OPTIONS", "HEAD":
+		return method, true
+	default:
+		return "", false
+	}
+}
+
+func validHTTPMethods(values []string) []string {
+	methods := make([]string, 0, len(values))
+
+	for _, value := range values {
+		method, ok := normalizeHTTPMethod(value)
+		if !ok || containsString(methods, method) {
+			continue
+		}
+
+		methods = append(methods, method)
+	}
+
+	return methods
 }

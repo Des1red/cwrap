@@ -58,11 +58,13 @@ func NewEntity(url string) *Entity {
 			Tech:    make(map[string]string),
 		},
 		Content: ContentIntel{
-			MIMEs:       make(map[string]int),
-			Statuses:    make(map[int]int),
-			JSFindings:  make(map[string]int),
-			JSLeaks:     []JSLeak{},
-			SeenJSLeaks: make(map[string]bool),
+			MIMEs:           make(map[string]int),
+			Statuses:        make(map[int]int),
+			JSFindings:      make(map[string]int),
+			JSLeaks:         []JSLeak{},
+			SeenJSLeaks:     make(map[string]bool),
+			JSHTTPFlows:     make([]JSHTTPFlow, 0),
+			SeenJSHTTPFlows: make(map[string]bool),
 		},
 		Signals: Signals{
 			Tags: make(map[Signal]bool),
@@ -145,4 +147,38 @@ func identityFingerprint(id *Identity) string {
 		id.Rejected,
 		id.Synthetic,
 	)
+}
+
+func (e *Entity) AddJSHTTPFlow(flow JSHTTPFlow) bool {
+	if flow.Source == "" || flow.Sink == "" {
+		return false
+	}
+
+	if e.Content.SeenJSHTTPFlows == nil {
+		e.Content.SeenJSHTTPFlows = make(map[string]bool)
+	}
+
+	key := fmt.Sprintf(
+		"%s|%s|%s|%s|%s|%s|%t|%t",
+		flow.Source,
+		flow.Function,
+		flow.Sink,
+		flow.URLSource,
+		flow.MethodSource,
+		flow.ResolvedURL+"|"+flow.ResolvedMethod,
+		flow.DynamicURL,
+		flow.DynamicMethod,
+	)
+
+	if e.Content.SeenJSHTTPFlows[key] {
+		return false
+	}
+
+	e.Content.SeenJSHTTPFlows[key] = true
+	e.Content.JSHTTPFlows = append(
+		e.Content.JSHTTPFlows,
+		flow,
+	)
+
+	return true
 }

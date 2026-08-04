@@ -44,6 +44,115 @@ func resolveDataFlowMethods(
 	return []string{"GET"}
 }
 
+func resolveNewDataFlowInstance(
+	node *tree_sitter.Node,
+	source []byte,
+	stringValues map[string]string,
+	classes map[string]dataFlowClass,
+) (dataFlowInstance, bool) {
+	if node == nil {
+		return dataFlowInstance{}, false
+	}
+
+	if node.Kind() == "ternary_expression" {
+		for _, field := range []string{
+			"consequence",
+			"alternative",
+		} {
+			branch := node.ChildByFieldName(field)
+
+			instance, ok := resolveNewDataFlowInstance(
+				branch,
+				source,
+				stringValues,
+				classes,
+			)
+			if ok {
+				return instance, true
+			}
+		}
+
+		return dataFlowInstance{}, false
+	}
+
+	if node.Kind() != "new_expression" {
+		return dataFlowInstance{}, false
+	}
+
+	constructor := node.ChildByFieldName("constructor")
+	arguments := node.ChildByFieldName("arguments")
+
+	if constructor == nil || arguments == nil {
+		return dataFlowInstance{}, false
+	}
+
+	className := strings.TrimSpace(
+		constructor.Utf8Text(source),
+	)
+
+	class, exists := classes[className]
+	if !exists {
+		return dataFlowInstance{}, false
+	}
+
+	instance := dataFlowInstance{
+		ClassName:    className,
+		Fields:       make(map[string]string),
+		ObjectFields: make(map[string]dataFlowInstance),
+	}
+
+	constructorTarget := dataFlowFunction{
+		Parameters: class.ConstructorParameters,
+	}
+
+	values := resolveDataFlowCallValues(
+		constructorTarget,
+		arguments,
+		source,
+		stringValues,
+	)
+
+	for field, parameter := range class.FieldParameters {
+		if value, exists := values.Scalars[parameter]; exists {
+			instance.Fields[field] = value
+		}
+	}
+
+	argumentIndex := 0
+
+	for index := uint(0); index < arguments.NamedChildCount(); index++ {
+		argument := arguments.NamedChild(index)
+		if argument == nil {
+			continue
+		}
+
+		if argumentIndex >= len(class.ConstructorParameters) {
+			break
+		}
+
+		parameter := class.ConstructorParameters[argumentIndex]
+		argumentIndex++
+
+		childInstance, ok := resolveNewDataFlowInstance(
+			argument,
+			source,
+			stringValues,
+			classes,
+		)
+		if !ok {
+			continue
+		}
+
+		for field, fieldParameter := range class.FieldParameters {
+			if fieldParameter == parameter {
+				instance.ObjectFields[field] = childInstance
+			}
+		}
+	}
+
+	return instance, true
+}
+
 func resolveDataFlowPath(
 	target dataFlowFunction,
 	values dataFlowCallValues,
@@ -244,4 +353,150 @@ func resolveLocalObjectNode(
 	}
 
 	return node
+}
+
+func resolveDataFlowParameterReference(
+	node *tree_sitter.Node,
+	source []byte,
+	parameterSet map[string]bool,
+) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+
+	if node.Kind() == "identifier" {
+		name := strings.TrimSpace(
+			node.Utf8Text(source),
+		)
+
+		return name, parameterSet[name]
+	}
+
+	// Handles wrappers such as String(url).
+	if node.Kind() == "call_expression" {
+		function := node.ChildByFieldName("function")
+		arguments := node.ChildByFieldName("arguments")
+
+		if function == nil ||
+			arguments == nil ||
+			arguments.NamedChildCount() != 1 {
+			return "", false
+		}
+
+		functionName := strings.TrimSpace(
+			function.Utf8Text(source),
+		)
+
+		switch functionName {
+		case "String":
+			return resolveDataFlowParameterReference(
+				arguments.NamedChild(0),
+				source,
+				parameterSet,
+			)
+		}
+	}
+
+	return "", false
+}
+
+func resolveDelegatedDataFlowReference(
+	node *tree_sitter.Node,
+	source []byte,
+	parameterSet map[string]bool,
+	fieldParameters map[string]string,
+) (
+	parameter string,
+	property string,
+	ok bool,
+) {
+	if node == nil {
+		return "", "", false
+	}
+
+	if node.Kind() == "identifier" {
+		name := strings.TrimSpace(
+			node.Utf8Text(source),
+		)
+
+		if parameterSet[name] {
+			return name, "", true
+		}
+
+		return "", "", false
+	}
+
+	if node.Kind() != "member_expression" {
+		return "", "", false
+	}
+
+	object := node.ChildByFieldName("object")
+	propertyNode := node.ChildByFieldName("property")
+
+	if object == nil || propertyNode == nil {
+		return "", "", false
+	}
+
+	objectName := strings.TrimSpace(
+		object.Utf8Text(source),
+	)
+
+	propertyName := strings.TrimSpace(
+		propertyNode.Utf8Text(source),
+	)
+
+	if objectName == "this" {
+		if parameter, exists :=
+			fieldParameters[propertyName]; exists {
+
+			return parameter, "", true
+		}
+
+		return "this", propertyName, true
+	}
+
+	if parameterSet[objectName] {
+		return objectName, propertyName, true
+	}
+
+	return "", "", false
+}
+
+func isDataFlowMethodResolved(
+	target dataFlowFunction,
+	values dataFlowCallValues,
+) bool {
+	if len(target.FetchMethods) > 0 {
+		return len(
+			validHTTPMethods(target.FetchMethods),
+		) > 0
+	}
+
+	if target.RequestMethodProperty != "" {
+		properties := values.Objects[target.RequestMethodParam]
+
+		_, exists :=
+			properties[target.RequestMethodProperty]
+
+		return exists
+	}
+
+	if target.FetchMethodProperty != "" {
+		properties := values.Objects[target.FetchMethodParam]
+
+		_, exists :=
+			properties[target.FetchMethodProperty]
+
+		return exists
+	}
+
+	if target.FetchMethodParam != "" {
+		_, exists :=
+			values.Scalars[target.FetchMethodParam]
+
+		return exists
+	}
+
+	// No method binding means the normal fetch default is GET.
+	return true
 }

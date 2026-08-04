@@ -8,7 +8,9 @@ import (
 )
 
 type dataFlowFunction struct {
-	Parameters            []string
+	Parameters []string
+	Sink       string
+
 	FetchURLParam         string
 	FetchMethodParam      string
 	FetchURLProperty      string
@@ -20,6 +22,27 @@ type dataFlowFunction struct {
 	RequestMethodParam    string
 	RequestMethodProperty string
 }
+type JSHTTPFlow struct {
+	Function string
+	Sink     string
+
+	URLSource    string
+	MethodSource string
+
+	ResolvedURL    string
+	ResolvedMethod string
+
+	DynamicURL    bool
+	DynamicMethod bool
+
+	Confidence string
+}
+
+type dataFlowExtractionResult struct {
+	Endpoints []JSEndpoint
+	HTTPFlows []JSHTTPFlow
+}
+
 type dataFlowBinding struct {
 	Target dataFlowFunction
 	Values dataFlowCallValues
@@ -31,10 +54,10 @@ type dataFlowMutator struct {
 }
 
 type dataFlowInstance struct {
-	ClassName string
-	Fields    map[string]string
+	ClassName    string
+	Fields       map[string]string
+	ObjectFields map[string]dataFlowInstance
 }
-
 type dataFlowClass struct {
 	ConstructorParameters []string
 	FieldParameters       map[string]string
@@ -93,16 +116,18 @@ func mergeDataFlowCallValues(
 
 func extractEndpointsDataFlow(
 	source []byte,
-) ([]JSEndpoint, error) {
+) (dataFlowExtractionResult, error) {
 	tree, err := parseJavaScriptTree(source)
 	if err != nil {
-		return nil, err
+		return dataFlowExtractionResult{},
+			fmt.Errorf("parse JavaScript tree: %w", err)
 	}
 	defer tree.Close()
 
 	root := tree.RootNode()
 	if root == nil {
-		return nil, fmt.Errorf("tree-sitter returned nil root node")
+		return dataFlowExtractionResult{},
+			fmt.Errorf("tree-sitter returned nil root node")
 	}
 	stringValues := findStringVariables(root, source)
 
@@ -112,7 +137,9 @@ func extractEndpointsDataFlow(
 		stringValues,
 	)
 	endpoints := make([]JSEndpoint, 0)
+	flows := make([]JSHTTPFlow, 0)
 	seen := make(map[string]bool)
+	seenFlows := make(map[string]bool)
 
 	walkTree(root, func(node *tree_sitter.Node) {
 		if node.Kind() != "call_expression" {
@@ -147,16 +174,73 @@ func extractEndpointsDataFlow(
 			callValues,
 		)
 
+		path, kind, pathResolved := resolveDataFlowPath(
+			binding.Target,
+			values,
+		)
+
 		methods := resolveDataFlowMethods(
 			binding.Target,
 			values,
 		)
 
-		path, kind, ok := resolveDataFlowPath(
+		methodResolved := isDataFlowMethodResolved(
 			binding.Target,
 			values,
 		)
-		if !ok {
+
+		if !pathResolved || !methodResolved {
+			urlSource := dataFlowURLSource(
+				binding.Target,
+				argumentsNode,
+				source,
+			)
+
+			methodSource := dataFlowMethodSource(
+				binding.Target,
+				argumentsNode,
+				source,
+			)
+
+			flow := JSHTTPFlow{
+				Function:      functionName,
+				Sink:          binding.Target.Sink,
+				URLSource:     urlSource,
+				MethodSource:  methodSource,
+				DynamicURL:    !pathResolved,
+				DynamicMethod: !methodResolved,
+				Confidence:    "medium",
+			}
+
+			if pathResolved {
+				flow.ResolvedURL = path
+			}
+
+			if methodResolved && len(methods) == 1 {
+				if method, ok :=
+					normalizeHTTPMethod(methods[0]); ok {
+
+					flow.ResolvedMethod = method
+				}
+			}
+
+			key := fmt.Sprintf(
+				"%s|%s|%s|%s|%s|%s|%t|%t",
+				flow.Function,
+				flow.Sink,
+				flow.URLSource,
+				flow.MethodSource,
+				flow.ResolvedURL,
+				flow.ResolvedMethod,
+				flow.DynamicURL,
+				flow.DynamicMethod,
+			)
+
+			if !seenFlows[key] {
+				seenFlows[key] = true
+				flows = append(flows, flow)
+			}
+
 			return
 		}
 
@@ -171,5 +255,8 @@ func extractEndpointsDataFlow(
 		}
 	})
 
-	return endpoints, nil
+	return dataFlowExtractionResult{
+		Endpoints: endpoints,
+		HTTPFlows: flows,
+	}, nil
 }

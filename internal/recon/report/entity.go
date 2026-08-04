@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 )
 
 type routeKey struct {
@@ -275,22 +276,134 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		}
 	}
 
-	if len(ent.Content.JSFindings) > 0 || len(ent.Content.JSLeaks) > 0 {
+	jsFindingKeys := reportableJSFindingKeys(ent)
+
+	if len(jsFindingKeys) > 0 ||
+		len(ent.Content.JSLeaks) > 0 ||
+		len(ent.Content.JSHTTPFlows) > 0 {
+
 		rw.line(4, "JS Intelligence:")
 
-		if len(ent.Content.JSFindings) > 0 {
-			keys := make([]string, 0, len(ent.Content.JSFindings))
-			for k := range ent.Content.JSFindings {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
-			for _, k := range keys {
-				rw.line(6, "%s: %d", k, ent.Content.JSFindings[k])
+		if len(jsFindingKeys) > 0 {
+			rw.line(6, "Signals:")
+
+			for _, key := range jsFindingKeys {
+				rw.line(
+					8,
+					"%s: %d",
+					key,
+					ent.Content.JSFindings[key],
+				)
 			}
 		}
 
-		for _, leak := range ent.Content.JSLeaks {
-			rw.line(6, "[%s] %s: %s", leak.Kind, leak.Key, leak.Value)
+		if len(ent.Content.JSLeaks) > 0 {
+			rw.line(6, "JS Leaks:")
+
+			for _, leak := range ent.Content.JSLeaks {
+				rw.line(
+					8,
+					"[%s] %s: %s",
+					leak.Kind,
+					leak.Key,
+					leak.Value,
+				)
+			}
+		}
+
+		if len(ent.Content.JSHTTPFlows) > 0 {
+			rw.line(6, "Dynamic HTTP Flows:")
+
+			flows := append(
+				[]knowledge.JSHTTPFlow(nil),
+				ent.Content.JSHTTPFlows...,
+			)
+
+			sort.SliceStable(flows, func(i, j int) bool {
+				if flows[i].Function != flows[j].Function {
+					return flows[i].Function < flows[j].Function
+				}
+
+				if flows[i].Sink != flows[j].Sink {
+					return flows[i].Sink < flows[j].Sink
+				}
+
+				if flows[i].URLSource != flows[j].URLSource {
+					return flows[i].URLSource < flows[j].URLSource
+				}
+
+				return flows[i].MethodSource <
+					flows[j].MethodSource
+			})
+
+			for _, flow := range flows {
+				function := strings.TrimSpace(flow.Function)
+				if function == "" {
+					function = "(anonymous)"
+				}
+
+				sink := strings.TrimSpace(flow.Sink)
+				if sink == "" {
+					sink = "unknown HTTP sink"
+				}
+
+				confidence := strings.TrimSpace(
+					flow.Confidence,
+				)
+				if confidence == "" {
+					confidence = "unknown"
+				}
+
+				rw.line(
+					8,
+					"- %s -> %s [%s confidence]",
+					function,
+					sink,
+					confidence,
+				)
+
+				if flow.ResolvedURL != "" {
+					rw.line(
+						10,
+						"URL: %s [resolved]",
+						flow.ResolvedURL,
+					)
+				} else {
+					urlSource := strings.TrimSpace(
+						flow.URLSource,
+					)
+					if urlSource == "" {
+						urlSource = "unknown"
+					}
+
+					rw.line(
+						10,
+						"URL source: %s [dynamic]",
+						urlSource,
+					)
+				}
+
+				if flow.ResolvedMethod != "" {
+					rw.line(
+						10,
+						"Method: %s [resolved]",
+						flow.ResolvedMethod,
+					)
+				} else {
+					methodSource := strings.TrimSpace(
+						flow.MethodSource,
+					)
+					if methodSource == "" {
+						methodSource = "unknown"
+					}
+
+					rw.line(
+						10,
+						"Method source: %s [dynamic]",
+						methodSource,
+					)
+				}
+			}
 		}
 	}
 
@@ -301,6 +414,46 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 			rw.line(6, "! %s", f)
 		}
 	}
+}
+
+func reportableJSFindingKeys(
+	ent *knowledge.Entity,
+) []string {
+	if ent == nil {
+		return nil
+	}
+
+	keys := make([]string, 0)
+
+	for key, count := range ent.Content.JSFindings {
+		if count <= 0 || hideJSFindingFromReport(key) {
+			continue
+		}
+
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	return keys
+}
+
+func hideJSFindingFromReport(key string) bool {
+	if strings.HasPrefix(key, "ast_") {
+		return true
+	}
+
+	switch key {
+	case "email",
+		"endpoint",
+		"http_flow":
+		return true
+	}
+
+	// Endpoint totals already appear in the discovery and
+	// route trees, so endpoint_literal and other endpoint
+	// implementation counters are redundant here.
+	return strings.HasPrefix(key, "endpoint_")
 }
 
 func writeTaggedProbeLog(w io.Writer, k *knowledge.Knowledge, debug bool) {

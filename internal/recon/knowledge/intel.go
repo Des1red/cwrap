@@ -42,6 +42,9 @@ type ContentIntel struct {
 	JSFindings  map[string]int  // kind -> count (jwt/aws_key/pem/firebase/keyword)
 	JSLeaks     []JSLeak        // optional evidence (redacted unless enabled)
 	SeenJSLeaks map[string]bool // to avoid dupes in JS leaks
+
+	JSHTTPFlows     []JSHTTPFlow
+	SeenJSHTTPFlows map[string]bool
 }
 
 type JSLeak struct {
@@ -49,6 +52,24 @@ type JSLeak struct {
 	Source string // URL of JS or page
 	Key    string // e.g. "apiKey" or "client_secret" if known
 	Value  string // redacted by default; full only if enabled
+}
+
+type JSHTTPFlow struct {
+	Source string
+
+	Function string
+	Sink     string
+
+	URLSource    string
+	MethodSource string
+
+	ResolvedURL    string
+	ResolvedMethod string
+
+	DynamicURL    bool
+	DynamicMethod bool
+
+	Confidence string
 }
 
 type ParamIntel struct {

@@ -99,10 +99,59 @@ func findFetchDataFlowParameters(
 			return
 		}
 
+		if function.Kind() == "member_expression" {
+			property := function.ChildByFieldName("property")
+
+			if property != nil &&
+				strings.TrimSpace(
+					property.Utf8Text(source),
+				) == "open" &&
+				arguments.NamedChildCount() >= 2 {
+				result.Sink = "XMLHttpRequest.open"
+				methodNode := arguments.NamedChild(0)
+				urlNode := arguments.NamedChild(1)
+
+				if method, ok := resolveDataFlowParameterReference(
+					methodNode,
+					source,
+					parameterSet,
+				); ok {
+					result.FetchMethodParam = method
+				} else if staticMethod, ok :=
+					treeStringLiteral(methodNode, source); ok {
+
+					staticMethod = strings.ToUpper(staticMethod)
+
+					if !containsString(
+						result.FetchMethods,
+						staticMethod,
+					) {
+						result.FetchMethods = append(
+							result.FetchMethods,
+							staticMethod,
+						)
+					}
+				}
+
+				if url, ok := resolveDataFlowParameterReference(
+					urlNode,
+					source,
+					parameterSet,
+				); ok {
+					result.FetchURLParam = url
+				} else if staticPath, ok :=
+					treeStringLiteral(urlNode, source); ok {
+
+					result.FetchStaticPath = staticPath
+				}
+
+				return
+			}
+		}
 		if !isFetchCall(function, source) {
 			return
 		}
-
+		result.Sink = "fetch"
 		if arguments.NamedChildCount() >= 1 {
 			urlNode := arguments.NamedChild(0)
 
@@ -576,4 +625,181 @@ func findStaticRequestMethods(
 	}
 
 	return methods
+}
+
+func findDelegatedDataFlowFunction(
+	body *tree_sitter.Node,
+	source []byte,
+	parameters []string,
+	classes map[string]dataFlowClass,
+) (dataFlowFunction, bool) {
+	parameterSet := make(map[string]bool)
+
+	for _, parameter := range parameters {
+		parameterSet[parameter] = true
+	}
+	fieldParameters := make(map[string]string)
+
+	findConstructorBindings(
+		body,
+		source,
+		parameters,
+		fieldParameters,
+	)
+
+	methodTargets := make(map[string]dataFlowFunction)
+	ambiguousMethods := make(map[string]bool)
+
+	for _, class := range classes {
+		for methodName, target := range class.Methods {
+			if _, exists := methodTargets[methodName]; exists {
+				ambiguousMethods[methodName] = true
+				continue
+			}
+
+			methodTargets[methodName] = target
+		}
+	}
+
+	var result dataFlowFunction
+	found := false
+
+	walkTree(body, func(node *tree_sitter.Node) {
+		if found || node.Kind() != "call_expression" {
+			return
+		}
+
+		function := node.ChildByFieldName("function")
+		arguments := node.ChildByFieldName("arguments")
+
+		if function == nil ||
+			arguments == nil ||
+			function.Kind() != "member_expression" {
+			return
+		}
+
+		property := function.ChildByFieldName("property")
+		if property == nil {
+			return
+		}
+
+		methodName := strings.TrimSpace(
+			property.Utf8Text(source),
+		)
+
+		if methodName == "" || ambiguousMethods[methodName] {
+			return
+		}
+
+		target, exists := methodTargets[methodName]
+		if !exists {
+			return
+		}
+
+		delegated := dataFlowFunction{
+			Parameters:   parameters,
+			Sink:         target.Sink,
+			FetchMethods: append([]string(nil), target.FetchMethods...),
+		}
+
+		resolveArgument := func(
+			targetParameter string,
+			targetProperty string,
+		) (string, string, bool) {
+			if targetParameter == "" {
+				return "", "", false
+			}
+
+			parameterIndex := -1
+
+			for index, parameter := range target.Parameters {
+				if parameter == targetParameter {
+					parameterIndex = index
+					break
+				}
+			}
+
+			if parameterIndex < 0 ||
+				uint(parameterIndex) >= arguments.NamedChildCount() {
+				return "", "", false
+			}
+
+			argument := arguments.NamedChild(
+				uint(parameterIndex),
+			)
+
+			parameter, property, ok :=
+				resolveDelegatedDataFlowReference(
+					argument,
+					source,
+					parameterSet,
+					fieldParameters,
+				)
+			if !ok {
+				return "", "", false
+			}
+
+			// The delegated target reads a property from its
+			// argument, for example options.url.
+			if targetProperty != "" {
+				if property != "" {
+					return "", "", false
+				}
+
+				property = targetProperty
+			}
+
+			return parameter, property, true
+		}
+
+		urlParameter := target.FetchURLParam
+		urlProperty := target.FetchURLProperty
+
+		if target.RequestURLParam != "" {
+			urlParameter = target.RequestURLParam
+			urlProperty = target.RequestURLProperty
+		}
+
+		if parameter, property, ok := resolveArgument(
+			urlParameter,
+			urlProperty,
+		); ok {
+			if property == "" {
+				delegated.FetchURLParam = parameter
+			} else {
+				delegated.FetchURLParam = parameter
+				delegated.FetchURLProperty = property
+			}
+		} else if target.FetchStaticPath != "" {
+			delegated.FetchStaticPath =
+				target.FetchStaticPath
+		} else {
+			return
+		}
+
+		methodParameter := target.FetchMethodParam
+		methodProperty := target.FetchMethodProperty
+
+		if target.RequestMethodParam != "" {
+			methodParameter = target.RequestMethodParam
+			methodProperty = target.RequestMethodProperty
+		}
+
+		if parameter, property, ok := resolveArgument(
+			methodParameter,
+			methodProperty,
+		); ok {
+			if property == "" {
+				delegated.FetchMethodParam = parameter
+			} else {
+				delegated.FetchMethodParam = parameter
+				delegated.FetchMethodProperty = property
+			}
+		}
+
+		result = delegated
+		found = true
+	})
+
+	return result, found
 }
