@@ -1,6 +1,7 @@
-package jsintel
+package treesitter
 
 import (
+	"cwrap/internal/recon/jsintel/common"
 	"fmt"
 	"strings"
 
@@ -39,7 +40,7 @@ type JSHTTPFlow struct {
 }
 
 type dataFlowExtractionResult struct {
-	Endpoints []JSEndpoint
+	Endpoints []common.JSEndpoint
 	HTTPFlows []JSHTTPFlow
 }
 
@@ -136,7 +137,7 @@ func extractEndpointsDataFlow(
 		source,
 		stringValues,
 	)
-	endpoints := make([]JSEndpoint, 0)
+	endpoints := make([]common.JSEndpoint, 0)
 	flows := make([]JSHTTPFlow, 0)
 	seen := make(map[string]bool)
 	seenFlows := make(map[string]bool)
@@ -245,7 +246,7 @@ func extractEndpointsDataFlow(
 		}
 
 		for _, method := range methods {
-			appendJSEndpoint(
+			common.AppendJSEndpoint(
 				&endpoints,
 				seen,
 				method,

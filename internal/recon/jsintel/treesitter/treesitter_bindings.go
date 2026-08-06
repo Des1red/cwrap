@@ -1,4 +1,4 @@
-package jsintel
+package treesitter
 
 import (
 	"strings"

@@ -1,6 +1,7 @@
 package jsintel
 
 import (
+	"cwrap/internal/recon/jsintel/common"
 	"cwrap/internal/recon/knowledge"
 	"strings"
 )
@@ -10,18 +11,18 @@ func learnInfrastructure(
 	sourceURL,
 	source string,
 ) {
-	urls := reURL.FindAllString(source, -1)
+	urls := common.ReURL.FindAllString(source, -1)
 	for _, u := range urls {
-		if isNoiseURL(u) {
+		if common.IsNoiseURL(u) {
 			continue
 		}
 		ent.Content.JSFindings["host_url"]++
 		if len(ent.Content.JSLeaks) < 8 {
-			appendLeak(ent, "host_url", sourceURL, "url", redact(u, 180))
+			common.AppendLeak(ent, "host_url", sourceURL, "url", common.Redact(u, 180))
 		}
 	}
 
-	internalDomains := reInternalDomain.FindAllStringSubmatch(source, -1)
+	internalDomains := common.ReInternalDomain.FindAllStringSubmatch(source, -1)
 	if len(internalDomains) > 0 {
 		for _, m := range internalDomains {
 			label := m[1]
@@ -30,16 +31,16 @@ func learnInfrastructure(
 			}
 			ent.Content.JSFindings["host_internal"]++
 			if len(ent.Content.JSLeaks) < 8 {
-				appendLeak(ent, "host_internal", sourceURL, "domain", m[0])
+				common.AppendLeak(ent, "host_internal", sourceURL, "domain", m[0])
 			}
 		}
 	}
 
-	privIPs := reRFC1918.FindAllString(source, -1)
+	privIPs := common.ReRFC1918.FindAllString(source, -1)
 	if len(privIPs) > 0 {
 		ent.Content.JSFindings["host_private_ip"] += len(privIPs)
 		for i := 0; i < len(privIPs) && i < 8; i++ {
-			appendLeak(ent, "host_private_ip", sourceURL, "ip", privIPs[i])
+			common.AppendLeak(ent, "host_private_ip", sourceURL, "ip", privIPs[i])
 		}
 	}
 

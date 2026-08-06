@@ -1,4 +1,4 @@
-package jsintel
+package common
 
 import (
 	"cwrap/internal/recon/knowledge"
@@ -9,47 +9,47 @@ import (
 
 var (
 	// --- secrets / keys ---
-	reJWT    = regexp.MustCompile(`\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`)
-	reAWS    = regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`)
-	rePEM    = regexp.MustCompile(`-----BEGIN (?:RSA |EC |OPENSSH |)?PRIVATE KEY-----`)
-	reAssign = regexp.MustCompile(`(?i)\b(api[_-]?key|client[_-]?secret|secret|token|bearer|authorization|private[_-]?key|password)\b\s*[:=]\s*["']([^"'\n\r]{6,})["']`)
-	reEmail  = regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`)
+	ReJWT    = regexp.MustCompile(`\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b`)
+	ReAWS    = regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`)
+	RePEM    = regexp.MustCompile(`-----BEGIN (?:RSA |EC |OPENSSH |)?PRIVATE KEY-----`)
+	ReAssign = regexp.MustCompile(`(?i)\b(api[_-]?key|client[_-]?secret|secret|token|bearer|authorization|private[_-]?key|password)\b\s*[:=]\s*["']([^"'\n\r]{6,})["']`)
+	ReEmail  = regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`)
 
 	// --- endpoint discovery ---
 	// fetch("/path")  -> method unknown (assume GET)
-	reFetch = regexp.MustCompile(`(?i)\bfetch\(\s*["']([^"']+)["']`)
+	ReFetch = regexp.MustCompile(`(?i)\bfetch\(\s*["']([^"']+)["']`)
 
 	// axios.get("/path") / axios.post("/path") ...
 	// groups: (1)=method (2)=path
-	reAxios = regexp.MustCompile(`(?i)\baxios\.(get|post|put|delete|patch|options|head)\(\s*["']([^"']+)["']`)
+	ReAxios = regexp.MustCompile(`(?i)\baxios\.(get|post|put|delete|patch|options|head)\(\s*["']([^"']+)["']`)
 
 	// xhr.open("POST", "/path")
 	// groups: (1)=method (2)=path
-	reXHR = regexp.MustCompile(`(?i)\.open\(\s*["'](GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)["']\s*,\s*["']([^"']+)["']`)
+	ReXHR = regexp.MustCompile(`(?i)\.open\(\s*["'](GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)["']\s*,\s*["']([^"']+)["']`)
 
 	// string literals that *look* like interesting paths (tight filter)
 	// group: (1)=path
-	rePathLiteral = regexp.MustCompile(`["'](/(?:api|admin|internal|private|debug|graphql|v\d+|auth|login|logout|oauth|swagger)[^"']{0,200})["']`)
+	RePathLiteral = regexp.MustCompile(`["'](/(?:api|admin|internal|private|debug|graphql|v\d+|auth|login|logout|oauth|swagger)[^"']{0,200})["']`)
 
 	// --- roles / privilege surfaces ---
-	reRoleCompare = regexp.MustCompile(`(?is)\b(role|user\.role|claims\.role)\s*(?:===|==|!=|!==)\s*["']([a-z0-9_-]{3,32})["']`)
-	reAdminBool   = regexp.MustCompile(`(?is)\b(isAdmin|admin|is_admin|superuser|isRoot|root)\b\s*(?:===|==|=)\s*(true|false)\b`)
-	rePrivGate    = regexp.MustCompile(`(?is)\bif\s*\([^)]*(admin|isAdmin|superuser|root)[^)]*\)`)
+	ReRoleCompare = regexp.MustCompile(`(?is)\b(role|user\.role|claims\.role)\s*(?:===|==|!=|!==)\s*["']([a-z0-9_-]{3,32})["']`)
+	ReAdminBool   = regexp.MustCompile(`(?is)\b(isAdmin|admin|is_admin|superuser|isRoot|root)\b\s*(?:===|==|=)\s*(true|false)\b`)
+	RePrivGate    = regexp.MustCompile(`(?is)\bif\s*\([^)]*(admin|isAdmin|superuser|root)[^)]*\)`)
 
 	// --- feature flags ---
-	reFeatureToken  = regexp.MustCompile(`(?i)\b(FEATURE_[A-Z0-9_]{3,64}|FLAG_[A-Z0-9_]{3,64})\b`)
-	reFlagAssign    = regexp.MustCompile(`(?is)\b(flags?|featureFlags?|toggles?)\s*[:=]\s*\{[^}]{0,600}\}`)
-	reEnableDisable = regexp.MustCompile(`(?i)\b(enable|enabled|disable|disabled)\s*[_-]?\s*([a-z0-9_]{3,48})\b`)
+	ReFeatureToken  = regexp.MustCompile(`(?i)\b(FEATURE_[A-Z0-9_]{3,64}|FLAG_[A-Z0-9_]{3,64})\b`)
+	ReFlagAssign    = regexp.MustCompile(`(?is)\b(flags?|featureFlags?|toggles?)\s*[:=]\s*\{[^}]{0,600}\}`)
+	ReEnableDisable = regexp.MustCompile(`(?i)\b(enable|enabled|disable|disabled)\s*[_-]?\s*([a-z0-9_]{3,48})\b`)
 
 	// --- env vars ---
-	reProcEnv       = regexp.MustCompile(`\bprocess\.env\.([A-Z0-9_]{2,64})\b`)
-	reImportMetaEnv = regexp.MustCompile(`\bimport\.meta\.env\.([A-Z0-9_]{2,64})\b`)
-	rePublicEnv     = regexp.MustCompile(`\b(NEXT_PUBLIC_[A-Z0-9_]{2,64}|VITE_[A-Z0-9_]{2,64}|REACT_APP_[A-Z0-9_]{2,64})\b`)
+	ReProcEnv       = regexp.MustCompile(`\bprocess\.env\.([A-Z0-9_]{2,64})\b`)
+	ReImportMetaEnv = regexp.MustCompile(`\bimport\.meta\.env\.([A-Z0-9_]{2,64})\b`)
+	RePublicEnv     = regexp.MustCompile(`\b(NEXT_PUBLIC_[A-Z0-9_]{2,64}|VITE_[A-Z0-9_]{2,64}|REACT_APP_[A-Z0-9_]{2,64})\b`)
 
 	// --- hardcoded hosts / URLs ---
-	reURL            = regexp.MustCompile(`(?i)\b(https?|wss?)://[a-z0-9._-]+(?::\d{2,5})?(?:/[^\s"'<>]{0,200})?`)
-	reInternalDomain = regexp.MustCompile(`(?i)\b([a-z0-9][a-z0-9-]{3,})\.(local|lan|internal|intra|corp|home|test)\b`)
-	reRFC1918        = regexp.MustCompile(`\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(?::\d{2,5})?\b`)
+	ReURL            = regexp.MustCompile(`(?i)\b(https?|wss?)://[a-z0-9._-]+(?::\d{2,5})?(?:/[^\s"'<>]{0,200})?`)
+	ReInternalDomain = regexp.MustCompile(`(?i)\b([a-z0-9][a-z0-9-]{3,})\.(local|lan|internal|intra|corp|home|test)\b`)
+	ReRFC1918        = regexp.MustCompile(`\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(?::\d{2,5})?\b`)
 )
 
 type JSEndpoint struct {
@@ -58,7 +58,7 @@ type JSEndpoint struct {
 	Kind   string // "fetch", "axios", "xhr", "literal"
 }
 
-func addJSEndpoint(ent *knowledge.Entity,
+func AddJSEndpoint(ent *knowledge.Entity,
 	out *[]JSEndpoint, seen map[string]bool, method, rawPath, kind string) bool {
 	rawPath = strings.TrimSpace(rawPath)
 	if rawPath == "" {
@@ -90,7 +90,7 @@ func addJSEndpoint(ent *knowledge.Entity,
 	return true
 }
 
-func appendJSEndpoint(
+func AppendJSEndpoint(
 	out *[]JSEndpoint,
 	seen map[string]bool,
 	method,
@@ -127,7 +127,7 @@ func appendJSEndpoint(
 
 	return true
 }
-func appendLeak(ent *knowledge.Entity, kind, source, key, value string) {
+func AppendLeak(ent *knowledge.Entity, kind, source, key, value string) {
 
 	if ent.Content.SeenJSLeaks == nil {
 		ent.Content.SeenJSLeaks = make(map[string]bool)
@@ -149,7 +149,7 @@ func appendLeak(ent *knowledge.Entity, kind, source, key, value string) {
 	})
 }
 
-func redact(s string, max int) string {
+func Redact(s string, max int) string {
 	if max <= 0 {
 		return ""
 	}
@@ -190,7 +190,7 @@ func IsPhantomJSURL(k *knowledge.Knowledge, resolvedURL string) bool {
 
 // isNoiseURL returns true for URLs that are structurally valid but semantically
 // useless for recon — XML namespaces, W3C schema URIs, CDN boilerplate, etc.
-func isNoiseURL(u string) bool {
+func IsNoiseURL(u string) bool {
 	noise := []string{
 		"www.w3.org",
 		"schemas.xmlsoap.org",

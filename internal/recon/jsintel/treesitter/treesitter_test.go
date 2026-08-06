@@ -1,4 +1,4 @@
-package jsintel
+package treesitter
 
 import (
 	"strings"
@@ -414,7 +414,7 @@ func TestExtractEndpointsHybridResolvesFunctionArgument(t *testing.T) {
 		request("/api/users");
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
 	}
@@ -456,7 +456,7 @@ func TestExtractEndpointsHybridResolvesVariableArgument(t *testing.T) {
 		request(endpoint);
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
 	}
@@ -496,7 +496,7 @@ func TestExtractEndpointsHybridResolvesObjectPropertyArgument(
 		});
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
 	}
@@ -538,7 +538,7 @@ func TestExtractEndpointsHybridResolvesFetchMethodParameter(
 		request("/api/users", "POST");
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
 	}
@@ -578,7 +578,7 @@ func TestExtractEndpointsHybridResolvesObjectMethodProperty(
 		});
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
 	}
@@ -620,7 +620,7 @@ func TestExtractEndpointsHybridResolvesArrowFunctionArgument(
 		request("/api/users", "POST");
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
 	}
@@ -661,7 +661,7 @@ func TestExtractEndpointsHybridResolvesConciseArrowFunction(
 		request("/api/users", "POST");
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
 	}
@@ -704,7 +704,7 @@ func TestExtractEndpointsHybridResolvesConditionalFetchMethod(
 		request("/api/session", token);
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -748,7 +748,7 @@ func TestExtractEndpointsHybridResolvesRequestConstructor(
 		request();
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -790,7 +790,7 @@ func TestExtractEndpointsHybridResolvesDynamicRequestProperties(
 		});
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -841,7 +841,7 @@ func TestExtractEndpointsHybridResolvesRequestInstanceFields(
 		client.send();
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -890,7 +890,7 @@ func TestExtractEndpointsHybridResolvesPrototypeInstanceFields(
 		client.send();
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -938,7 +938,7 @@ func TestExtractEndpointsHybridResolvesRequestOptionsVariable(
 		client.send();
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -989,7 +989,7 @@ func TestExtractEndpointsHybridResolvesMemberFetchCall(
 		client.send();
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -1037,7 +1037,7 @@ func TestExtractEndpointsHybridResolvesInstanceMutatorMethod(
 		client.send();
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -1087,7 +1087,7 @@ func TestExtractEndpointsHybridResolvesPrototypeAlias(
 		client.send();
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -1138,7 +1138,7 @@ func TestExtractEndpointsHybridResolvesAssignedPrototypeAlias(
 		client.send();
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -1194,7 +1194,7 @@ func TestExtractEndpointsHybridResolvesFactoryCreatedInstance(t *testing.T) {
 		client.send();
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -1268,7 +1268,7 @@ func TestExtractEndpointsHybridResolvesFactoryStoredInConstructorField(
 		);
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -1329,7 +1329,7 @@ func TestExtractEndpointsHybridResolvesReturnedInstanceStoredInObjectField(
 		);
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",
@@ -1363,7 +1363,7 @@ func TestExtractEndpointsHybridRecordsDynamicHTTPFlow(
 		request(runtimeURL, runtimeMethod);
 	`)
 
-	result, err := extractEndpointsHybrid(source)
+	result, err := ExtractEndpointsHybrid(source)
 	if err != nil {
 		t.Fatalf(
 			"extractEndpointsHybrid returned error: %v",

@@ -1,6 +1,7 @@
 package jsintel
 
 import (
+	"cwrap/internal/recon/jsintel/common"
 	"cwrap/internal/recon/knowledge"
 	"testing"
 )
@@ -22,7 +23,7 @@ func hasLeak(ent *knowledge.Entity, kind, key string) bool {
 	return false
 }
 
-func hasEndpoint(eps []JSEndpoint, method, path string) bool {
+func hasEndpoint(eps []common.JSEndpoint, method, path string) bool {
 	for _, ep := range eps {
 		if ep.Method == method && ep.Path == path {
 			return true

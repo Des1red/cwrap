@@ -1,7 +1,12 @@
-package jsintel
+package treesitter
+
+import (
+	astp "cwrap/internal/recon/jsintel/ast"
+	"cwrap/internal/recon/jsintel/common"
+)
 
 type hybridEndpointResult struct {
-	Endpoints []JSEndpoint
+	Endpoints []common.JSEndpoint
 	HTTPFlows []JSHTTPFlow
 
 	Scopes       int
@@ -10,11 +15,11 @@ type hybridEndpointResult struct {
 	Recovered    bool
 }
 
-func extractEndpointsHybrid(
+func ExtractEndpointsHybrid(
 	source []byte,
 ) (hybridEndpointResult, error) {
 	astEndpoints, gojaErr :=
-		extractEndpointsAST(string(source))
+		astp.ExtractEndpointsAST(string(source))
 
 	dataFlowResult, dataFlowErr :=
 		extractEndpointsDataFlow(source)
@@ -68,14 +73,14 @@ func extractEndpointsHybrid(
 }
 
 func mergeJSEndpoints(
-	groups ...[]JSEndpoint,
-) []JSEndpoint {
-	merged := make([]JSEndpoint, 0)
+	groups ...[]common.JSEndpoint,
+) []common.JSEndpoint {
+	merged := make([]common.JSEndpoint, 0)
 	seen := make(map[string]bool)
 
 	for _, endpoints := range groups {
 		for _, endpoint := range endpoints {
-			appendJSEndpoint(
+			common.AppendJSEndpoint(
 				&merged,
 				seen,
 				endpoint.Method,

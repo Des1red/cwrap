@@ -1,6 +1,9 @@
-package jsintel
+package astp_test
 
 import (
+	"cwrap/internal/recon/jsintel"
+	astp "cwrap/internal/recon/jsintel/ast"
+	"cwrap/internal/recon/jsintel/common"
 	"cwrap/internal/recon/knowledge"
 	"testing"
 )
@@ -12,7 +15,7 @@ func TestExtractFetchAST_StringLiteral(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/users",
 		Method: "GET",
 		Kind:   "fetch-ast",
@@ -27,7 +30,7 @@ func TestExtractFetchAST_ConstantIdentifier(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/users",
 		Method: "GET",
 		Kind:   "fetch-ast",
@@ -44,7 +47,7 @@ func TestExtractFetchAST_Concatenation(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/users",
 		Method: "GET",
 		Kind:   "fetch-ast",
@@ -58,7 +61,7 @@ func TestExtractFetchAST_TemplateLiteral(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/v2/users",
 		Method: "GET",
 		Kind:   "fetch-ast",
@@ -77,7 +80,7 @@ func TestExtractFetchAST_Method(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/users",
 		Method: "POST",
 		Kind:   "fetch-ast",
@@ -113,8 +116,8 @@ func TestExtractFetchAST_Deduplicates(t *testing.T) {
 
 func assertEndpoint(
 	t *testing.T,
-	endpoints []JSEndpoint,
-	want JSEndpoint,
+	endpoints []common.JSEndpoint,
+	want common.JSEndpoint,
 ) {
 	t.Helper()
 
@@ -143,7 +146,7 @@ func TestExtractEndpointsAST_AxiosConstant(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/users",
 		Method: "POST",
 		Kind:   "axios-ast",
@@ -157,7 +160,7 @@ func TestExtractEndpointsAST_AxiosTemplateLiteral(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/v2/users",
 		Method: "GET",
 		Kind:   "axios-ast",
@@ -176,7 +179,7 @@ func TestExtractEndpointsAST_XHRConstants(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/users",
 		Method: "POST",
 		Kind:   "xhr-ast",
@@ -191,7 +194,7 @@ func TestExtractEndpointsAST_XHRTemplateLiteral(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/v3/items",
 		Method: "GET",
 		Kind:   "xhr-ast",
@@ -209,7 +212,7 @@ func TestExtractEndpointsAST_AxiosInstance(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "https://api.example.com/v1/users",
 		Method: "GET",
 		Kind:   "axios-instance-ast",
@@ -230,7 +233,7 @@ func TestExtractEndpointsAST_AxiosInstanceResolvedBaseURL(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "https://api.example.com/v2/accounts",
 		Method: "POST",
 		Kind:   "axios-instance-ast",
@@ -248,7 +251,7 @@ func TestExtractEndpointsAST_AxiosInstanceAbsolutePath(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "https://other.example.com/status",
 		Method: "GET",
 		Kind:   "axios-instance-ast",
@@ -267,7 +270,7 @@ func TestExtractEndpointsAST_ObjectProperties(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/v2/users",
 		Method: "GET",
 		Kind:   "fetch-ast",
@@ -285,7 +288,7 @@ func TestExtractEndpointsAST_BracketProperty(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/users",
 		Method: "POST",
 		Kind:   "axios-ast",
@@ -305,7 +308,7 @@ func TestExtractEndpointsAST_ObjectValueUsesConstant(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/internal/users",
 		Method: "GET",
 		Kind:   "fetch-ast",
@@ -327,7 +330,7 @@ func TestExtractEndpointsAST_AxiosConfig(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/users",
 		Method: "POST",
 		Kind:   "axios-config-ast",
@@ -347,7 +350,7 @@ func TestExtractEndpointsAST_AxiosConfigDefaultsToGET(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/status",
 		Method: "GET",
 		Kind:   "axios-config-ast",
@@ -367,7 +370,7 @@ func TestExtractEndpointsAST_AxiosConfigVariableMethod(t *testing.T) {
 
 	got := mustExtractEndpointsAST(t, source)
 
-	assertEndpoint(t, got, JSEndpoint{
+	assertEndpoint(t, got, common.JSEndpoint{
 		Path:   "/api/account",
 		Method: "PATCH",
 		Kind:   "axios-config-ast",
@@ -387,14 +390,14 @@ func TestLearn_ExtractsResolvedFetchEndpoint(t *testing.T) {
 		});
 	`)
 
-	endpoints := Learn(
+	endpoints := jsintel.Learn(
 		k,
 		ent,
 		"https://example.com/app.js",
 		body,
 	)
 
-	want := JSEndpoint{
+	want := common.JSEndpoint{
 		Path:   "/api/v2/users",
 		Method: "POST",
 		Kind:   "fetch-ast",
@@ -416,10 +419,10 @@ func TestLearn_ExtractsResolvedFetchEndpoint(t *testing.T) {
 func mustExtractEndpointsAST(
 	t *testing.T,
 	source string,
-) []JSEndpoint {
+) []common.JSEndpoint {
 	t.Helper()
 
-	endpoints, err := extractEndpointsAST(source)
+	endpoints, err := astp.ExtractEndpointsAST(source)
 	if err != nil {
 		t.Fatalf("extract AST endpoints: %v", err)
 	}

@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"cwrap/internal/recon/jsintel"
+	"cwrap/internal/recon/jsintel/common"
 	"cwrap/internal/recon/knowledge"
 	"strings"
 	"time"
@@ -158,11 +159,11 @@ func (e *Engine) extractHTML(ent *knowledge.Entity, body []byte) {
 						// SPA shells return the same HTML for every route, causing
 						// relative script imports to resolve under arbitrary prefixes
 						// (e.g. /api/js/app.js, /api/logout/js/app.js)
-						if jsintel.IsPhantomJSURL(e.k, link) {
+						if common.IsPhantomJSURL(e.k, link) {
 							break
 						}
 
-						if suffix := jsintel.JSPathSuffix(link); suffix != "" {
+						if suffix := common.JSPathSuffix(link); suffix != "" {
 							if !e.k.RegisterJSSuffix(suffix) {
 								// lost the race — another goroutine already registered this suffix
 								break

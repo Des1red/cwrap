@@ -1,6 +1,8 @@
 package jsintel
 
 import (
+	"cwrap/internal/recon/jsintel/common"
+	"cwrap/internal/recon/jsintel/treesitter"
 	"cwrap/internal/recon/knowledge"
 	"strings"
 )
@@ -9,12 +11,12 @@ func discoverEndpoints(
 	ent *knowledge.Entity,
 	sourceURL string,
 	source string,
-) []JSEndpoint {
+) []common.JSEndpoint {
 	seen := make(map[string]bool)
-	endpoints := make([]JSEndpoint, 0)
+	endpoints := make([]common.JSEndpoint, 0)
 	endpointCount := 0
 
-	result, astErr := extractEndpointsHybrid([]byte(source))
+	result, astErr := treesitter.ExtractEndpointsHybrid([]byte(source))
 
 	if astErr != nil {
 		ent.Content.JSFindings["ast_parse_error"]++
@@ -62,7 +64,7 @@ func discoverEndpoints(
 
 	for _, endpoint := range result.Endpoints {
 
-		if addJSEndpoint(
+		if common.AddJSEndpoint(
 			ent,
 			&endpoints,
 			seen,
@@ -74,8 +76,8 @@ func discoverEndpoints(
 		}
 	}
 
-	for _, match := range reFetch.FindAllStringSubmatch(source, -1) {
-		if addJSEndpoint(
+	for _, match := range common.ReFetch.FindAllStringSubmatch(source, -1) {
+		if common.AddJSEndpoint(
 			ent,
 			&endpoints,
 			seen,
@@ -87,8 +89,8 @@ func discoverEndpoints(
 		}
 	}
 
-	for _, match := range reAxios.FindAllStringSubmatch(source, -1) {
-		if addJSEndpoint(
+	for _, match := range common.ReAxios.FindAllStringSubmatch(source, -1) {
+		if common.AddJSEndpoint(
 			ent,
 			&endpoints,
 			seen,
@@ -100,8 +102,8 @@ func discoverEndpoints(
 		}
 	}
 
-	for _, match := range reXHR.FindAllStringSubmatch(source, -1) {
-		if addJSEndpoint(
+	for _, match := range common.ReXHR.FindAllStringSubmatch(source, -1) {
+		if common.AddJSEndpoint(
 			ent,
 			&endpoints,
 			seen,
@@ -113,8 +115,8 @@ func discoverEndpoints(
 		}
 	}
 
-	for _, match := range rePathLiteral.FindAllStringSubmatch(source, -1) {
-		if addJSEndpoint(
+	for _, match := range common.RePathLiteral.FindAllStringSubmatch(source, -1) {
+		if common.AddJSEndpoint(
 			ent,
 			&endpoints,
 			seen,

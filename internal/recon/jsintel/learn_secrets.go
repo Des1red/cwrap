@@ -1,6 +1,7 @@
 package jsintel
 
 import (
+	"cwrap/internal/recon/jsintel/common"
 	"cwrap/internal/recon/knowledge"
 	"strings"
 )
@@ -11,10 +12,10 @@ func learnSecrets(
 	sourceURL,
 	source string,
 ) {
-	if rePEM.FindStringIndex(source) != nil {
+	if common.RePEM.FindStringIndex(source) != nil {
 		ent.Tag(knowledge.SigSensitiveKeyword)
 		ent.Content.JSFindings["pem"]++
-		appendLeak(
+		common.AppendLeak(
 			ent,
 			"pem",
 			sourceURL,
@@ -23,13 +24,13 @@ func learnSecrets(
 		)
 	}
 
-	awsKeys := reAWS.FindAllString(source, -1)
+	awsKeys := common.ReAWS.FindAllString(source, -1)
 	if len(awsKeys) > 0 {
 		ent.Tag(knowledge.SigSensitiveKeyword)
 		ent.Content.JSFindings["aws_key"] += len(awsKeys)
 
 		for index := 0; index < len(awsKeys) && index < 5; index++ {
-			appendLeak(
+			common.AppendLeak(
 				ent,
 				"aws_key",
 				sourceURL,
@@ -39,13 +40,13 @@ func learnSecrets(
 		}
 	}
 
-	jwts := reJWT.FindAllString(source, -1)
+	jwts := common.ReJWT.FindAllString(source, -1)
 	if len(jwts) > 0 {
 		ent.Tag(knowledge.SigSensitiveKeyword)
 		ent.Content.JSFindings["jwt"] += len(jwts)
 
 		for index := 0; index < len(jwts) && index < 5; index++ {
-			appendLeak(
+			common.AppendLeak(
 				ent,
 				"jwt",
 				sourceURL,
@@ -55,16 +56,16 @@ func learnSecrets(
 		}
 	}
 
-	assignments := reAssign.FindAllStringSubmatch(source, -1)
+	assignments := common.ReAssign.FindAllStringSubmatch(source, -1)
 	if len(assignments) > 0 {
 		ent.Tag(knowledge.SigSensitiveKeyword)
 		ent.Content.JSFindings["keyword"] += len(assignments)
 
 		for index := 0; index < len(assignments) && index < 5; index++ {
 			key := strings.ToLower(assignments[index][1])
-			value := redact(assignments[index][2], 200)
+			value := common.Redact(assignments[index][2], 200)
 
-			appendLeak(
+			common.AppendLeak(
 				ent,
 				"keyword",
 				sourceURL,
@@ -79,7 +80,7 @@ func learnSecrets(
 		strings.Contains(source, "apiKey") {
 		ent.Content.JSFindings["firebase"]++
 
-		appendLeak(
+		common.AppendLeak(
 			ent,
 			"firebase",
 			sourceURL,
@@ -88,7 +89,7 @@ func learnSecrets(
 		)
 	}
 
-	emails := reEmail.FindAllString(source, -1)
+	emails := common.ReEmail.FindAllString(source, -1)
 	if len(emails) == 0 {
 		return
 	}
@@ -96,7 +97,7 @@ func learnSecrets(
 	ent.Content.JSFindings["email"] += len(emails)
 
 	for _, email := range emails {
-		appendLeak(
+		common.AppendLeak(
 			ent,
 			"email",
 			sourceURL,

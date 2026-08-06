@@ -1,8 +1,11 @@
 package jsintel
 
-import "cwrap/internal/recon/knowledge"
+import (
+	"cwrap/internal/recon/jsintel/common"
+	"cwrap/internal/recon/knowledge"
+)
 
-func Learn(k *knowledge.Knowledge, ent *knowledge.Entity, sourceURL string, body []byte) []JSEndpoint {
+func Learn(k *knowledge.Knowledge, ent *knowledge.Entity, sourceURL string, body []byte) []common.JSEndpoint {
 	if ent == nil {
 		return nil
 	}

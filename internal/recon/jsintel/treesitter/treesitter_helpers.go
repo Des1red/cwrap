@@ -1,6 +1,8 @@
-package jsintel
+package treesitter
 
 import (
+	astp "cwrap/internal/recon/jsintel/ast"
+	"cwrap/internal/recon/jsintel/common"
 	"fmt"
 	"strings"
 
@@ -183,8 +185,8 @@ func nearestJavaScriptScope(
 
 func extractEndpointsFromTreeScopes(
 	scopes []javaScriptScope,
-) ([]JSEndpoint, int, int) {
-	endpoints := make([]JSEndpoint, 0)
+) ([]common.JSEndpoint, int, int) {
+	endpoints := make([]common.JSEndpoint, 0)
 	seen := make(map[string]bool)
 	parsedScopes := 0
 	failedScopes := 0
@@ -192,7 +194,7 @@ func extractEndpointsFromTreeScopes(
 	for _, scope := range scopes {
 		scopeSource := prepareScopeForGoja(scope)
 
-		resolved, parseErr := parseEndpointProgram(scopeSource)
+		resolved, parseErr := astp.ExtractEndpointsAST(scopeSource)
 		if parseErr != nil {
 			failedScopes++
 			continue
@@ -201,7 +203,7 @@ func extractEndpointsFromTreeScopes(
 		parsedScopes++
 
 		for _, endpoint := range resolved {
-			appendJSEndpoint(
+			common.AppendJSEndpoint(
 				&endpoints,
 				seen,
 				endpoint.Method,

@@ -1,7 +1,7 @@
 package http
 
 import (
-	"cwrap/internal/recon/jsintel"
+	"cwrap/internal/recon/jsintel/common"
 	"cwrap/internal/recon/knowledge"
 	"net/http"
 	"strings"
@@ -51,7 +51,7 @@ func isStaticAssetURL(u string) bool {
 func (e *Engine) handleJSEndpoints(
 	ent *knowledge.Entity,
 	sourceURL string,
-	endpoints []jsintel.JSEndpoint,
+	endpoints []common.JSEndpoint,
 ) {
 	for _, ep := range endpoints {
 		link, ok := e.normalizeLink(sourceURL, ep.Path)

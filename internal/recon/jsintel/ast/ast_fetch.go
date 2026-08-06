@@ -1,8 +1,9 @@
-package jsintel
+package astp
 
 import (
 	"fmt"
 
+	"cwrap/internal/recon/jsintel/common"
 	"strings"
 
 	"github.com/dop251/goja/ast"
@@ -15,15 +16,15 @@ type endpointASTExtractor struct {
 	objectValues map[string]map[string]string
 	axiosClients map[string]string
 
-	endpoints []JSEndpoint
+	endpoints []common.JSEndpoint
 	seen      map[string]bool
 }
 
-func extractEndpointsAST(source string) ([]JSEndpoint, error) {
+func ExtractEndpointsAST(source string) ([]common.JSEndpoint, error) {
 	return parseEndpointProgram(source)
 }
 
-func parseEndpointProgram(source string) ([]JSEndpoint, error) {
+func parseEndpointProgram(source string) ([]common.JSEndpoint, error) {
 	program, err := parser.ParseFile(nil, "", source, 0)
 	if err != nil {
 		return nil, err
@@ -513,7 +514,7 @@ func (e *endpointASTExtractor) handleFetchCall(
 		}
 	}
 
-	appendJSEndpoint(
+	common.AppendJSEndpoint(
 		&e.endpoints,
 		e.seen,
 		method,
@@ -573,7 +574,7 @@ func (e *endpointASTExtractor) handleAxiosCall(
 		kind = "axios-instance-ast"
 	}
 
-	appendJSEndpoint(
+	common.AppendJSEndpoint(
 		&e.endpoints,
 		e.seen,
 		method,
@@ -630,7 +631,7 @@ func (e *endpointASTExtractor) handleAxiosConfigCall(
 		return true
 	}
 
-	appendJSEndpoint(
+	common.AppendJSEndpoint(
 		&e.endpoints,
 		e.seen,
 		method,
@@ -694,7 +695,7 @@ func (e *endpointASTExtractor) handleXHRCall(
 		return true
 	}
 
-	appendJSEndpoint(
+	common.AppendJSEndpoint(
 		&e.endpoints,
 		e.seen,
 		method,
