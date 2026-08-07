@@ -1,40 +1,8 @@
 package treesitter
 
 import (
-	"strings"
-
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
-
-func findDataFlowBindings(
-	root *tree_sitter.Node,
-	source []byte,
-	stringValues map[string]string,
-) map[string]dataFlowBinding {
-	bindings := make(map[string]dataFlowBinding)
-
-	classes := findDataFlowClasses(
-		root,
-		source,
-	)
-
-	registerFunctionBindings(
-		root,
-		source,
-		classes,
-		bindings,
-	)
-
-	registerInstanceBindings(
-		root,
-		source,
-		stringValues,
-		classes,
-		bindings,
-	)
-
-	return bindings
-}
 
 func registerFunctionBindings(
 	root *tree_sitter.Node,
@@ -88,9 +56,7 @@ func registerFunctionBindings(
 			return
 		}
 
-		name := strings.TrimSpace(
-			nameNode.Utf8Text(source),
-		)
+		name := nodeText(nameNode, source)
 		if name == "" {
 			return
 		}
@@ -113,318 +79,6 @@ func registerFunctionBindings(
 		bindings[name] = dataFlowBinding{
 			Target: delegated,
 			Values: newDataFlowCallValues(),
-		}
-	})
-}
-
-func findDataFlowClasses(
-	root *tree_sitter.Node,
-	source []byte,
-) map[string]dataFlowClass {
-	classes := make(map[string]dataFlowClass)
-
-	walkTree(root, func(node *tree_sitter.Node) {
-		if node.Kind() != "class_declaration" {
-			return
-		}
-
-		nameNode := node.ChildByFieldName("name")
-		bodyNode := node.ChildByFieldName("body")
-
-		if nameNode == nil || bodyNode == nil {
-			return
-		}
-
-		className := strings.TrimSpace(
-			nameNode.Utf8Text(source),
-		)
-
-		if className == "" {
-			return
-		}
-
-		class := dataFlowClass{
-			FieldParameters: make(map[string]string),
-			Methods:         make(map[string]dataFlowFunction),
-			Mutators:        make(map[string]dataFlowMutator),
-		}
-
-		for index := uint(0); index < bodyNode.NamedChildCount(); index++ {
-
-			methodNode := bodyNode.NamedChild(index)
-
-			if methodNode == nil ||
-				methodNode.Kind() != "method_definition" {
-				continue
-			}
-
-			name := methodNode.ChildByFieldName("name")
-			parameters :=
-				methodNode.ChildByFieldName("parameters")
-			body := methodNode.ChildByFieldName("body")
-
-			if name == nil ||
-				parameters == nil ||
-				body == nil {
-				continue
-			}
-
-			methodName := strings.TrimSpace(
-				name.Utf8Text(source),
-			)
-
-			if methodName == "constructor" {
-				class.ConstructorParameters =
-					collectDataFlowParameters(
-						parameters,
-						source,
-					)
-
-				findConstructorBindings(
-					body,
-					source,
-					class.ConstructorParameters,
-					class.FieldParameters,
-				)
-
-				continue
-			}
-
-			registerDataFlowClassMethod(
-				&class,
-				methodName,
-				parameters,
-				body,
-				source,
-				classes,
-			)
-		}
-
-		if len(class.Methods) > 0 {
-			classes[className] = class
-		}
-	})
-	walkTree(root, func(node *tree_sitter.Node) {
-		if node.Kind() != "function_declaration" {
-			return
-		}
-
-		nameNode := node.ChildByFieldName("name")
-		parametersNode := node.ChildByFieldName("parameters")
-		bodyNode := node.ChildByFieldName("body")
-
-		if nameNode == nil ||
-			parametersNode == nil ||
-			bodyNode == nil {
-			return
-		}
-
-		className := strings.TrimSpace(
-			nameNode.Utf8Text(source),
-		)
-		if className == "" {
-			return
-		}
-
-		class, exists := classes[className]
-		if !exists {
-			class = dataFlowClass{
-				FieldParameters: make(map[string]string),
-				Methods:         make(map[string]dataFlowFunction),
-				Mutators:        make(map[string]dataFlowMutator),
-			}
-		}
-
-		constructorParameters := collectDataFlowParameters(
-			parametersNode,
-			source,
-		)
-
-		findConstructorBindings(
-			bodyNode,
-			source,
-			constructorParameters,
-			class.FieldParameters,
-		)
-
-		class.ConstructorParameters = constructorParameters
-		classes[className] = class
-	})
-	prototypeAliases := make(map[string]string)
-
-	walkTree(root, func(node *tree_sitter.Node) {
-		if node.Kind() != "assignment_expression" {
-			return
-		}
-
-		left := node.ChildByFieldName("left")
-		right := node.ChildByFieldName("right")
-		if left != nil &&
-			right != nil &&
-			left.Kind() == "identifier" &&
-			right.Kind() == "member_expression" {
-
-			object := right.ChildByFieldName("object")
-			property := right.ChildByFieldName("property")
-
-			if object != nil &&
-				property != nil &&
-				strings.TrimSpace(
-					property.Utf8Text(source),
-				) == "prototype" {
-
-				aliasName := strings.TrimSpace(
-					left.Utf8Text(source),
-				)
-
-				className := strings.TrimSpace(
-					object.Utf8Text(source),
-				)
-
-				prototypeAliases[aliasName] = className
-
-				return
-			}
-		}
-		if left == nil ||
-			right == nil ||
-			left.Kind() != "member_expression" ||
-			right.Kind() != "function_expression" {
-			return
-		}
-
-		methodNameNode := left.ChildByFieldName("property")
-		methodObject := left.ChildByFieldName("object")
-
-		if methodNameNode == nil || methodObject == nil {
-			return
-		}
-
-		className := ""
-
-		switch methodObject.Kind() {
-		case "member_expression":
-			classNode :=
-				methodObject.ChildByFieldName("object")
-
-			prototypeProperty :=
-				methodObject.ChildByFieldName("property")
-
-			if classNode == nil || prototypeProperty == nil {
-				return
-			}
-
-			if strings.TrimSpace(
-				prototypeProperty.Utf8Text(source),
-			) != "prototype" {
-				return
-			}
-
-			className = strings.TrimSpace(
-				classNode.Utf8Text(source),
-			)
-
-		case "identifier":
-			aliasName := strings.TrimSpace(
-				methodObject.Utf8Text(source),
-			)
-
-			className = prototypeAliases[aliasName]
-
-		default:
-			return
-		}
-
-		if className == "" {
-			return
-		}
-
-		methodName := strings.TrimSpace(
-			methodNameNode.Utf8Text(source),
-		)
-
-		class, exists := classes[className]
-		if !exists || methodName == "" {
-			return
-		}
-
-		parametersNode :=
-			right.ChildByFieldName("parameters")
-		bodyNode := right.ChildByFieldName("body")
-
-		if parametersNode == nil || bodyNode == nil {
-			return
-		}
-
-		registerDataFlowClassMethod(
-			&class,
-			methodName,
-			parametersNode,
-			bodyNode,
-			source,
-			classes,
-		)
-
-		classes[className] = class
-	})
-
-	return classes
-}
-
-func findConstructorBindings(
-	body *tree_sitter.Node,
-	source []byte,
-	parameters []string,
-	fields map[string]string,
-) {
-	parameterSet := make(map[string]bool)
-
-	for _, parameter := range parameters {
-		parameterSet[parameter] = true
-	}
-
-	walkTree(body, func(node *tree_sitter.Node) {
-		if node.Kind() != "assignment_expression" {
-			return
-		}
-
-		left := node.ChildByFieldName("left")
-		right := node.ChildByFieldName("right")
-
-		if left == nil ||
-			right == nil ||
-			left.Kind() != "member_expression" ||
-			right.Kind() != "identifier" {
-			return
-		}
-
-		object := left.ChildByFieldName("object")
-		property := left.ChildByFieldName("property")
-
-		if object == nil || property == nil {
-			return
-		}
-
-		if strings.TrimSpace(
-			object.Utf8Text(source),
-		) != "this" {
-			return
-		}
-
-		parameter := strings.TrimSpace(
-			right.Utf8Text(source),
-		)
-
-		if !parameterSet[parameter] {
-			return
-		}
-
-		field := strings.TrimSpace(
-			property.Utf8Text(source),
-		)
-
-		if field != "" {
-			fields[field] = parameter
 		}
 	})
 }
@@ -459,9 +113,7 @@ func registerInstanceBindings(
 			return
 		}
 
-		instanceName := strings.TrimSpace(
-			nameNode.Utf8Text(source),
-		)
+		instanceName := nodeText(nameNode, source)
 
 		if instanceName == "" {
 			return
@@ -508,13 +160,9 @@ func registerInstanceBindings(
 			return
 		}
 
-		instanceName := strings.TrimSpace(
-			object.Utf8Text(source),
-		)
+		instanceName := nodeText(object, source)
 
-		methodName := strings.TrimSpace(
-			property.Utf8Text(source),
-		)
+		methodName := nodeText(property, source)
 
 		instance, exists := instances[instanceName]
 		if !exists {
@@ -573,4 +221,86 @@ func registerInstanceBindings(
 				}
 		}
 	}
+}
+
+func findConstructorBindings(
+	body *tree_sitter.Node,
+	source []byte,
+	parameters []string,
+	fields map[string]string,
+) {
+	parameterSet := make(map[string]bool)
+
+	for _, parameter := range parameters {
+		parameterSet[parameter] = true
+	}
+
+	walkTree(body, func(node *tree_sitter.Node) {
+		if node.Kind() != "assignment_expression" {
+			return
+		}
+
+		left := node.ChildByFieldName("left")
+		right := node.ChildByFieldName("right")
+
+		if left == nil ||
+			right == nil ||
+			left.Kind() != "member_expression" ||
+			right.Kind() != "identifier" {
+			return
+		}
+
+		object := left.ChildByFieldName("object")
+		property := left.ChildByFieldName("property")
+
+		if object == nil || property == nil {
+			return
+		}
+
+		if nodeText(object, source) != "this" {
+			return
+		}
+
+		parameter := nodeText(right, source)
+
+		if !parameterSet[parameter] {
+			return
+		}
+
+		field := nodeText(property, source)
+
+		if field != "" {
+			fields[field] = parameter
+		}
+	})
+}
+
+func findDataFlowBindings(
+	root *tree_sitter.Node,
+	source []byte,
+	stringValues map[string]string,
+) map[string]dataFlowBinding {
+	bindings := make(map[string]dataFlowBinding)
+
+	classes := findDataFlowClasses(
+		root,
+		source,
+	)
+
+	registerFunctionBindings(
+		root,
+		source,
+		classes,
+		bindings,
+	)
+
+	registerInstanceBindings(
+		root,
+		source,
+		stringValues,
+		classes,
+		bindings,
+	)
+
+	return bindings
 }

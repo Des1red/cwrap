@@ -86,9 +86,7 @@ func resolveNewDataFlowInstance(
 		return dataFlowInstance{}, false
 	}
 
-	className := strings.TrimSpace(
-		constructor.Utf8Text(source),
-	)
+	className := nodeText(constructor, source)
 
 	class, exists := classes[className]
 	if !exists {
@@ -249,7 +247,7 @@ func resolveDataFlowArgument(
 		return "", false
 	}
 
-	name := strings.TrimSpace(node.Utf8Text(source))
+	name := nodeText(node, source)
 	value, exists := stringValues[name]
 
 	return value, exists
@@ -261,35 +259,19 @@ func resolveObjectStringProperties(
 ) map[string]string {
 	values := make(map[string]string)
 
-	if node == nil || node.Kind() != "object" {
-		return values
-	}
-
-	for index := uint(0); index < node.NamedChildCount(); index++ {
-		pair := node.NamedChild(index)
-		if pair == nil || pair.Kind() != "pair" {
-			continue
-		}
-
-		keyNode := pair.ChildByFieldName("key")
-		valueNode := pair.ChildByFieldName("value")
-
-		if keyNode == nil || valueNode == nil {
-			continue
-		}
-
+	forEachObjectPair(node, source, func(
+		keyName string,
+		keyNode, valueNode *tree_sitter.Node,
+	) {
 		value, ok := treeStringLiteral(valueNode, source)
 		if !ok {
-			continue
+			return
 		}
 
-		key := strings.TrimSpace(keyNode.Utf8Text(source))
-		key = strings.Trim(key, `"'`)
-
-		if key != "" {
-			values[key] = value
+		if keyName != "" {
+			values[keyName] = value
 		}
-	}
+	})
 
 	return values
 }
@@ -311,9 +293,7 @@ func resolveLocalObjectNode(
 		return node
 	}
 
-	targetName := strings.TrimSpace(
-		node.Utf8Text(source),
-	)
+	targetName := nodeText(node, source)
 
 	if targetName == "" {
 		return node
@@ -339,9 +319,7 @@ func resolveLocalObjectNode(
 			return
 		}
 
-		name := strings.TrimSpace(
-			nameNode.Utf8Text(source),
-		)
+		name := nodeText(nameNode, source)
 
 		if name == targetName {
 			resolved = valueNode
@@ -365,9 +343,7 @@ func resolveDataFlowParameterReference(
 	}
 
 	if node.Kind() == "identifier" {
-		name := strings.TrimSpace(
-			node.Utf8Text(source),
-		)
+		name := nodeText(node, source)
 
 		return name, parameterSet[name]
 	}
@@ -383,9 +359,7 @@ func resolveDataFlowParameterReference(
 			return "", false
 		}
 
-		functionName := strings.TrimSpace(
-			function.Utf8Text(source),
-		)
+		functionName := nodeText(function, source)
 
 		switch functionName {
 		case "String":
@@ -415,9 +389,7 @@ func resolveDelegatedDataFlowReference(
 	}
 
 	if node.Kind() == "identifier" {
-		name := strings.TrimSpace(
-			node.Utf8Text(source),
-		)
+		name := nodeText(node, source)
 
 		if parameterSet[name] {
 			return name, "", true
@@ -437,13 +409,9 @@ func resolveDelegatedDataFlowReference(
 		return "", "", false
 	}
 
-	objectName := strings.TrimSpace(
-		object.Utf8Text(source),
-	)
+	objectName := nodeText(object, source)
 
-	propertyName := strings.TrimSpace(
-		propertyNode.Utf8Text(source),
-	)
+	propertyName := nodeText(propertyNode, source)
 
 	if objectName == "this" {
 		if parameter, exists :=

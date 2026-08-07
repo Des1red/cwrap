@@ -26,7 +26,7 @@ func findNamedDataFlowFunctions(
 				return
 			}
 
-			name := strings.TrimSpace(nameNode.Utf8Text(source))
+			name := nodeText(nameNode, source)
 			if name == "" {
 				return
 			}
@@ -49,7 +49,7 @@ func findNamedDataFlowFunctions(
 				return
 			}
 
-			name := strings.TrimSpace(nameNode.Utf8Text(source))
+			name := nodeText(nameNode, source)
 			if name == "" {
 				return
 			}
@@ -103,9 +103,7 @@ func findFetchDataFlowParameters(
 			property := function.ChildByFieldName("property")
 
 			if property != nil &&
-				strings.TrimSpace(
-					property.Utf8Text(source),
-				) == "open" &&
+				nodeText(property, source) == "open" &&
 				arguments.NamedChildCount() >= 2 {
 				result.Sink = "XMLHttpRequest.open"
 				methodNode := arguments.NamedChild(0)
@@ -158,9 +156,7 @@ func findFetchDataFlowParameters(
 			if urlNode != nil {
 				switch urlNode.Kind() {
 				case "identifier":
-					name := strings.TrimSpace(
-						urlNode.Utf8Text(source),
-					)
+					name := nodeText(urlNode, source)
 
 					if parameterSet[name] {
 						result.FetchURLParam = name
@@ -171,13 +167,9 @@ func findFetchDataFlowParameters(
 					property := urlNode.ChildByFieldName("property")
 
 					if object != nil && property != nil {
-						name := strings.TrimSpace(
-							object.Utf8Text(source),
-						)
+						name := nodeText(object, source)
 
-						propertyName := strings.TrimSpace(
-							property.Utf8Text(source),
-						)
+						propertyName := nodeText(property, source)
 
 						if parameterSet[name] {
 							result.FetchURLParam = name
@@ -197,9 +189,7 @@ func findFetchDataFlowParameters(
 						break
 					}
 
-					if strings.TrimSpace(
-						constructor.Utf8Text(source),
-					) != "Request" {
+					if nodeText(constructor, source) != "Request" {
 						break
 					}
 
@@ -232,13 +222,8 @@ func findFetchDataFlowParameters(
 								break
 							}
 
-							name := strings.TrimSpace(
-								object.Utf8Text(source),
-							)
-
-							propertyName := strings.TrimSpace(
-								property.Utf8Text(source),
-							)
+							name := nodeText(object, source)
+							propertyName := nodeText(property, source)
 
 							if parameterSet[name] ||
 								name == "this" {
@@ -313,9 +298,7 @@ func findFetchMethodBinding(
 
 		switch property.Kind() {
 		case "shorthand_property_identifier":
-			name := strings.TrimSpace(
-				property.Utf8Text(source),
-			)
+			name := nodeText(property, source)
 
 			if name == "method" && parameterSet[name] {
 				result.FetchMethodParam = name
@@ -330,7 +313,7 @@ func findFetchMethodBinding(
 			}
 
 			keyName := strings.Trim(
-				strings.TrimSpace(key.Utf8Text(source)),
+				nodeText(key, source),
 				`"'`,
 			)
 
@@ -340,9 +323,7 @@ func findFetchMethodBinding(
 
 			switch value.Kind() {
 			case "identifier":
-				name := strings.TrimSpace(
-					value.Utf8Text(source),
-				)
+				name := nodeText(value, source)
 
 				if parameterSet[name] {
 					result.FetchMethodParam = name
@@ -357,13 +338,9 @@ func findFetchMethodBinding(
 					continue
 				}
 
-				name := strings.TrimSpace(
-					object.Utf8Text(source),
-				)
+				name := nodeText(object, source)
 
-				propertyName := strings.TrimSpace(
-					propertyNode.Utf8Text(source),
-				)
+				propertyName := nodeText(propertyNode, source)
 
 				if parameterSet[name] {
 					result.FetchMethodParam = name
@@ -387,31 +364,12 @@ func findRequestMethodBinding(
 	parameterSet map[string]bool,
 	result *dataFlowFunction,
 ) {
-	if options == nil || options.Kind() != "object" {
-		return
-	}
-
-	for index := uint(0); index < options.NamedChildCount(); index++ {
-
-		pair := options.NamedChild(index)
-		if pair == nil || pair.Kind() != "pair" {
-			continue
-		}
-
-		key := pair.ChildByFieldName("key")
-		value := pair.ChildByFieldName("value")
-
-		if key == nil || value == nil {
-			continue
-		}
-
-		keyName := strings.Trim(
-			strings.TrimSpace(key.Utf8Text(source)),
-			`"'`,
-		)
-
+	forEachObjectPair(options, source, func(
+		keyName string,
+		keyNode, value *tree_sitter.Node,
+	) {
 		if keyName != "method" {
-			continue
+			return
 		}
 
 		switch value.Kind() {
@@ -420,16 +378,11 @@ func findRequestMethodBinding(
 			property := value.ChildByFieldName("property")
 
 			if object == nil || property == nil {
-				continue
+				return
 			}
 
-			name := strings.TrimSpace(
-				object.Utf8Text(source),
-			)
-
-			propertyName := strings.TrimSpace(
-				property.Utf8Text(source),
-			)
+			name := nodeText(object, source)
+			propertyName := nodeText(property, source)
 
 			if parameterSet[name] || name == "this" {
 				result.RequestMethodParam = name
@@ -437,13 +390,9 @@ func findRequestMethodBinding(
 			}
 
 		case "ternary_expression":
-			addConditionalMethods(
-				value,
-				source,
-				&result.FetchMethods,
-			)
+			addConditionalMethods(value, source, &result.FetchMethods)
 		}
-	}
+	})
 }
 
 func findStringVariables(
@@ -473,7 +422,7 @@ func findStringVariables(
 			return
 		}
 
-		name := strings.TrimSpace(nameNode.Utf8Text(source))
+		name := nodeText(nameNode, source)
 		if name != "" {
 			values[name] = value
 		}
@@ -510,14 +459,14 @@ func findAxiosClientNames(
 		}
 
 		callee := strings.ToLower(
-			strings.TrimSpace(function.Utf8Text(source)),
+			nodeText(function, source),
 		)
 
 		if callee != "axios.create" {
 			return
 		}
 
-		name := strings.TrimSpace(nameNode.Utf8Text(source))
+		name := nodeText(nameNode, source)
 		if name != "" {
 			clients[name] = true
 		}
@@ -585,44 +534,24 @@ func findStaticRequestMethods(
 ) []string {
 	methods := make([]string, 0)
 
-	if options == nil || options.Kind() != "object" {
-		return methods
-	}
-
-	for index := uint(0); index < options.NamedChildCount(); index++ {
-
-		pair := options.NamedChild(index)
-		if pair == nil || pair.Kind() != "pair" {
-			continue
-		}
-
-		key := pair.ChildByFieldName("key")
-		value := pair.ChildByFieldName("value")
-
-		if key == nil || value == nil {
-			continue
-		}
-
-		keyName := strings.Trim(
-			strings.TrimSpace(key.Utf8Text(source)),
-			`"'`,
-		)
-
+	forEachObjectPair(options, source, func(
+		keyName string,
+		keyNode, value *tree_sitter.Node,
+	) {
 		if keyName != "method" {
-			continue
+			return
 		}
 
 		method, ok := treeStringLiteral(value, source)
 		if !ok {
-			continue
+			return
 		}
 
 		method = strings.ToUpper(method)
-
 		if !containsString(methods, method) {
 			methods = append(methods, method)
 		}
-	}
+	})
 
 	return methods
 }
@@ -683,9 +612,7 @@ func findDelegatedDataFlowFunction(
 			return
 		}
 
-		methodName := strings.TrimSpace(
-			property.Utf8Text(source),
-		)
+		methodName := nodeText(property, source)
 
 		if methodName == "" || ambiguousMethods[methodName] {
 			return
@@ -802,4 +729,238 @@ func findDelegatedDataFlowFunction(
 	})
 
 	return result, found
+}
+
+func findDataFlowClasses(
+	root *tree_sitter.Node,
+	source []byte,
+) map[string]dataFlowClass {
+	classes := make(map[string]dataFlowClass)
+
+	walkTree(root, func(node *tree_sitter.Node) {
+		if node.Kind() != "class_declaration" {
+			return
+		}
+
+		nameNode := node.ChildByFieldName("name")
+		bodyNode := node.ChildByFieldName("body")
+
+		if nameNode == nil || bodyNode == nil {
+			return
+		}
+
+		className := nodeText(nameNode, source)
+
+		if className == "" {
+			return
+		}
+
+		class := dataFlowClass{
+			FieldParameters: make(map[string]string),
+			Methods:         make(map[string]dataFlowFunction),
+			Mutators:        make(map[string]dataFlowMutator),
+		}
+
+		for index := uint(0); index < bodyNode.NamedChildCount(); index++ {
+
+			methodNode := bodyNode.NamedChild(index)
+
+			if methodNode == nil ||
+				methodNode.Kind() != "method_definition" {
+				continue
+			}
+
+			name := methodNode.ChildByFieldName("name")
+			parameters :=
+				methodNode.ChildByFieldName("parameters")
+			body := methodNode.ChildByFieldName("body")
+
+			if name == nil ||
+				parameters == nil ||
+				body == nil {
+				continue
+			}
+
+			methodName := nodeText(name, source)
+
+			if methodName == "constructor" {
+				class.ConstructorParameters =
+					collectDataFlowParameters(
+						parameters,
+						source,
+					)
+
+				findConstructorBindings(
+					body,
+					source,
+					class.ConstructorParameters,
+					class.FieldParameters,
+				)
+
+				continue
+			}
+
+			registerDataFlowClassMethod(
+				&class,
+				methodName,
+				parameters,
+				body,
+				source,
+				classes,
+			)
+		}
+
+		if len(class.Methods) > 0 {
+			classes[className] = class
+		}
+	})
+	walkTree(root, func(node *tree_sitter.Node) {
+		if node.Kind() != "function_declaration" {
+			return
+		}
+
+		nameNode := node.ChildByFieldName("name")
+		parametersNode := node.ChildByFieldName("parameters")
+		bodyNode := node.ChildByFieldName("body")
+
+		if nameNode == nil ||
+			parametersNode == nil ||
+			bodyNode == nil {
+			return
+		}
+
+		className := nodeText(nameNode, source)
+		if className == "" {
+			return
+		}
+
+		class, exists := classes[className]
+		if !exists {
+			class = dataFlowClass{
+				FieldParameters: make(map[string]string),
+				Methods:         make(map[string]dataFlowFunction),
+				Mutators:        make(map[string]dataFlowMutator),
+			}
+		}
+
+		constructorParameters := collectDataFlowParameters(
+			parametersNode,
+			source,
+		)
+
+		findConstructorBindings(
+			bodyNode,
+			source,
+			constructorParameters,
+			class.FieldParameters,
+		)
+
+		class.ConstructorParameters = constructorParameters
+		classes[className] = class
+	})
+	prototypeAliases := make(map[string]string)
+
+	walkTree(root, func(node *tree_sitter.Node) {
+		if node.Kind() != "assignment_expression" {
+			return
+		}
+
+		left := node.ChildByFieldName("left")
+		right := node.ChildByFieldName("right")
+		if left != nil &&
+			right != nil &&
+			left.Kind() == "identifier" &&
+			right.Kind() == "member_expression" {
+
+			object := right.ChildByFieldName("object")
+			property := right.ChildByFieldName("property")
+
+			if object != nil &&
+				property != nil &&
+				nodeText(property, source) == "prototype" {
+
+				aliasName := nodeText(left, source)
+
+				className := nodeText(object, source)
+
+				prototypeAliases[aliasName] = className
+
+				return
+			}
+		}
+		if left == nil ||
+			right == nil ||
+			left.Kind() != "member_expression" ||
+			right.Kind() != "function_expression" {
+			return
+		}
+
+		methodNameNode := left.ChildByFieldName("property")
+		methodObject := left.ChildByFieldName("object")
+
+		if methodNameNode == nil || methodObject == nil {
+			return
+		}
+
+		className := ""
+
+		switch methodObject.Kind() {
+		case "member_expression":
+			classNode :=
+				methodObject.ChildByFieldName("object")
+
+			prototypeProperty :=
+				methodObject.ChildByFieldName("property")
+
+			if classNode == nil || prototypeProperty == nil {
+				return
+			}
+
+			if nodeText(prototypeProperty, source) != "prototype" {
+				return
+			}
+
+			className = nodeText(classNode, source)
+
+		case "identifier":
+			aliasName := nodeText(methodObject, source)
+
+			className = prototypeAliases[aliasName]
+
+		default:
+			return
+		}
+
+		if className == "" {
+			return
+		}
+
+		methodName := nodeText(methodNameNode, source)
+
+		class, exists := classes[className]
+		if !exists || methodName == "" {
+			return
+		}
+
+		parametersNode :=
+			right.ChildByFieldName("parameters")
+		bodyNode := right.ChildByFieldName("body")
+
+		if parametersNode == nil || bodyNode == nil {
+			return
+		}
+
+		registerDataFlowClassMethod(
+			&class,
+			methodName,
+			parametersNode,
+			bodyNode,
+			source,
+			classes,
+		)
+
+		classes[className] = class
+	})
+
+	return classes
 }

@@ -3,7 +3,6 @@ package treesitter
 import (
 	"cwrap/internal/recon/jsintel/common"
 	"fmt"
-	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
@@ -154,9 +153,7 @@ func extractEndpointsDataFlow(
 			return
 		}
 
-		functionName := strings.TrimSpace(
-			functionNode.Utf8Text(source),
-		)
+		functionName := nodeText(functionNode, source)
 
 		binding, exists := bindings[functionName]
 		if !exists {

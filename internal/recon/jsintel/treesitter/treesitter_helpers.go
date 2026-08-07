@@ -57,6 +57,50 @@ func walkTree(
 	}
 }
 
+// nodeText returns the trimmed source text for a tree-sitter node.
+func nodeText(node *tree_sitter.Node, source []byte) string {
+	if node == nil {
+		return ""
+	}
+	return strings.TrimSpace(node.Utf8Text(source))
+}
+
+// keyText returns a node's trimmed text with surrounding quote
+// characters stripped, used for reading object literal keys such as
+// "method" or 'method'.
+func keyText(node *tree_sitter.Node, source []byte) string {
+	return strings.Trim(nodeText(node, source), `"'`)
+}
+
+// forEachObjectPair walks the top-level key/value pairs of an object
+// literal node, skipping anything that isn't a well-formed "pair" with
+// both a key and a value. No-op if options is nil or not an object.
+func forEachObjectPair(
+	options *tree_sitter.Node,
+	source []byte,
+	visit func(keyName string, keyNode, valueNode *tree_sitter.Node),
+) {
+	if options == nil || options.Kind() != "object" {
+		return
+	}
+
+	for index := uint(0); index < options.NamedChildCount(); index++ {
+		pair := options.NamedChild(index)
+		if pair == nil || pair.Kind() != "pair" {
+			continue
+		}
+
+		keyNode := pair.ChildByFieldName("key")
+		valueNode := pair.ChildByFieldName("value")
+
+		if keyNode == nil || valueNode == nil {
+			continue
+		}
+
+		visit(keyText(keyNode, source), keyNode, valueNode)
+	}
+}
+
 func isHTTPCallNode(
 	call *tree_sitter.Node,
 	source []byte,
@@ -71,7 +115,7 @@ func isHTTPCallNode(
 		return false
 	}
 
-	name := strings.TrimSpace(function.Utf8Text(source))
+	name := nodeText(function, source)
 	lower := strings.ToLower(name)
 
 	if isFetchCall(function, source) {
@@ -94,9 +138,9 @@ func isHTTPCallNode(
 		property := function.ChildByFieldName("property")
 
 		if object != nil && property != nil {
-			clientName := strings.TrimSpace(object.Utf8Text(source))
+			clientName := nodeText(object, source)
 			method := strings.ToLower(
-				strings.TrimSpace(property.Utf8Text(source)),
+				nodeText(property, source),
 			)
 
 			if axiosClients[clientName] {
@@ -125,9 +169,7 @@ func isFetchCall(
 	}
 
 	if function.Kind() == "identifier" {
-		return strings.TrimSpace(
-			function.Utf8Text(source),
-		) == "fetch"
+		return nodeText(function, source) == "fetch"
 	}
 
 	if function.Kind() != "member_expression" {
@@ -139,9 +181,7 @@ func isFetchCall(
 		return false
 	}
 
-	return strings.TrimSpace(
-		property.Utf8Text(source),
-	) == "fetch"
+	return nodeText(property, source) == "fetch"
 }
 
 func isXHRLikeOpenCall(
@@ -158,7 +198,7 @@ func isXHRLikeOpenCall(
 		return false
 	}
 
-	method := strings.TrimSpace(methodNode.Utf8Text(source))
+	method := nodeText(methodNode, source)
 	method = strings.Trim(method, `"'`)
 
 	switch strings.ToUpper(method) {
@@ -235,7 +275,7 @@ func treeStringLiteral(
 		return "", false
 	}
 
-	raw := strings.TrimSpace(node.Utf8Text(source))
+	raw := nodeText(node, source)
 	if len(raw) < 2 {
 		return "", false
 	}
@@ -272,7 +312,7 @@ func collectDataFlowParameters(
 
 		parameters = append(
 			parameters,
-			strings.TrimSpace(parameter.Utf8Text(source)),
+			nodeText(parameter, source),
 		)
 	}
 
@@ -440,9 +480,7 @@ func dataFlowArgumentSource(
 		return ""
 	}
 
-	value := strings.TrimSpace(
-		argument.Utf8Text(source),
-	)
+	value := nodeText(argument, source)
 
 	if property != "" {
 		value += "." + property
