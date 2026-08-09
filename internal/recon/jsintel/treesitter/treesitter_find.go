@@ -13,60 +13,15 @@ func findNamedDataFlowFunctions(
 ) map[string]dataFlowFunction {
 	functions := make(map[string]dataFlowFunction)
 
-	walkTree(root, func(node *tree_sitter.Node) {
-		switch node.Kind() {
-		case "function_declaration":
-			nameNode := node.ChildByFieldName("name")
-			parametersNode := node.ChildByFieldName("parameters")
-			bodyNode := node.ChildByFieldName("body")
-
-			if nameNode == nil ||
-				parametersNode == nil ||
-				bodyNode == nil {
-				return
-			}
-
-			name := nodeText(nameNode, source)
-			if name == "" {
-				return
-			}
-
-			functions[name] = buildDataFlowFunction(
-				parametersNode,
-				bodyNode,
-				source,
-			)
-		case "variable_declarator":
-			nameNode := node.ChildByFieldName("name")
-			valueNode := node.ChildByFieldName("value")
-
-			if nameNode == nil || valueNode == nil {
-				return
-			}
-
-			if nameNode.Kind() != "identifier" ||
-				valueNode.Kind() != "arrow_function" {
-				return
-			}
-
-			name := nodeText(nameNode, source)
-			if name == "" {
-				return
-			}
-
-			parametersNode := valueNode.ChildByFieldName("parameters")
-			bodyNode := valueNode.ChildByFieldName("body")
-
-			if parametersNode == nil || bodyNode == nil {
-				return
-			}
-
-			functions[name] = buildDataFlowFunction(
-				parametersNode,
-				bodyNode,
-				source,
-			)
-		}
+	walkNamedFunctionLikeNodes(root, source, func(
+		name string,
+		parametersNode, bodyNode *tree_sitter.Node,
+	) {
+		functions[name] = buildDataFlowFunction(
+			parametersNode,
+			bodyNode,
+			source,
+		)
 	})
 
 	return functions
@@ -289,13 +244,7 @@ func findFetchMethodBinding(
 	parameterSet map[string]bool,
 	result *dataFlowFunction,
 ) {
-	for index := uint(0); index < options.NamedChildCount(); index++ {
-
-		property := options.NamedChild(index)
-		if property == nil {
-			continue
-		}
-
+	iterateObjectProperties(options, func(property *tree_sitter.Node) {
 		switch property.Kind() {
 		case "shorthand_property_identifier":
 			name := nodeText(property, source)
@@ -309,16 +258,13 @@ func findFetchMethodBinding(
 			value := property.ChildByFieldName("value")
 
 			if key == nil || value == nil {
-				continue
+				return
 			}
 
-			keyName := strings.Trim(
-				nodeText(key, source),
-				`"'`,
-			)
+			keyName := keyText(key, source)
 
 			if keyName != "method" {
-				continue
+				return
 			}
 
 			switch value.Kind() {
@@ -331,15 +277,13 @@ func findFetchMethodBinding(
 
 			case "member_expression":
 				object := value.ChildByFieldName("object")
-				propertyNode :=
-					value.ChildByFieldName("property")
+				propertyNode := value.ChildByFieldName("property")
 
 				if object == nil || propertyNode == nil {
-					continue
+					return
 				}
 
 				name := nodeText(object, source)
-
 				propertyName := nodeText(propertyNode, source)
 
 				if parameterSet[name] {
@@ -355,7 +299,7 @@ func findFetchMethodBinding(
 				)
 			}
 		}
-	}
+	})
 }
 
 func findRequestMethodBinding(
@@ -401,18 +345,7 @@ func findStringVariables(
 ) map[string]string {
 	values := make(map[string]string)
 
-	walkTree(root, func(node *tree_sitter.Node) {
-		if node.Kind() != "variable_declarator" {
-			return
-		}
-
-		nameNode := node.ChildByFieldName("name")
-		valueNode := node.ChildByFieldName("value")
-
-		if nameNode == nil || valueNode == nil {
-			return
-		}
-
+	walkVariableDeclarators(root, func(nameNode, valueNode *tree_sitter.Node) {
 		if nameNode.Kind() != "identifier" {
 			return
 		}
@@ -437,15 +370,8 @@ func findAxiosClientNames(
 ) map[string]bool {
 	clients := make(map[string]bool)
 
-	walkTree(root, func(node *tree_sitter.Node) {
-		if node.Kind() != "variable_declarator" {
-			return
-		}
-
-		nameNode := node.ChildByFieldName("name")
-		valueNode := node.ChildByFieldName("value")
-
-		if nameNode == nil || valueNode == nil {
+	walkVariableDeclarators(root, func(nameNode, valueNode *tree_sitter.Node) {
+		if nameNode.Kind() != "identifier" {
 			return
 		}
 
@@ -458,10 +384,7 @@ func findAxiosClientNames(
 			return
 		}
 
-		callee := strings.ToLower(
-			nodeText(function, source),
-		)
-
+		callee := strings.ToLower(nodeText(function, source))
 		if callee != "axios.create" {
 			return
 		}
@@ -755,11 +678,7 @@ func findDataFlowClasses(
 			return
 		}
 
-		class := dataFlowClass{
-			FieldParameters: make(map[string]string),
-			Methods:         make(map[string]dataFlowFunction),
-			Mutators:        make(map[string]dataFlowMutator),
-		}
+		class := newDataFlowClass()
 
 		for index := uint(0); index < bodyNode.NamedChildCount(); index++ {
 
@@ -836,11 +755,7 @@ func findDataFlowClasses(
 
 		class, exists := classes[className]
 		if !exists {
-			class = dataFlowClass{
-				FieldParameters: make(map[string]string),
-				Methods:         make(map[string]dataFlowFunction),
-				Mutators:        make(map[string]dataFlowMutator),
-			}
+			class = newDataFlowClass()
 		}
 
 		constructorParameters := collectDataFlowParameters(
@@ -860,16 +775,8 @@ func findDataFlowClasses(
 	})
 	prototypeAliases := make(map[string]string)
 
-	walkTree(root, func(node *tree_sitter.Node) {
-		if node.Kind() != "assignment_expression" {
-			return
-		}
-
-		left := node.ChildByFieldName("left")
-		right := node.ChildByFieldName("right")
-		if left != nil &&
-			right != nil &&
-			left.Kind() == "identifier" &&
+	walkAssignmentExpressions(root, func(left, right *tree_sitter.Node) {
+		if left.Kind() == "identifier" &&
 			right.Kind() == "member_expression" {
 
 			object := right.ChildByFieldName("object")
@@ -880,7 +787,6 @@ func findDataFlowClasses(
 				nodeText(property, source) == "prototype" {
 
 				aliasName := nodeText(left, source)
-
 				className := nodeText(object, source)
 
 				prototypeAliases[aliasName] = className
@@ -888,9 +794,8 @@ func findDataFlowClasses(
 				return
 			}
 		}
-		if left == nil ||
-			right == nil ||
-			left.Kind() != "member_expression" ||
+
+		if left.Kind() != "member_expression" ||
 			right.Kind() != "function_expression" {
 			return
 		}

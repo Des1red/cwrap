@@ -77,41 +77,12 @@ func newDataFlowCallValues() dataFlowCallValues {
 	}
 }
 
-func mergeDataFlowCallValues(
-	base dataFlowCallValues,
-	extra dataFlowCallValues,
-) dataFlowCallValues {
-	result := newDataFlowCallValues()
-
-	for name, value := range base.Scalars {
-		result.Scalars[name] = value
+func newDataFlowClass() dataFlowClass {
+	return dataFlowClass{
+		FieldParameters: make(map[string]string),
+		Methods:         make(map[string]dataFlowFunction),
+		Mutators:        make(map[string]dataFlowMutator),
 	}
-
-	for name, properties := range base.Objects {
-		copied := make(map[string]string)
-
-		for property, value := range properties {
-			copied[property] = value
-		}
-
-		result.Objects[name] = copied
-	}
-
-	for name, value := range extra.Scalars {
-		result.Scalars[name] = value
-	}
-
-	for name, properties := range extra.Objects {
-		if result.Objects[name] == nil {
-			result.Objects[name] = make(map[string]string)
-		}
-
-		for property, value := range properties {
-			result.Objects[name][property] = value
-		}
-	}
-
-	return result
 }
 
 func extractEndpointsDataFlow(

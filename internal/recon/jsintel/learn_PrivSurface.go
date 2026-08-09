@@ -12,22 +12,22 @@ func learnPrivilegeSurfaces(
 ) {
 	roleHits := common.ReRoleCompare.FindAllStringSubmatch(source, -1)
 	if len(roleHits) > 0 {
-		ent.Content.JSFindings["role_check"] += len(roleHits)
+		ent.Content.JSFindings[knowledge.JSFindingRoleCheck] += len(roleHits)
 		for i := 0; i < len(roleHits) && i < 5; i++ {
-			common.AppendLeak(ent, "role_check", sourceURL, "role", roleHits[i][2])
+			common.AppendLeak(ent, knowledge.JSFindingRoleCheck, sourceURL, "role", roleHits[i][2])
 		}
 	}
 
 	adminBool := common.ReAdminBool.FindAllStringSubmatch(source, -1)
 	if len(adminBool) > 0 {
-		ent.Content.JSFindings["priv_flag"] += len(adminBool)
+		ent.Content.JSFindings[knowledge.JSFindingPrivFlag] += len(adminBool)
 		for i := 0; i < len(adminBool) && i < 5; i++ {
-			common.AppendLeak(ent, "priv_flag", sourceURL, adminBool[i][1], adminBool[i][2])
+			common.AppendLeak(ent, knowledge.JSFindingPrivFlag, sourceURL, adminBool[i][1], adminBool[i][2])
 		}
 	}
 
 	if common.RePrivGate.FindStringIndex(source) != nil {
-		ent.Content.JSFindings["priv_gate"]++
-		common.AppendLeak(ent, "priv_gate", sourceURL, "if_gate", "Privilege gate conditional detected")
+		ent.Content.JSFindings[knowledge.JSFindingPrivGate]++
+		common.AppendLeak(ent, knowledge.JSFindingPrivGate, sourceURL, "if_gate", "Privilege gate conditional detected")
 	}
 }

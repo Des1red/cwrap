@@ -1417,3 +1417,25 @@ func TestExtractEndpointsHybridRecordsDynamicHTTPFlow(
 		)
 	}
 }
+
+func TestFindNamedDataFlowFunctionsSkipsDestructuredArrowBinding(t *testing.T) {
+	source := []byte(`
+		const { run } = (url) => {
+			fetch(url);
+		};
+
+		run("/api/users");
+	`)
+
+	result, err := ExtractEndpointsHybrid(source)
+	if err != nil {
+		t.Fatalf("extractEndpointsHybrid returned error: %v", err)
+	}
+
+	if len(result.Endpoints) != 0 {
+		t.Fatalf(
+			"expected destructured binding to produce no endpoint, got %#v",
+			result.Endpoints,
+		)
+	}
+}

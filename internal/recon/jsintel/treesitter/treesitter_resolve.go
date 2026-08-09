@@ -6,6 +6,19 @@ import (
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
+// lookupObjectValue reads a resolved property off a call argument that
+// was captured as an object literal, e.g. options.method. Returns
+// false if the parameter was never captured or didn't have that
+// property — same as the two-step map lookup it replaces.
+func lookupObjectValue(
+	values dataFlowCallValues,
+	param, property string,
+) (string, bool) {
+	properties := values.Objects[param]
+	value, exists := properties[property]
+	return value, exists
+}
+
 func resolveDataFlowMethods(
 	target dataFlowFunction,
 	values dataFlowCallValues,
@@ -15,21 +28,21 @@ func resolveDataFlowMethods(
 	}
 
 	if target.RequestMethodProperty != "" {
-		properties := values.Objects[target.RequestMethodParam]
-
-		if resolved, exists :=
-			properties[target.RequestMethodProperty]; exists {
-			return []string{
-				strings.ToUpper(resolved),
-			}
+		if resolved, exists := lookupObjectValue(
+			values,
+			target.RequestMethodParam,
+			target.RequestMethodProperty,
+		); exists {
+			return []string{strings.ToUpper(resolved)}
 		}
 	}
 
 	if target.FetchMethodProperty != "" {
-		properties := values.Objects[target.FetchMethodParam]
-
-		if resolved, exists :=
-			properties[target.FetchMethodProperty]; exists {
+		if resolved, exists := lookupObjectValue(
+			values,
+			target.FetchMethodParam,
+			target.FetchMethodProperty,
+		); exists {
 			return []string{strings.ToUpper(resolved)}
 		}
 	}
@@ -162,9 +175,11 @@ func resolveDataFlowPath(
 	}
 
 	if target.RequestURLProperty != "" {
-		properties := values.Objects[target.RequestURLParam]
-
-		path, exists := properties[target.RequestURLProperty]
+		path, exists := lookupObjectValue(
+			values,
+			target.RequestURLParam,
+			target.RequestURLProperty,
+		)
 
 		return path,
 			"fetch-request-object-dataflow-ast",
@@ -172,9 +187,11 @@ func resolveDataFlowPath(
 	}
 
 	if target.FetchURLProperty != "" {
-		properties := values.Objects[target.FetchURLParam]
-
-		path, exists := properties[target.FetchURLProperty]
+		path, exists := lookupObjectValue(
+			values,
+			target.FetchURLParam,
+			target.FetchURLProperty,
+		)
 		return path, "fetch-object-dataflow-ast", exists
 	}
 
@@ -441,19 +458,21 @@ func isDataFlowMethodResolved(
 	}
 
 	if target.RequestMethodProperty != "" {
-		properties := values.Objects[target.RequestMethodParam]
-
-		_, exists :=
-			properties[target.RequestMethodProperty]
+		_, exists := lookupObjectValue(
+			values,
+			target.RequestMethodParam,
+			target.RequestMethodProperty,
+		)
 
 		return exists
 	}
 
 	if target.FetchMethodProperty != "" {
-		properties := values.Objects[target.FetchMethodParam]
-
-		_, exists :=
-			properties[target.FetchMethodProperty]
+		_, exists := lookupObjectValue(
+			values,
+			target.FetchMethodParam,
+			target.FetchMethodProperty,
+		)
 
 		return exists
 	}

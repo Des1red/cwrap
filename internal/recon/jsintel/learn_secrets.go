@@ -14,10 +14,10 @@ func learnSecrets(
 ) {
 	if common.RePEM.FindStringIndex(source) != nil {
 		ent.Tag(knowledge.SigSensitiveKeyword)
-		ent.Content.JSFindings["pem"]++
+		ent.Content.JSFindings[knowledge.JSFindingPEM]++
 		common.AppendLeak(
 			ent,
-			"pem",
+			knowledge.JSFindingPEM,
 			sourceURL,
 			"private_key",
 			"-----BEGIN PRIVATE KEY-----",
@@ -27,12 +27,11 @@ func learnSecrets(
 	awsKeys := common.ReAWS.FindAllString(source, -1)
 	if len(awsKeys) > 0 {
 		ent.Tag(knowledge.SigSensitiveKeyword)
-		ent.Content.JSFindings["aws_key"] += len(awsKeys)
-
+		ent.Content.JSFindings[knowledge.JSFindingAWSKey] += len(awsKeys)
 		for index := 0; index < len(awsKeys) && index < 5; index++ {
 			common.AppendLeak(
 				ent,
-				"aws_key",
+				knowledge.JSFindingAWSKey,
 				sourceURL,
 				"access_key_id",
 				awsKeys[index],
@@ -43,12 +42,12 @@ func learnSecrets(
 	jwts := common.ReJWT.FindAllString(source, -1)
 	if len(jwts) > 0 {
 		ent.Tag(knowledge.SigSensitiveKeyword)
-		ent.Content.JSFindings["jwt"] += len(jwts)
+		ent.Content.JSFindings[knowledge.JSFindingJWT] += len(jwts)
 
 		for index := 0; index < len(jwts) && index < 5; index++ {
 			common.AppendLeak(
 				ent,
-				"jwt",
+				knowledge.JSFindingJWT,
 				sourceURL,
 				"",
 				jwts[index],
@@ -59,7 +58,7 @@ func learnSecrets(
 	assignments := common.ReAssign.FindAllStringSubmatch(source, -1)
 	if len(assignments) > 0 {
 		ent.Tag(knowledge.SigSensitiveKeyword)
-		ent.Content.JSFindings["keyword"] += len(assignments)
+		ent.Content.JSFindings[knowledge.JSFindingKeyword] += len(assignments)
 
 		for index := 0; index < len(assignments) && index < 5; index++ {
 			key := strings.ToLower(assignments[index][1])
@@ -67,7 +66,7 @@ func learnSecrets(
 
 			common.AppendLeak(
 				ent,
-				"keyword",
+				knowledge.JSFindingKeyword,
 				sourceURL,
 				key,
 				value,
@@ -78,11 +77,11 @@ func learnSecrets(
 	if strings.Contains(source, "authDomain") &&
 		strings.Contains(source, "projectId") &&
 		strings.Contains(source, "apiKey") {
-		ent.Content.JSFindings["firebase"]++
+		ent.Content.JSFindings[knowledge.JSFindingFirebase]++
 
 		common.AppendLeak(
 			ent,
-			"firebase",
+			knowledge.JSFindingFirebase,
 			sourceURL,
 			"firebase_config",
 			"Firebase configuration block detected",
@@ -94,12 +93,12 @@ func learnSecrets(
 		return
 	}
 
-	ent.Content.JSFindings["email"] += len(emails)
+	ent.Content.JSFindings[knowledge.JSFindingEmail] += len(emails)
 
 	for _, email := range emails {
 		common.AppendLeak(
 			ent,
-			"email",
+			knowledge.JSFindingEmail,
 			sourceURL,
 			"",
 			email,

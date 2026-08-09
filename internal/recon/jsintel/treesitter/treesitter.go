@@ -15,6 +15,23 @@ type hybridEndpointResult struct {
 	Recovered    bool
 }
 
+// withDataFlowMerge merges base with the dataflow pass's endpoints and
+// surfaces its HTTP flows, but only if the dataflow pass itself
+// succeeded — on dataFlowErr it returns base untouched and no flows,
+// same as the two inlined blocks it replaces.
+func withDataFlowMerge(
+	base []common.JSEndpoint,
+	dataFlowResult dataFlowExtractionResult,
+	dataFlowErr error,
+) ([]common.JSEndpoint, []JSHTTPFlow) {
+	if dataFlowErr != nil {
+		return base, nil
+	}
+
+	return mergeJSEndpoints(base, dataFlowResult.Endpoints),
+		dataFlowResult.HTTPFlows
+}
+
 func ExtractEndpointsHybrid(
 	source []byte,
 ) (hybridEndpointResult, error) {
@@ -25,17 +42,11 @@ func ExtractEndpointsHybrid(
 		extractEndpointsDataFlow(source)
 
 	if gojaErr == nil {
-		endpoints := astEndpoints
-		var flows []JSHTTPFlow
-
-		if dataFlowErr == nil {
-			endpoints = mergeJSEndpoints(
-				astEndpoints,
-				dataFlowResult.Endpoints,
-			)
-
-			flows = dataFlowResult.HTTPFlows
-		}
+		endpoints, flows := withDataFlowMerge(
+			astEndpoints,
+			dataFlowResult,
+			dataFlowErr,
+		)
 
 		return hybridEndpointResult{
 			Endpoints: endpoints,
@@ -51,16 +62,11 @@ func ExtractEndpointsHybrid(
 	recovered, parsed, failed :=
 		extractEndpointsFromTreeScopes(scopes)
 
-	var flows []JSHTTPFlow
-
-	if dataFlowErr == nil {
-		recovered = mergeJSEndpoints(
-			recovered,
-			dataFlowResult.Endpoints,
-		)
-
-		flows = dataFlowResult.HTTPFlows
-	}
+	recovered, flows := withDataFlowMerge(
+		recovered,
+		dataFlowResult,
+		dataFlowErr,
+	)
 
 	return hybridEndpointResult{
 		Endpoints:    recovered,

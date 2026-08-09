@@ -16,9 +16,9 @@ func learnInfrastructure(
 		if common.IsNoiseURL(u) {
 			continue
 		}
-		ent.Content.JSFindings["host_url"]++
+		ent.Content.JSFindings[knowledge.JSFindingHostURL]++
 		if len(ent.Content.JSLeaks) < 8 {
-			common.AppendLeak(ent, "host_url", sourceURL, "url", common.Redact(u, 180))
+			common.AppendLeak(ent, knowledge.JSFindingHostURL, sourceURL, "url", common.Redact(u, 180))
 		}
 	}
 
@@ -29,18 +29,18 @@ func learnInfrastructure(
 			if label != strings.ToLower(label) {
 				continue // camelCase/PascalCase = code identifier, not a hostname
 			}
-			ent.Content.JSFindings["host_internal"]++
+			ent.Content.JSFindings[knowledge.JSFindingHostInternal]++
 			if len(ent.Content.JSLeaks) < 8 {
-				common.AppendLeak(ent, "host_internal", sourceURL, "domain", m[0])
+				common.AppendLeak(ent, knowledge.JSFindingHostInternal, sourceURL, "domain", m[0])
 			}
 		}
 	}
 
 	privIPs := common.ReRFC1918.FindAllString(source, -1)
 	if len(privIPs) > 0 {
-		ent.Content.JSFindings["host_private_ip"] += len(privIPs)
+		ent.Content.JSFindings[knowledge.JSFindingHostPrivateIP] += len(privIPs)
 		for i := 0; i < len(privIPs) && i < 8; i++ {
-			common.AppendLeak(ent, "host_private_ip", sourceURL, "ip", privIPs[i])
+			common.AppendLeak(ent, knowledge.JSFindingHostPrivateIP, sourceURL, "ip", privIPs[i])
 		}
 	}
 

@@ -19,20 +19,20 @@ func discoverEndpoints(
 	result, astErr := treesitter.ExtractEndpointsHybrid([]byte(source))
 
 	if astErr != nil {
-		ent.Content.JSFindings["ast_parse_error"]++
+		ent.Content.JSFindings[knowledge.JSFindingASTParseError]++
 
 		if result.Recovered {
-			ent.Content.JSFindings["ast_recovery_run"]++
-			ent.Content.JSFindings["ast_recovery_scopes"] += result.Scopes
-			ent.Content.JSFindings["ast_recovery_parsed"] += result.ParsedScopes
-			ent.Content.JSFindings["ast_recovery_failed"] += result.FailedScopes
+			ent.Content.JSFindings[knowledge.JSFindingASTRecoveryRun]++
+			ent.Content.JSFindings[knowledge.JSFindingASTRecoveryScopes] += result.Scopes
+			ent.Content.JSFindings[knowledge.JSFindingASTRecoveryParsed] += result.ParsedScopes
+			ent.Content.JSFindings[knowledge.JSFindingASTRecoveryFailed] += result.FailedScopes
 		}
 
 		if len(result.Endpoints) > 0 {
-			ent.Content.JSFindings["ast_recovered"]++
+			ent.Content.JSFindings[knowledge.JSFindingASTRecovered]++
 		}
 	} else {
-		ent.Content.JSFindings["ast_parsed"]++
+		ent.Content.JSFindings[knowledge.JSFindingASTParsed]++
 	}
 
 	flowCount := 0
@@ -59,7 +59,7 @@ func discoverEndpoints(
 	}
 
 	if flowCount > 0 {
-		ent.Content.JSFindings["http_flow"] += flowCount
+		ent.Content.JSFindings[knowledge.JSFindingHTTPFlow] += flowCount
 	}
 
 	for _, endpoint := range result.Endpoints {
@@ -129,7 +129,7 @@ func discoverEndpoints(
 	}
 
 	if endpointCount > 0 {
-		ent.Content.JSFindings["endpoint"] += endpointCount
+		ent.Content.JSFindings[knowledge.JSFindingEndpoint] += endpointCount
 	}
 
 	return endpoints
