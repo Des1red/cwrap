@@ -32,6 +32,7 @@ func writeGroupNextSteps(w io.Writer, g entityGroup) {
 	}
 	sort.Strings(steps)
 
+	rw.Blank()
 	rw.Line(2, "Group Next Steps:")
 	for _, step := range steps {
 		urls := byStep[step]

@@ -50,19 +50,23 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 
 	rw := common.ReportWriter{W: w}
 
+	// keyWidth aligns the vitals block's key column; "CSRFPresent:" (12
+	// chars) is the longest label, so 13 leaves a one-space gutter.
+	const keyWidth = 13
+
 	rw.Blank()
 	rw.Line(2, "[ENTITY] %s", ent.URL)
-	rw.Line(4, "Probes: %d", ent.State.ProbeCount)
+	rw.KV(4, keyWidth, "Probes:", "%d", ent.State.ProbeCount)
 
 	methods := sortedKeys(ent.HTTP.Methods)
 	if len(methods) > 0 {
-		rw.Line(4, "Methods: %v", methods)
+		rw.KV(4, keyWidth, "Methods:", "%s", common.JoinComma(methods))
 	}
 	if ent.HTTP.AuthLikely {
-		rw.Line(4, "AuthLikely: %t", ent.HTTP.AuthLikely)
+		rw.KV(4, keyWidth, "AuthLikely:", "%t", ent.HTTP.AuthLikely)
 	}
 	if ent.HTTP.CSRFPresent {
-		rw.Line(4, "CSRFPresent: %t", ent.HTTP.CSRFPresent)
+		rw.KV(4, keyWidth, "CSRFPresent:", "%t", ent.HTTP.CSRFPresent)
 	}
 
 	if len(ent.HTTP.Tech) > 0 {
@@ -76,15 +80,15 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		for _, k := range techKeys {
 			parts = append(parts, fmt.Sprintf("%s=%s", k, ent.HTTP.Tech[k]))
 		}
-		rw.Line(4, "Tech: %v", parts)
+		rw.KV(4, keyWidth, "Tech:", "%s", common.JoinComma(parts))
 	}
 
 	if ent.Content.LooksLikeHTML {
-		rw.Line(4, "Content: HTML")
+		rw.KV(4, keyWidth, "Content:", "%s", "HTML")
 	} else if ent.Content.LooksLikeJSON {
-		rw.Line(4, "Content: JSON")
+		rw.KV(4, keyWidth, "Content:", "%s", "JSON")
 	} else if ent.Content.LooksLikeXML {
-		rw.Line(4, "Content: XML")
+		rw.KV(4, keyWidth, "Content:", "%s", "XML")
 	}
 
 	if len(ent.Content.Statuses) > 0 {
@@ -98,14 +102,16 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		for _, c := range codes {
 			parts = append(parts, fmt.Sprintf("%d×%d", c, ent.Content.Statuses[c]))
 		}
-		rw.Line(4, "Statuses: %s", common.JoinSpace(parts))
+		rw.KV(4, keyWidth, "Statuses:", "%s", common.JoinSpace(parts))
 	}
 
-	if sigs := activeSignals(ent); len(sigs) > 0 {
-		rw.Line(4, "Signals: %v", sigs)
+	sigs := activeSignals(ent)
+	if len(sigs) > 0 {
+		rw.KV(4, keyWidth, "Signals:", "%s", common.JoinComma(sigs))
 	}
 
 	if ent.SessionUsed || ent.SessionIssued || len(ent.SessionCookies) > 0 {
+		rw.Blank()
 		rw.Line(4, "Session:")
 		if ent.SessionUsed {
 			rw.Line(6, "Used: %t", ent.SessionUsed)
@@ -126,6 +132,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 	}
 
 	if len(ent.Identities) > 0 {
+		rw.Blank()
 		rw.Line(4, "Identities:")
 		names := make([]string, 0, len(ent.Identities))
 		for n := range ent.Identities {
@@ -184,10 +191,10 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 				}
 			}
 
-			rw.Line(6, "%s: %v", name, tags)
+			rw.Line(6, "%s: %s", name, common.JoinComma(tags))
 
 			if len(id.CookieNames) > 0 {
-				rw.Line(8, "cookies: %v", id.CookieNames)
+				rw.Line(8, "cookies: %s", common.JoinComma(id.CookieNames))
 			}
 		}
 	}
@@ -204,6 +211,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 	}
 
 	if hasInterestingParams || hasNonInjectedParams(ent) {
+		rw.Blank()
 		rw.Line(4, "Parameters:")
 
 		pnames := make([]string, 0, len(ent.Params))
@@ -259,7 +267,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 				tags = append(tags, fmt.Sprintf("interest=%d", p.Interest))
 			}
 
-			rw.Line(6, "%s: %v", name, tags)
+			rw.Line(6, "%s: %s", name, common.JoinComma(tags))
 
 			if len(p.ObservedChanges) > 0 {
 				keys := make([]string, 0, len(p.ObservedChanges))
@@ -267,7 +275,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 					keys = append(keys, k)
 				}
 				sort.Strings(keys)
-				rw.Line(8, "changes: %v", keys)
+				rw.Line(8, "changes: %s", common.JoinComma(keys))
 			}
 
 			if len(p.IdentityAccess) > 0 {
@@ -285,6 +293,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		len(ent.Content.JSLeaks) > 0 ||
 		len(ent.Content.JSHTTPFlows) > 0 {
 
+		rw.Blank()
 		rw.Line(4, "JS Intelligence:")
 
 		if len(jsFindingKeys) > 0 {
@@ -301,6 +310,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		}
 
 		if len(ent.Content.JSLeaks) > 0 {
+			rw.Blank()
 			rw.Line(6, "JS Leaks:")
 
 			for _, leak := range ent.Content.JSLeaks {
@@ -315,6 +325,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		}
 
 		if len(ent.Content.JSHTTPFlows) > 0 {
+			rw.Blank()
 			rw.Line(6, "Dynamic HTTP Flows:")
 
 			flows := append(
@@ -412,6 +423,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 
 	findings := derive.DeriveFindings(ent)
 	if len(findings) > 0 {
+		rw.Blank()
 		rw.Line(4, "Findings:")
 		for _, f := range findings {
 			rw.Line(6, "! %s", f)

@@ -13,6 +13,8 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 	fmt.Fprintln(w, "GLOBAL STATS")
 	fmt.Fprintln(w, "------------------------------------------------")
 
+	rw := common.ReportWriter{W: w}
+
 	urls := common.SortedEntityURLs(k)
 
 	abnormalResponseCount := 0
@@ -25,11 +27,15 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 		abnormalResponseCount += len(ent.AbnormalResponses)
 	}
 
-	fmt.Fprintf(w, "Entities:          %d\n", len(urls))
-	fmt.Fprintf(w, "Static assets:     %d\n", len(k.StaticAssets))
-	fmt.Fprintf(w, "Edges:             %d\n", len(k.Edges))
-	fmt.Fprintf(w, "Global parameters: %d\n", len(k.Params))
-	fmt.Fprintf(w, "Abnormal responses:  %d\n", abnormalResponseCount)
+	// statsKeyWidth aligns this block's key column; "Abnormal responses:"
+	// (20 chars) is the longest label, so 21 leaves a one-space gutter.
+	const statsKeyWidth = 21
+
+	rw.KV(0, statsKeyWidth, "Entities:", "%d", len(urls))
+	rw.KV(0, statsKeyWidth, "Static assets:", "%d", len(k.StaticAssets))
+	rw.KV(0, statsKeyWidth, "Edges:", "%d", len(k.Edges))
+	rw.KV(0, statsKeyWidth, "Global parameters:", "%d", len(k.Params))
+	rw.KV(0, statsKeyWidth, "Abnormal responses:", "%d", abnormalResponseCount)
 
 	sigCounts := make(map[string]int)
 	for _, u := range urls {
@@ -68,7 +74,7 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 		}
 	}
 	if len(publicURLs) > 0 {
-		fmt.Fprintf(w, "Public endpoints:  %d\n", len(publicURLs))
+		rw.KV(0, statsKeyWidth, "Public endpoints:", "%d", len(publicURLs))
 		sort.Strings(publicURLs)
 		for _, u := range publicURLs {
 			fmt.Fprintf(w, "  - %s\n", u)

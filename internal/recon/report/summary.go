@@ -72,28 +72,27 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 	// High risk highlights (short list)
 	high := buildHighRiskHighlights(k)
 
-	fmt.Fprintln(w, "========== cwrap Recon Summary ==========")
+	fmt.Fprintln(w, common.Bold(common.Cyan("========== cwrap Recon Summary ==========")))
 	if k.Target != "" {
-		fmt.Fprintln(w, "Target:", k.Target)
+		fmt.Fprintln(w, "Target:", common.Bold(k.Target))
 	} else if entityCount > 0 {
-		fmt.Fprintln(w, "Target:", urls[0])
+		fmt.Fprintln(w, "Target:", common.Bold(urls[0]))
 	} else {
-		fmt.Fprintln(w, "Target: (unknown)")
+		fmt.Fprintln(w, "Target:", common.Bold("(unknown)"))
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "Entities discovered: %d\n", entityCount)
 	fmt.Fprintf(w, "Edges discovered:    %d\n", edgeCount)
 	fmt.Fprintf(w, "Global parameters:   %d\n", globalParamCnt)
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Auth boundary:       %v\n", yesNo(hasAuthBoundary))
-	fmt.Fprintf(w, "Role boundary:       %v\n", yesNo(hasRoleBoundary))
-	fmt.Fprintf(w, "Ownership boundary:  %v\n", yesNo(hasOwnership))
-	fmt.Fprintf(w, "IDOR surfaces:       %d\n", possibleIDOR)
-	fmt.Fprintf(w, "Admin surfaces:      %d\n", adminSurface)
-	fmt.Fprintf(w, "JS leaks:            %d\n", jsLeakCount)
-	fmt.Fprintf(w, "Abnormal responses: %d\n", abnormalResponseCount)
-	fmt.Fprintf(w, "Credentialless issuance: %v\n", yesNo(hasCredlessIssuance))
-
+	fmt.Fprintf(w, "Auth boundary:       %s\n", yesNo(hasAuthBoundary))
+	fmt.Fprintf(w, "Role boundary:       %s\n", yesNo(hasRoleBoundary))
+	fmt.Fprintf(w, "Ownership boundary:  %s\n", yesNo(hasOwnership))
+	fmt.Fprintf(w, "IDOR surfaces:       %s\n", riskCount(possibleIDOR))
+	fmt.Fprintf(w, "Admin surfaces:      %s\n", riskCount(adminSurface))
+	fmt.Fprintf(w, "JS leaks:            %s\n", riskCount(jsLeakCount))
+	fmt.Fprintf(w, "Abnormal responses: %s\n", riskCount(abnormalResponseCount))
+	fmt.Fprintf(w, "Credentialless issuance: %s\n", yesNo(hasCredlessIssuance))
 	public := 0
 	for _, u := range urls {
 		ent := k.Entities[u]
@@ -105,32 +104,40 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 
 	if len(high) > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintln(w, "High Risk Findings:")
+		fmt.Fprintln(w, common.Bold(common.Red("High Risk Findings:")))
 		for _, s := range high {
-			fmt.Fprintln(w, " •", s)
+			fmt.Fprintln(w, common.Red(" • "+s))
 		}
 	}
 
 	fmt.Fprintln(w)
 	if fileErr == nil && path != "" {
-		fmt.Fprintln(w, "Full report saved at:")
-		fmt.Fprintln(w, " ", path)
+		fmt.Fprintln(w, common.Green("Full report saved at:"))
+		fmt.Fprintln(w, " ", common.Bold(path))
 	} else {
-		fmt.Fprintln(w, "Full report save failed:")
+		fmt.Fprintln(w, common.Bold(common.Red("Full report save failed:")))
 		if fileErr != nil {
-			fmt.Fprintln(w, " ", fileErr.Error())
+			fmt.Fprintln(w, " ", common.Red(fileErr.Error()))
 		} else {
-			fmt.Fprintln(w, "  (unknown error)")
+			fmt.Fprintln(w, common.Red("  (unknown error)"))
 		}
 	}
-	fmt.Fprintln(w, "========================================")
+	fmt.Fprintln(w, common.Bold(common.Cyan("========================================")))
 }
 
 func yesNo(b bool) string {
 	if b {
-		return "yes"
+		return common.Red("yes")
 	}
-	return "no"
+	return common.Green("no")
+}
+
+func riskCount(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if n > 0 {
+		return common.Red(s)
+	}
+	return common.Green(s)
 }
 
 func buildHighRiskHighlights(k *knowledge.Knowledge) []string {
