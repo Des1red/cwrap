@@ -1,4 +1,3 @@
-// report/report.go
 package report
 
 import (
@@ -15,7 +14,7 @@ func CreateSummary(k *knowledge.Knowledge, debug bool) (string, error) {
 		return "", fmt.Errorf("nil knowledge")
 	}
 
-	path, err := CreateFileReport(k, debug)
+	path, err := createReport(k, debug)
 	// Even if file creation fails, still print a summary of what we have.
 	printSummary(os.Stdout, k, path, err)
 

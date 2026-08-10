@@ -2,6 +2,7 @@ package report
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/recon/report/common"
 	"fmt"
 	"io"
 	"sort"
@@ -12,7 +13,7 @@ func writeGlobalStats(w io.Writer, k *knowledge.Knowledge) {
 	fmt.Fprintln(w, "GLOBAL STATS")
 	fmt.Fprintln(w, "------------------------------------------------")
 
-	urls := sortedEntityURLs(k)
+	urls := common.SortedEntityURLs(k)
 
 	abnormalResponseCount := 0
 	for _, u := range urls {

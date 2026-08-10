@@ -2,6 +2,7 @@ package report
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/recon/report/common"
 	"fmt"
 	"io"
 	"net/url"
@@ -57,7 +58,7 @@ func writeDiscoveryTree(w io.Writer, k *knowledge.Knowledge) {
 		}
 	}
 	if root == "" {
-		urls := sortedEntityURLs(k)
+		urls := common.SortedEntityURLs(k)
 		if len(urls) > 0 {
 			root = urls[0]
 		}
@@ -120,7 +121,7 @@ func buildPathTree(k *knowledge.Knowledge) *treeNode {
 		Children: map[string]*treeNode{},
 	}
 
-	for _, rawURL := range sortedEntityURLs(k) {
+	for _, rawURL := range common.SortedEntityURLs(k) {
 		u, err := url.Parse(rawURL)
 		if err != nil {
 			continue

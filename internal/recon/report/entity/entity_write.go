@@ -1,7 +1,10 @@
-package report
+package entity
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/recon/report/common"
+	"cwrap/internal/recon/report/derive"
+	"cwrap/internal/recon/report/js"
 	"fmt"
 	"io"
 	"sort"
@@ -15,18 +18,18 @@ type routeKey struct {
 	num     int
 }
 
-func writeEntityDetails(w io.Writer, k *knowledge.Knowledge) {
-	rw := reportWriter{w: w}
+func WriteEntityDetails(w io.Writer, k *knowledge.Knowledge) {
+	rw := common.ReportWriter{W: w}
 
-	rw.line(0, "------------------------------------------------")
-	rw.line(0, "ENTITY INTELLIGENCE")
-	rw.line(0, "------------------------------------------------")
+	rw.Line(0, "------------------------------------------------")
+	rw.Line(0, "ENTITY INTELLIGENCE")
+	rw.Line(0, "------------------------------------------------")
 
 	groups := entityGroupsByRoute(k)
 
 	for _, g := range groups {
-		rw.blank()
-		rw.line(0, "[ENDPOINT GROUP] %s", g.Key)
+		rw.Blank()
+		rw.Line(0, "[ENDPOINT GROUP] %s", g.Key)
 
 		for _, ent := range g.Entities {
 			if ent == nil || ent.State.IsSPAFallback {
@@ -45,21 +48,21 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		return
 	}
 
-	rw := reportWriter{w: w}
+	rw := common.ReportWriter{W: w}
 
-	rw.blank()
-	rw.line(2, "[ENTITY] %s", ent.URL)
-	rw.line(4, "Probes: %d", ent.State.ProbeCount)
+	rw.Blank()
+	rw.Line(2, "[ENTITY] %s", ent.URL)
+	rw.Line(4, "Probes: %d", ent.State.ProbeCount)
 
 	methods := sortedKeys(ent.HTTP.Methods)
 	if len(methods) > 0 {
-		rw.line(4, "Methods: %v", methods)
+		rw.Line(4, "Methods: %v", methods)
 	}
 	if ent.HTTP.AuthLikely {
-		rw.line(4, "AuthLikely: %t", ent.HTTP.AuthLikely)
+		rw.Line(4, "AuthLikely: %t", ent.HTTP.AuthLikely)
 	}
 	if ent.HTTP.CSRFPresent {
-		rw.line(4, "CSRFPresent: %t", ent.HTTP.CSRFPresent)
+		rw.Line(4, "CSRFPresent: %t", ent.HTTP.CSRFPresent)
 	}
 
 	if len(ent.HTTP.Tech) > 0 {
@@ -73,15 +76,15 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		for _, k := range techKeys {
 			parts = append(parts, fmt.Sprintf("%s=%s", k, ent.HTTP.Tech[k]))
 		}
-		rw.line(4, "Tech: %v", parts)
+		rw.Line(4, "Tech: %v", parts)
 	}
 
 	if ent.Content.LooksLikeHTML {
-		rw.line(4, "Content: HTML")
+		rw.Line(4, "Content: HTML")
 	} else if ent.Content.LooksLikeJSON {
-		rw.line(4, "Content: JSON")
+		rw.Line(4, "Content: JSON")
 	} else if ent.Content.LooksLikeXML {
-		rw.line(4, "Content: XML")
+		rw.Line(4, "Content: XML")
 	}
 
 	if len(ent.Content.Statuses) > 0 {
@@ -95,20 +98,20 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		for _, c := range codes {
 			parts = append(parts, fmt.Sprintf("%d×%d", c, ent.Content.Statuses[c]))
 		}
-		rw.line(4, "Statuses: %s", joinSpace(parts))
+		rw.Line(4, "Statuses: %s", common.JoinSpace(parts))
 	}
 
 	if sigs := activeSignals(ent); len(sigs) > 0 {
-		rw.line(4, "Signals: %v", sigs)
+		rw.Line(4, "Signals: %v", sigs)
 	}
 
 	if ent.SessionUsed || ent.SessionIssued || len(ent.SessionCookies) > 0 {
-		rw.line(4, "Session:")
+		rw.Line(4, "Session:")
 		if ent.SessionUsed {
-			rw.line(6, "Used: %t", ent.SessionUsed)
+			rw.Line(6, "Used: %t", ent.SessionUsed)
 		}
 		if ent.SessionIssued {
-			rw.line(6, "Issued: %t", ent.SessionIssued)
+			rw.Line(6, "Issued: %t", ent.SessionIssued)
 		}
 		if len(ent.SessionCookies) > 0 {
 			names := make([]string, 0, len(ent.SessionCookies))
@@ -117,13 +120,13 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 			}
 			sort.Strings(names)
 			for _, n := range names {
-				rw.line(6, "- %s=%s", n, ent.SessionCookies[n])
+				rw.Line(6, "- %s=%s", n, ent.SessionCookies[n])
 			}
 		}
 	}
 
 	if len(ent.Identities) > 0 {
-		rw.line(4, "Identities:")
+		rw.Line(4, "Identities:")
 		names := make([]string, 0, len(ent.Identities))
 		for n := range ent.Identities {
 			names = append(names, n)
@@ -181,10 +184,10 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 				}
 			}
 
-			rw.line(6, "%s: %v", name, tags)
+			rw.Line(6, "%s: %v", name, tags)
 
 			if len(id.CookieNames) > 0 {
-				rw.line(8, "cookies: %v", id.CookieNames)
+				rw.Line(8, "cookies: %v", id.CookieNames)
 			}
 		}
 	}
@@ -201,7 +204,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 	}
 
 	if hasInterestingParams || hasNonInjectedParams(ent) {
-		rw.line(4, "Parameters:")
+		rw.Line(4, "Parameters:")
 
 		pnames := make([]string, 0, len(ent.Params))
 		for n := range ent.Params {
@@ -256,7 +259,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 				tags = append(tags, fmt.Sprintf("interest=%d", p.Interest))
 			}
 
-			rw.line(6, "%s: %v", name, tags)
+			rw.Line(6, "%s: %v", name, tags)
 
 			if len(p.ObservedChanges) > 0 {
 				keys := make([]string, 0, len(p.ObservedChanges))
@@ -264,31 +267,31 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 					keys = append(keys, k)
 				}
 				sort.Strings(keys)
-				rw.line(8, "changes: %v", keys)
+				rw.Line(8, "changes: %v", keys)
 			}
 
 			if len(p.IdentityAccess) > 0 {
-				rw.line(8, "access: %v", p.IdentityAccess)
+				rw.Line(8, "access: %v", p.IdentityAccess)
 			}
 			if len(p.IdentityDenied) > 0 {
-				rw.line(8, "denied: %v", p.IdentityDenied)
+				rw.Line(8, "denied: %v", p.IdentityDenied)
 			}
 		}
 	}
 
-	jsFindingKeys := reportableJSFindingKeys(ent)
+	jsFindingKeys := js.ReportableJSFindingKeys(ent)
 
 	if len(jsFindingKeys) > 0 ||
 		len(ent.Content.JSLeaks) > 0 ||
 		len(ent.Content.JSHTTPFlows) > 0 {
 
-		rw.line(4, "JS Intelligence:")
+		rw.Line(4, "JS Intelligence:")
 
 		if len(jsFindingKeys) > 0 {
-			rw.line(6, "Signals:")
+			rw.Line(6, "Signals:")
 
 			for _, key := range jsFindingKeys {
-				rw.line(
+				rw.Line(
 					8,
 					"%s: %d",
 					key,
@@ -298,10 +301,10 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		}
 
 		if len(ent.Content.JSLeaks) > 0 {
-			rw.line(6, "JS Leaks:")
+			rw.Line(6, "JS Leaks:")
 
 			for _, leak := range ent.Content.JSLeaks {
-				rw.line(
+				rw.Line(
 					8,
 					"[%s] %s: %s",
 					leak.Kind,
@@ -312,7 +315,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		}
 
 		if len(ent.Content.JSHTTPFlows) > 0 {
-			rw.line(6, "Dynamic HTTP Flows:")
+			rw.Line(6, "Dynamic HTTP Flows:")
 
 			flows := append(
 				[]knowledge.JSHTTPFlow(nil),
@@ -354,7 +357,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 					confidence = "unknown"
 				}
 
-				rw.line(
+				rw.Line(
 					8,
 					"- %s -> %s [%s confidence]",
 					function,
@@ -363,7 +366,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 				)
 
 				if flow.ResolvedURL != "" {
-					rw.line(
+					rw.Line(
 						10,
 						"URL: %s [resolved]",
 						flow.ResolvedURL,
@@ -376,7 +379,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 						urlSource = "unknown"
 					}
 
-					rw.line(
+					rw.Line(
 						10,
 						"URL source: %s [dynamic]",
 						urlSource,
@@ -384,7 +387,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 				}
 
 				if flow.ResolvedMethod != "" {
-					rw.line(
+					rw.Line(
 						10,
 						"Method: %s [resolved]",
 						flow.ResolvedMethod,
@@ -397,7 +400,7 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 						methodSource = "unknown"
 					}
 
-					rw.line(
+					rw.Line(
 						10,
 						"Method source: %s [dynamic]",
 						methodSource,
@@ -407,190 +410,11 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		}
 	}
 
-	findings := deriveFindings(ent)
+	findings := derive.DeriveFindings(ent)
 	if len(findings) > 0 {
-		rw.line(4, "Findings:")
+		rw.Line(4, "Findings:")
 		for _, f := range findings {
-			rw.line(6, "! %s", f)
-		}
-	}
-}
-
-func reportableJSFindingKeys(
-	ent *knowledge.Entity,
-) []string {
-	if ent == nil {
-		return nil
-	}
-
-	keys := make([]string, 0)
-
-	for key, count := range ent.Content.JSFindings {
-		if count <= 0 || hideJSFindingFromReport(key) {
-			continue
-		}
-
-		keys = append(keys, key)
-	}
-
-	sort.Strings(keys)
-
-	return keys
-}
-
-func hideJSFindingFromReport(key string) bool {
-	if strings.HasPrefix(key, "ast_") {
-		return true
-	}
-
-	switch key {
-	case "email",
-		"endpoint",
-		"http_flow":
-		return true
-	}
-
-	// Endpoint totals already appear in the discovery and
-	// route trees, so endpoint_literal and other endpoint
-	// implementation counters are redundant here.
-	return strings.HasPrefix(key, "endpoint_")
-}
-
-func writeTaggedProbeLog(w io.Writer, k *knowledge.Knowledge, debug bool) {
-	if !debug {
-		return
-	}
-	rw := reportWriter{w: w}
-
-	rw.line(0, "------------------------------------------------")
-	rw.line(0, "PROBE LOG FOR TAGGED ENTITIES")
-	rw.line(0, "------------------------------------------------")
-
-	printed := false
-
-	for _, u := range entityURLsByRoute(k) {
-		ent := k.Entities[u]
-		if ent == nil || ent.State.IsSPAFallback {
-			continue
-		}
-
-		sigs := activeSignals(ent)
-		if len(sigs) == 0 || len(ent.ProbeLog) == 0 {
-			continue
-		}
-
-		rows := make([]knowledge.ProbeLogEntry, 0, len(ent.ProbeLog))
-		for _, p := range ent.ProbeLog {
-			if shouldPrintProbeLog(p) {
-				rows = append(rows, p)
-			}
-		}
-
-		if len(rows) == 0 {
-			continue
-		}
-
-		sort.Slice(rows, func(i, j int) bool {
-			if rows[i].URL != rows[j].URL {
-				return rows[i].URL < rows[j].URL
-			}
-			if rows[i].Reason != rows[j].Reason {
-				return rows[i].Reason < rows[j].Reason
-			}
-			if rows[i].IdentityKind != rows[j].IdentityKind {
-				return rows[i].IdentityKind < rows[j].IdentityKind
-			}
-			if rows[i].Identity != rows[j].Identity {
-				return rows[i].Identity < rows[j].Identity
-			}
-			if rows[i].Method != rows[j].Method {
-				return rows[i].Method < rows[j].Method
-			}
-			return rows[i].Status < rows[j].Status
-		})
-
-		printed = true
-
-		rw.blank()
-		rw.line(0, "[ENTITY] %s", ent.URL)
-		rw.line(2, "Signals: %v", sigs)
-
-		for _, p := range rows {
-			count := ""
-			if p.Count > 1 {
-				count = fmt.Sprintf(" ×%d", p.Count)
-			}
-
-			loc := ""
-			if p.Location != "" {
-				loc = " -> " + p.Location
-			}
-
-			reason := p.Reason
-			if kind := probeIdentityKindLabel(p.IdentityKind); kind != "" {
-				reason += "/" + kind
-			}
-
-			rw.line(
-				2,
-				"%-6s %-14s %-3d%s %s [%s]%s",
-				p.Method,
-				p.Identity,
-				p.Status,
-				count,
-				p.URL,
-				reason,
-				loc,
-			)
-		}
-	}
-
-	if !printed {
-		rw.line(0, "(no tagged probe log)")
-	}
-
-	rw.blank()
-}
-
-func shouldPrintProbeLog(p knowledge.ProbeLogEntry) bool {
-	return p.Status != 404 && p.Status < 500
-}
-
-func writeGroupNextSteps(w io.Writer, g entityGroup) {
-	rw := reportWriter{w: w}
-
-	byStep := map[string][]string{}
-
-	for _, ent := range g.Entities {
-		if ent == nil {
-			continue
-		}
-
-		for _, step := range deriveNextSteps(ent) {
-			byStep[step] = append(byStep[step], ent.URL)
-		}
-	}
-
-	if len(byStep) == 0 {
-		return
-	}
-
-	steps := make([]string, 0, len(byStep))
-	for step := range byStep {
-		steps = append(steps, step)
-	}
-	sort.Strings(steps)
-
-	rw.line(2, "Group Next Steps:")
-	for _, step := range steps {
-		urls := byStep[step]
-		sort.Strings(urls)
-		urls = dedup(urls)
-
-		rw.blank()
-		rw.line(4, "> %s", step)
-		for _, u := range urls {
-			rw.line(8, "from: %s", u)
+			rw.Line(6, "! %s", f)
 		}
 	}
 }

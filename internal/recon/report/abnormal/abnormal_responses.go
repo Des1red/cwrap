@@ -1,7 +1,8 @@
-package report
+package abnormal
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/recon/report/common"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,7 +10,7 @@ import (
 	"strings"
 )
 
-func writeAbnormalResponses(
+func WriteAbnormalResponses(
 	k *knowledge.Knowledge,
 	reportPath string,
 ) (string, int, error) {
@@ -52,7 +53,7 @@ func writeAbnormalResponses(
 func collectAbnormalResponses(
 	k *knowledge.Knowledge,
 ) []knowledge.AbnormalResponse {
-	urls := sortedEntityURLs(k)
+	urls := common.SortedEntityURLs(k)
 
 	var out []knowledge.AbnormalResponse
 

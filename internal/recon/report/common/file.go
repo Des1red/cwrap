@@ -1,4 +1,4 @@
-package report
+package common
 
 import (
 	"cwrap/internal/model"
@@ -10,45 +10,13 @@ import (
 	"time"
 )
 
-// CreateFileReport writes the full report (tree + deep per-entity analysis) to a file.
-// No hidden data, no exceptions.
-func CreateFileReport(
-	k *knowledge.Knowledge,
-	debug bool,
-) (string, error) {
-	if k == nil {
-		return "", fmt.Errorf("nil knowledge")
-	}
-
-	if err := ensureDir(); err != nil {
-		return "", err
-	}
-
-	f, path, err := createFile(k)
-	if err != nil {
-		return "", err
-	}
-
-	writeFullReport(f, k, debug)
-
-	if err := f.Close(); err != nil {
-		return path, fmt.Errorf("close report file: %w", err)
-	}
-
-	if _, _, err := writeAbnormalResponses(k, path); err != nil {
-		return path, err
-	}
-
-	return path, nil
-}
-
 // ---- file plumbing ----
 
-func ensureDir() error {
+func EnsureDir() error {
 	return os.MkdirAll(model.ReportDirectoryName, 0o755)
 }
 
-func createFile(k *knowledge.Knowledge) (*os.File, string, error) {
+func CreateFile(k *knowledge.Knowledge) (*os.File, string, error) {
 	targetPart := sanitizeTargetForFilename(k.Target)
 	if targetPart == "" {
 		targetPart = "target"

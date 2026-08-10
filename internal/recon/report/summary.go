@@ -2,6 +2,7 @@ package report
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/recon/report/common"
 	"fmt"
 	"io"
 	"strings"
@@ -10,7 +11,7 @@ import (
 // ---- summary ----
 
 func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr error) {
-	urls := sortedEntityURLs(k)
+	urls := common.SortedEntityURLs(k)
 
 	// Global counts / flags
 	var (
@@ -133,7 +134,7 @@ func yesNo(b bool) string {
 }
 
 func buildHighRiskHighlights(k *knowledge.Knowledge) []string {
-	urls := sortedEntityURLs(k)
+	urls := common.SortedEntityURLs(k)
 	var out []string
 
 	for _, u := range urls {
@@ -180,22 +181,9 @@ func buildHighRiskHighlights(k *knowledge.Knowledge) []string {
 	}
 
 	// Dedup + cap to keep summary readable
-	out = dedup(out)
+	out = common.Dedup(out)
 	if len(out) > 6 {
 		out = out[:6]
-	}
-	return out
-}
-
-func dedup(in []string) []string {
-	seen := make(map[string]bool, len(in))
-	out := make([]string, 0, len(in))
-	for _, s := range in {
-		if s == "" || seen[s] {
-			continue
-		}
-		seen[s] = true
-		out = append(out, s)
 	}
 	return out
 }

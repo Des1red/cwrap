@@ -1,4 +1,4 @@
-package report
+package entity
 
 import (
 	"cwrap/internal/recon/knowledge"
@@ -67,34 +67,6 @@ func paramSourceShort(p *knowledge.ParamIntel) string {
 	return "injected"
 }
 
-func paramSourceLabel(p *knowledge.ParamIntel, src knowledge.ParamSource) string {
-	switch src {
-	case knowledge.ParamInjected:
-		if p.DiscoveryReason != "" {
-			return "injected (scanner discovery: " + p.DiscoveryReason + ")"
-		}
-		return "injected (scanner discovery)"
-	case knowledge.ParamQuery:
-		return "query"
-	case knowledge.ParamForm:
-		return "form"
-	case knowledge.ParamJSON:
-		return "json"
-	case knowledge.ParamPath:
-		return "path"
-	default:
-		return "unknown"
-	}
-}
-
-func copySet(in map[string]bool) map[string]bool {
-	out := make(map[string]bool, len(in)+1)
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
-}
-
 func identityKindLabel(k knowledge.IdentityKind) string {
 	switch k {
 	case knowledge.IdentityUnknown:
@@ -114,36 +86,6 @@ func identityKindLabel(k knowledge.IdentityKind) string {
 	}
 }
 
-func isRealInputParam(p *knowledge.ParamIntel) bool {
-	if p == nil {
-		return false
-	}
-
-	return p.Sources[knowledge.ParamQuery] ||
-		p.Sources[knowledge.ParamPath] ||
-		p.Sources[knowledge.ParamForm]
-}
-
-func sortedEntityURLs(k *knowledge.Knowledge) []string {
-	urls := make([]string, 0, len(k.Entities))
-	for u := range k.Entities {
-		urls = append(urls, u)
-	}
-	sort.Strings(urls)
-	return urls
-}
-
-func probeIdentityKindLabel(k knowledge.ProbeIdentityKind) string {
-	switch k {
-	case knowledge.ProbeIdentitySynthetic:
-		return "synthetic"
-	case knowledge.ProbeIdentityLive:
-		return "live"
-	default:
-		return ""
-	}
-}
-
 func activeSignals(ent *knowledge.Entity) []string {
 	if ent == nil || len(ent.Signals.Tags) == 0 {
 		return nil
@@ -152,20 +94,6 @@ func activeSignals(ent *knowledge.Entity) []string {
 	for s, on := range ent.Signals.Tags {
 		if on {
 			out = append(out, s.String())
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-func sortedKeys(m map[string]bool) []string {
-	if len(m) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(m))
-	for k, on := range m {
-		if on {
-			out = append(out, k)
 		}
 	}
 	sort.Strings(out)
@@ -246,4 +174,18 @@ func routeSortKey(raw string) routeKey {
 		family: "/" + path,
 		depth:  depth,
 	}
+}
+
+func sortedKeys(m map[string]bool) []string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(m))
+	for k, on := range m {
+		if on {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
 }

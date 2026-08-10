@@ -2,6 +2,7 @@ package report
 
 import (
 	"cwrap/internal/recon/knowledge"
+	"cwrap/internal/recon/report/entity"
 	"fmt"
 	"io"
 	"time"
@@ -21,8 +22,8 @@ func writeFullReport(w io.Writer, k *knowledge.Knowledge, debug bool) {
 	writeContactInfo(w, k)
 	writeDiscoveryTree(w, k)
 	writeRouteTree(w, k)
-	writeEntityDetails(w, k)
-	writeTaggedProbeLog(w, k, debug)
+	entity.WriteEntityDetails(w, k)
+	entity.WriteTaggedProbeLog(w, k, debug)
 	writeStaticAssets(w, k)
 	writeIdentityVault(w, k)
 
