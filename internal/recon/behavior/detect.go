@@ -48,7 +48,13 @@ func (e *Engine) detectAuthBoundary(ent *knowledge.Entity, identityStatuses map[
 		if id == nil {
 			continue
 		}
-		if status == 200 && id.SentCreds {
+		// shouldCompareIdentity requires SentCreds, a non-None/Invalid Kind,
+		// AND non-synthetic — so a corrupted-token identity that happens to
+		// get accepted (200) is excluded here. That case is broken token
+		// validation (analyzeTokenValidation's job), not evidence of an
+		// ordinary auth boundary, and conflating the two would misreport
+		// a validation bug as normal authenticated access.
+		if status == 200 && e.shouldCompareIdentity(idName, id) {
 			hasAuthedSuccess = true
 		}
 		if (status == 401 || status == 403) && !id.SentCreds {

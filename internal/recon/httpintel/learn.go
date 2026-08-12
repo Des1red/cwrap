@@ -11,5 +11,6 @@ func Learn(ent *knowledge.Entity, resp *http.Response) {
 	learnStatus(ent, resp)
 	learnHeaders(ent, resp)
 	learnContentType(ent, resp)
+	learnSecurityHeaders(ent, resp)
 	learnTech(ent, resp)
 }

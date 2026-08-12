@@ -50,9 +50,9 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 
 	rw := common.ReportWriter{W: w}
 
-	// keyWidth aligns the vitals block's key column; "CSRFPresent:" (12
-	// chars) is the longest label, so 13 leaves a one-space gutter.
-	const keyWidth = 13
+	// keyWidth aligns the vitals block's key column; "MissingSecurityHeaders:"
+	// (23 chars) is the longest label, so 24 leaves a one-space gutter.
+	const keyWidth = 24
 
 	rw.Blank()
 	rw.Line(2, "[ENTITY] %s", ent.URL)
@@ -67,6 +67,18 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 	}
 	if ent.HTTP.CSRFPresent {
 		rw.KV(4, keyWidth, "CSRFPresent:", "%t", ent.HTTP.CSRFPresent)
+	}
+	if ent.HTTP.AuthScheme != "" {
+		rw.KV(4, keyWidth, "AuthScheme:", "%s", ent.HTTP.AuthScheme)
+	}
+	if ent.HTTP.CORSPermissive {
+		rw.KV(4, keyWidth, "CORSOrigin:", "%s", ent.HTTP.CORSOrigin)
+	}
+	if ent.HTTP.FrameAncestors != "" {
+		rw.KV(4, keyWidth, "FrameAncestors:", "%s", ent.HTTP.FrameAncestors)
+	}
+	if len(ent.HTTP.MissingSecurityHeaders) > 0 {
+		rw.KV(4, keyWidth, "MissingSecurityHeaders:", "%s", common.JoinComma(ent.HTTP.MissingSecurityHeaders))
 	}
 
 	if len(ent.HTTP.Tech) > 0 {

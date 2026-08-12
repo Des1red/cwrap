@@ -22,6 +22,9 @@ const (
 	SigCredentiallessTokenIssuance
 	SigBrokenTokenValidation
 	SigWeakOpaqueTokenValidation
+	SigPermissiveCORS
+	SigMissingSecurityHeaders
+	SigPermissiveFrameAncestors
 )
 
 func (s Signal) String() string {
@@ -62,6 +65,12 @@ func (s Signal) String() string {
 		return "WeakOpaqueTokenValidation"
 	case SigPublicAccess:
 		return "PublicAccess"
+	case SigPermissiveCORS:
+		return "PermissiveCORS"
+	case SigMissingSecurityHeaders:
+		return "MissingSecurityHeaders"
+	case SigPermissiveFrameAncestors:
+		return "PermissiveFrameAncestors"
 	default:
 		return "UnknownSignal"
 	}

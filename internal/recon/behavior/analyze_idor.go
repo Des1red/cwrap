@@ -77,22 +77,18 @@ func (e *Engine) analyzeIDOR(
 		}
 
 		// --- STRONG IDOR SIGNAL ---
-		if len(canonBodies) < 2 {
-			continue
-		}
+		if len(canonBodies) >= 2 {
+			first := canonBodies[0]
+			structDiff := false
 
-		first := canonBodies[0]
-		structDiff := false
-
-		for i := 1; i < len(canonBodies); i++ {
-			if !bytes.Equal(first, canonBodies[i]) {
-				structDiff = true
-				break
+			for i := 1; i < len(canonBodies); i++ {
+				if !bytes.Equal(first, canonBodies[i]) {
+					structDiff = true
+					break
+				}
 			}
-		}
 
-		if structDiff {
-			if credDenied && allowPrimaryIDOR {
+			if structDiff && credDenied && allowPrimaryIDOR {
 				p.ObservedChanges["idor-structure-diff"] = true
 				p.PossibleIDOR = true
 				ent.Tag(knowledge.SigPossibleIDOR)

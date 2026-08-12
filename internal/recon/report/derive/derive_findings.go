@@ -48,6 +48,17 @@ func DeriveFindings(ent *knowledge.Entity) []string {
 		out = append(out, "Weak opaque token/session validation — server accepted a corrupted session/token cookie")
 	}
 
+	if ent.HTTP.CORSPermissive {
+		out = append(out, fmt.Sprintf("Permissive CORS configuration — credentialed cross-origin requests allowed (origin: %s)", ent.HTTP.CORSOrigin))
+	}
+
+	if ent.SeenSignal(knowledge.SigMissingSecurityHeaders) {
+		out = append(out, fmt.Sprintf("Missing security headers: %s", common.JoinComma(ent.HTTP.MissingSecurityHeaders)))
+	}
+
+	if ent.SeenSignal(knowledge.SigPermissiveFrameAncestors) {
+		out = append(out, fmt.Sprintf("Permissive frame-ancestors policy weakens clickjacking protection (value: %s)", ent.HTTP.FrameAncestors))
+	}
 	// Param-based findings
 	pnames := make([]string, 0, len(ent.Params))
 	for n := range ent.Params {

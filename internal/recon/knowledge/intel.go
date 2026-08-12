@@ -24,6 +24,36 @@ type HTTPIntel struct {
 	AuthLikely  bool
 	CSRFPresent bool
 
+	// AuthScheme is the authentication scheme advertised by a
+	// WWW-Authenticate challenge (e.g. "bearer", "basic", "digest"),
+	// lowercased. Empty if the server never sent a challenge — most APIs
+	// using bearer tokens don't bother, so absence isn't itself meaningful,
+	// but presence tells you which attack surface applies (credential
+	// brute-forcing for Basic, JWT tampering for Bearer, nonce/replay
+	// analysis for Digest).
+	AuthScheme string
+
+	// CORS evidence. CORSPermissive is true when the response allows
+	// credentialed cross-origin requests from any origin — either a
+	// wildcard Access-Control-Allow-Origin combined with
+	// Access-Control-Allow-Credentials: true (invalid per spec but some
+	// servers still send it), or an Allow-Origin that reflects the
+	// request's Origin header verbatim while allowing credentials (the
+	// dangerous case: any origin can make authenticated requests).
+	// CORSOrigin holds the observed Allow-Origin value as evidence.
+	CORSPermissive bool
+	CORSOrigin     string
+
+	// MissingSecurityHeaders lists hardening headers absent from this
+	// response (e.g. "Content-Security-Policy", "X-Frame-Options").
+	// Populated only where absence is meaningful — see httpintel's
+	// gating logic, not evaluated unconditionally on every response.
+	MissingSecurityHeaders []string
+
+	// FrameAncestors holds the raw value of CSP's frame-ancestors
+	// directive when present, as evidence for SigPermissiveFrameAncestors.
+	FrameAncestors string
+
 	Tech map[string]string // Server, X-Powered-By, X-Generator, etc.
 }
 

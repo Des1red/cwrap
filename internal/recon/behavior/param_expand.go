@@ -89,6 +89,7 @@ func (e *Engine) Expand(ent *knowledge.Entity) {
 	e.expandMutation(ent)
 	e.expandIdentity(ent)
 	e.expandEnumeration(ent)
+	e.expandCORS(ent)
 }
 
 func extractNumericValue(raw, key string) int {
@@ -604,6 +605,31 @@ func (e *Engine) expandPathIDs(ent *knowledge.Entity) {
 			})
 		}
 	}
+}
+
+// corsProbeOrigin is a deliberately fake origin used to test whether a
+// server reflects an arbitrary Origin header back in
+// Access-Control-Allow-Origin. ".invalid" is a TLD reserved by RFC 2606
+// specifically for this kind of use — it can never collide with a real
+// site, so any reflection observed is unambiguous evidence, not coincidence.
+const corsProbeOrigin = "https://cors-probe.cwrap.invalid"
+
+// expandCORS sends a single GET carrying a crafted, non-existent Origin
+// header. httpintel's learnCORS reads it back off resp.Request and compares
+// it against the server's Access-Control-Allow-Origin response header —
+// if the server reflects our fake origin verbatim while also allowing
+// credentials, that's a permissive CORS misconfiguration regardless of
+// whether the entity showed any CORS headers on its baseline response.
+func (e *Engine) expandCORS(ent *knowledge.Entity) {
+	e.pushProbe(ent, knowledge.Probe{
+		URL:    ent.URL,
+		Method: "GET",
+		Headers: map[string]string{
+			"Origin": corsProbeOrigin,
+		},
+		Reason:   knowledge.ReasonCORSProbe,
+		Priority: 45,
+	})
 }
 
 func pathIDProbeFamilyKey(tmpl, name, baseVal string) string {

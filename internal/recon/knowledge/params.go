@@ -23,6 +23,7 @@ const (
 	ReasonLinkProbe           = "link"
 	ReasonRedirect            = "redirect"
 	ReasonJSFetch             = "js-fetch"
+	ReasonCORSProbe           = "cors-probe"
 )
 
 const (

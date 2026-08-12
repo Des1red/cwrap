@@ -1,3 +1,3 @@
 package model
 
-const Version = "3.1.1"
+const Version = "3.1.2"

@@ -78,6 +78,23 @@ func DeriveNextSteps(ent *knowledge.Entity) []string {
 		out = append(out, "Attempt cross-user object access (IDOR) across identities")
 	}
 
+	// Ownership-phase suggestions
+	if ent.SeenSignal(knowledge.SigObjectOwnership) {
+		out = append(out, "Attempt cross-user object access (IDOR) across identities")
+	}
+
+	if ent.HTTP.CORSPermissive {
+		out = append(out, "Test cross-origin credentialed requests from an attacker-controlled origin")
+	}
+
+	if ent.SeenSignal(knowledge.SigMissingSecurityHeaders) {
+		out = append(out, "Test clickjacking, MIME-sniffing, and injection vectors the missing headers would normally mitigate")
+	}
+
+	if ent.SeenSignal(knowledge.SigPermissiveFrameAncestors) {
+		out = append(out, "Attempt clickjacking via iframe embedding from an untrusted origin")
+	}
+
 	// JS leaks suggestions
 	if len(ent.Content.JSLeaks) > 0 ||
 		len(ent.Content.JSHTTPFlows) > 0 ||

@@ -166,3 +166,57 @@ func TestLearn_NoCSRFSignals(t *testing.T) {
 		t.Error("expected CSRFPresent=false when no CSRF signals present")
 	}
 }
+
+func TestLearn_BearerSchemeExtracted(t *testing.T) {
+	ent := newEnt()
+	Learn(ent, resp(401, map[string]string{"Www-Authenticate": `Bearer realm="api"`}))
+
+	if ent.HTTP.AuthScheme != "bearer" {
+		t.Errorf("expected AuthScheme=bearer, got %q", ent.HTTP.AuthScheme)
+	}
+}
+
+func TestLearn_BasicSchemeExtracted(t *testing.T) {
+	ent := newEnt()
+	Learn(ent, resp(401, map[string]string{"Www-Authenticate": `Basic realm="Restricted"`}))
+
+	if ent.HTTP.AuthScheme != "basic" {
+		t.Errorf("expected AuthScheme=basic, got %q", ent.HTTP.AuthScheme)
+	}
+}
+
+func TestLearn_DigestSchemeExtracted(t *testing.T) {
+	ent := newEnt()
+	Learn(ent, resp(401, map[string]string{"Www-Authenticate": `Digest realm="api", nonce="abc123", qop="auth"`}))
+
+	if ent.HTTP.AuthScheme != "digest" {
+		t.Errorf("expected AuthScheme=digest, got %q", ent.HTTP.AuthScheme)
+	}
+}
+
+func TestLearn_SchemeCaseNormalized(t *testing.T) {
+	ent := newEnt()
+	Learn(ent, resp(401, map[string]string{"Www-Authenticate": `BEARER realm="api"`}))
+
+	if ent.HTTP.AuthScheme != "bearer" {
+		t.Errorf("expected lowercased AuthScheme=bearer, got %q", ent.HTTP.AuthScheme)
+	}
+}
+
+func TestLearn_NoWWWAuthenticateNoScheme(t *testing.T) {
+	ent := newEnt()
+	Learn(ent, resp(200, nil))
+
+	if ent.HTTP.AuthScheme != "" {
+		t.Errorf("expected empty AuthScheme when no WWW-Authenticate header, got %q", ent.HTTP.AuthScheme)
+	}
+}
+
+func TestLearn_SchemeOnlyNoParams(t *testing.T) {
+	ent := newEnt()
+	Learn(ent, resp(401, map[string]string{"Www-Authenticate": "Bearer"}))
+
+	if ent.HTTP.AuthScheme != "bearer" {
+		t.Errorf("expected AuthScheme=bearer for bare scheme token, got %q", ent.HTTP.AuthScheme)
+	}
+}
