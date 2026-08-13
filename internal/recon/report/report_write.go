@@ -23,6 +23,7 @@ func writeFullReport(w io.Writer, k *knowledge.Knowledge, debug bool) {
 	writeDiscoveryTree(w, k)
 	writeRouteTree(w, k)
 	entity.WriteEntityDetails(w, k)
+	entity.WriteUnconfirmedAdminSurfaceRoutes(w, k)
 	entity.WriteTaggedProbeLog(w, k, debug)
 	writeStaticAssets(w, k)
 	writeIdentityVault(w, k)

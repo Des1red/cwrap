@@ -32,7 +32,7 @@ func WriteEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 		rw.Line(0, "[ENDPOINT GROUP] %s", g.Key)
 
 		for _, ent := range g.Entities {
-			if ent == nil || ent.State.IsSPAFallback {
+			if ent == nil {
 				continue
 			}
 
@@ -44,7 +44,7 @@ func WriteEntityDetails(w io.Writer, k *knowledge.Knowledge) {
 }
 
 func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
-	if ent == nil || ent.State.IsSPAFallback {
+	if ent == nil {
 		return
 	}
 
@@ -440,5 +440,46 @@ func writeEntityBlock(w io.Writer, ent *knowledge.Entity) {
 		for _, f := range findings {
 			rw.Line(6, "! %s", f)
 		}
+	}
+}
+
+// WriteUnconfirmedAdminSurfaceRoutes writes a report section for entities
+// whose only evidence is the AdminSurface path-pattern signal — set at
+// discovery time, before any request was sent — with nothing confirming
+// it at the HTTP level. Kept deliberately separate from ENTITY
+// INTELLIGENCE so an unconfirmed lead never reads as equivalent to a
+// confirmed, distinct endpoint. Entity blocks here will typically be
+// sparse: SPA-fallback entities skip httpintel's Learn pass and identity
+// extraction entirely, and fully-unreachable entities never got a
+// response at all — the path itself is the only thing worth flagging.
+func WriteUnconfirmedAdminSurfaceRoutes(w io.Writer, k *knowledge.Knowledge) {
+	groups := entityGroupsUnconfirmedAdminSurface(k)
+	if len(groups) == 0 {
+		return
+	}
+
+	rw := common.ReportWriter{W: w}
+
+	rw.Line(0, "------------------------------------------------")
+	rw.Line(0, "SECONDARY FOCUS ENDPOINTS (UNCONFIRMED — PATH PATTERN ONLY)")
+	rw.Line(0, "------------------------------------------------")
+	rw.Line(0, "These paths matched a sensitive-surface pattern before any request")
+	rw.Line(0, "was sent, but nothing about them was confirmed by an actual response —")
+	rw.Line(0, "either every probe returned the same SPA shell as the base page, or")
+	rw.Line(0, "every probe failed outright. Worth manual or client-side investigation.")
+
+	for _, g := range groups {
+		rw.Blank()
+		rw.Line(0, "[ENDPOINT GROUP] %s", g.Key)
+
+		for _, ent := range g.Entities {
+			if ent == nil {
+				continue
+			}
+
+			writeEntityBlock(w, ent)
+		}
+
+		writeGroupNextSteps(w, g)
 	}
 }

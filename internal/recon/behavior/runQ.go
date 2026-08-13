@@ -4,6 +4,7 @@ import (
 	"cwrap/internal/model"
 	"cwrap/internal/recon/knowledge"
 	"cwrap/internal/recon/transport"
+	"fmt"
 	"strings"
 )
 
@@ -215,6 +216,9 @@ func (e *Engine) executeProbeIdentities(
 
 		resp, err := transport.Do(reqID)
 		if err != nil {
+			if e.debug {
+				fmt.Printf("[ERROR] %s %s as %s: %v\n", probe.Method, probe.URL, id.Name, err)
+			}
 			continue
 		}
 

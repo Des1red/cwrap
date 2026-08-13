@@ -13,9 +13,24 @@ func DeriveFindings(ent *knowledge.Entity) []string {
 		return out
 	}
 
+	// isUnreachable is true when every probe against this entity failed to
+	// produce any observable HTTP behavior — no methods confirmed, no
+	// statuses recorded. Signals like SigAdminSurface are set from URL
+	// path patterns at discovery time, before any request is sent, so
+	// they can still be present here even though nothing about them was
+	// ever confirmed by an actual response. Used below to adjust wording
+	// rather than silently presenting an unconfirmed lead as a confirmed one.
+	isUnreachable := ent.State.ProbeCount > 0 &&
+		len(ent.HTTP.Methods) == 0 &&
+		len(ent.Content.Statuses) == 0
+
 	// Signals-based findings
 	if ent.SeenSignal(knowledge.SigAdminSurface) {
-		out = append(out, "Administrative surface detected")
+		if isUnreachable {
+			out = append(out, "Path suggests administrative surface (unconfirmed — endpoint unreachable over HTTP)")
+		} else {
+			out = append(out, "Administrative surface detected")
+		}
 	}
 
 	if ent.SeenSignal(knowledge.SigFileUpload) {
@@ -59,6 +74,7 @@ func DeriveFindings(ent *knowledge.Entity) []string {
 	if ent.SeenSignal(knowledge.SigPermissiveFrameAncestors) {
 		out = append(out, fmt.Sprintf("Permissive frame-ancestors policy weakens clickjacking protection (value: %s)", ent.HTTP.FrameAncestors))
 	}
+
 	// Param-based findings
 	pnames := make([]string, 0, len(ent.Params))
 	for n := range ent.Params {
@@ -101,9 +117,7 @@ func DeriveFindings(ent *knowledge.Entity) []string {
 	}
 
 	// non-HTTP service
-	if ent.State.ProbeCount > 0 &&
-		len(ent.HTTP.Methods) == 0 &&
-		len(ent.Content.Statuses) == 0 {
+	if isUnreachable {
 		out = append(out, "Endpoint unreachable over HTTP — may be a non-HTTP service (FTP, SSH, etc.)")
 	}
 

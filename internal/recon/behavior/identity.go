@@ -85,37 +85,11 @@ func (e *Engine) deriveIdentities(base model.Request) []Identity {
 	// Initial creation here only covers cookies already known at scan start.
 	baseCookies := mergedBaseCookies(base, e.sessionCookies)
 	if corruptedCookies, ok := corruptJWTCookies(baseCookies); ok {
-		ids = append(ids, Identity{
-			Name:      knowledge.CorruptedCookieToken,
-			Synthetic: true,
-			Apply: func(r model.Request) model.Request {
-				r.Flags.Bearer = ""
-				r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
-
-				if ck := cookieHeader(corruptedCookies); ck != "" {
-					r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
-				}
-
-				return r
-			},
-		})
+		ids = append(ids, corruptedCookieIdentity(knowledge.CorruptedCookieToken, corruptedCookies))
 	}
 
 	if corruptedCookies, ok := corruptOpaqueCookies(baseCookies); ok {
-		ids = append(ids, Identity{
-			Name:      knowledge.CorruptedOpaqueCookieToken,
-			Synthetic: true,
-			Apply: func(r model.Request) model.Request {
-				r.Flags.Bearer = ""
-				r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
-
-				if ck := cookieHeader(corruptedCookies); ck != "" {
-					r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
-				}
-
-				return r
-			},
-		})
+		ids = append(ids, corruptedCookieIdentity(knowledge.CorruptedOpaqueCookieToken, corruptedCookies))
 	}
 
 	// fake role
@@ -142,6 +116,28 @@ func removeAuthHeaders(h []model.Header) []model.Header {
 		out = append(out, hdr)
 	}
 	return out
+}
+
+// corruptedCookieIdentity builds a synthetic Identity that strips existing
+// auth headers and injects the given (already-corrupted) cookie set. Used
+// for both JWT-signature corruption and opaque-cookie corruption — the two
+// variants differ only in which pre-corrupted cookie map they're built
+// from, not in how the resulting identity behaves.
+func corruptedCookieIdentity(name string, cookies map[string]string) Identity {
+	return Identity{
+		Name:      name,
+		Synthetic: true,
+		Apply: func(r model.Request) model.Request {
+			r.Flags.Bearer = ""
+			r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
+
+			if ck := cookieHeader(cookies); ck != "" {
+				r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
+			}
+
+			return r
+		},
+	}
 }
 
 func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID string) {
@@ -181,6 +177,10 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 	// re-queue all currently known entities for this new identity
 	root := e.k.Entity(e.k.Target)
 	reason := knowledge.ReasonLiveIdentityRefresh + ":" + name
+	// Tracks entities already re-queued via their own direct self-probe
+	// below, so the fallback loop further down doesn't push a plain probe
+	// that re-triggers the same self-probe a second time through Expand.
+	handled := make(map[string]bool, len(e.k.Entities))
 
 	// replace the existing re-queue block for path param entities
 	for _, ent := range e.k.Entities {
@@ -192,6 +192,7 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 		if len(pathParams) == 0 {
 			continue
 		}
+		handled[ent.URL] = true
 
 		// reset so expandPathIDs re-runs for this entity under the new identity
 		ent.State.PathIDProbed = false
@@ -215,10 +216,16 @@ func (e *Engine) addLiveIdentity(name string, cookies map[string]string, roleUID
 		delete(e.probedPathTemplates, tmpl)
 	}
 
-	// re-queue path ID expansion for all seen entities that have path params
+	// Fallback: re-queue path ID expansion for seen entities that carry a
+	// ParamPath-sourced param but weren't already covered by the loop
+	// above — e.g. a URL that's been rewritten/normalized so its raw path
+	// no longer exposes the ID segment directly, even though the param
+	// was registered by an earlier expandPathIDs run. Entities already
+	// handled above are skipped to avoid pushing a redundant probe that
+	// re-triggers the same self-probe a second time.
 	for _, ent := range e.k.Entities {
 
-		if ent == nil || !ent.State.Seen {
+		if ent == nil || !ent.State.Seen || handled[ent.URL] {
 			continue
 		}
 		// only re-expand entities that had path ID params discovered
@@ -325,20 +332,7 @@ func (e *Engine) ensureCorruptedCookieIdentity(base model.Request) {
 		println("== New synthetic identity discovered:", knowledge.CorruptedCookieToken, "==")
 	}
 
-	e.identities = append(e.identities, Identity{
-		Name:      knowledge.CorruptedCookieToken,
-		Synthetic: true,
-		Apply: func(r model.Request) model.Request {
-			r.Flags.Bearer = ""
-			r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
-
-			if ck := cookieHeader(corruptedCookies); ck != "" {
-				r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
-			}
-
-			return r
-		},
-	})
+	e.identities = append(e.identities, corruptedCookieIdentity(knowledge.CorruptedCookieToken, corruptedCookies))
 
 	e.requeueSeenForNewIdentity()
 }
@@ -361,20 +355,7 @@ func (e *Engine) ensureCorruptedOpaqueCookieIdentity(base model.Request) {
 		println("== New synthetic identity discovered:", knowledge.CorruptedOpaqueCookieToken, "==")
 	}
 
-	e.identities = append(e.identities, Identity{
-		Name:      knowledge.CorruptedOpaqueCookieToken,
-		Synthetic: true,
-		Apply: func(r model.Request) model.Request {
-			r.Flags.Bearer = ""
-			r.Flags.Headers = removeAuthHeaders(r.Flags.Headers)
-
-			if ck := cookieHeader(corruptedCookies); ck != "" {
-				r.Flags.Headers = upsertHeader(r.Flags.Headers, "Cookie", ck)
-			}
-
-			return r
-		},
-	})
+	e.identities = append(e.identities, corruptedCookieIdentity(knowledge.CorruptedOpaqueCookieToken, corruptedCookies))
 
 	e.requeueSeenForNewIdentity()
 }

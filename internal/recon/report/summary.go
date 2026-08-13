@@ -61,12 +61,25 @@ func printSummary(w io.Writer, k *knowledge.Knowledge, path string, fileErr erro
 			}
 		}
 
+		abnormalResponseCount += len(ent.AbnormalResponses)
+		jsLeakCount += len(ent.Content.JSLeaks)
+	}
+	// Admin surface is a URL-pattern signal, deliberately preserved through
+	// SPA-fallback stripping (see cleanup.go) since it isn't invalidated by
+	// a fallback response — the path itself is still worth flagging even
+	// when nothing about the entity's behavior was confirmed. Counted in
+	// its own pass, independent of the IsSPAFallback skip above, so this
+	// count stays consistent with the full report's "unconfirmed admin
+	// surface" section rather than silently disagreeing with it.
+	for _, u := range urls {
+		ent := k.Entities[u]
+		if ent == nil {
+			continue
+		}
 		// crude admin surface (signal preferred, then URL heuristic)
 		if ent.SeenSignal(knowledge.SigAdminSurface) || strings.Contains(strings.ToLower(ent.URL), "admin") {
 			adminSurface++
 		}
-		abnormalResponseCount += len(ent.AbnormalResponses)
-		jsLeakCount += len(ent.Content.JSLeaks)
 	}
 
 	// High risk highlights (short list)
