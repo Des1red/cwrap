@@ -1,5 +1,7 @@
 github.com/Des1red/clihelp v1.0.2 h1:3jE0u7B8y5oGdrUDfj6Vfa4tpmmwFUmSdMMae3ZWloY=
 github.com/Des1red/clihelp v1.0.2/go.mod h1:4sMd2I5rpd6Sqb/o9EC4P37OajqkQeZMzxGZ2TIPaTg=
+github.com/Des1red/goinstall v0.0.0-20261007174718-294c4b350a05 h1:i8rrHbVXaelv19+K/kfuvpCNw0V8kJXkhwrow2jVorc=
+github.com/Des1red/goinstall v0.0.0-20261007174718-294c4b350a05/go.mod h1:OJZB4fBTCFol58fG6nrivVbQda5E+OcqDEWOJ1HPCds=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dop251/goja v0.0.0-20260723142020-b4aef50fa347 h1:RZr+96+PKQjn444QL1K9MtncwJ/PwfE+3TJLCYJL8es=

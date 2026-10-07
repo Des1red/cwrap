@@ -3,88 +3,118 @@ package bootstrap
 import (
 	"cwrap/internal/model"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
+
+	instll "github.com/Des1red/goinstall/cmd"
 )
 
 func install() {
 	ok1 := createconfig()
 	ok2 := createbinary()
+
 	if ok1 && ok2 {
 		log.Println("cwrap successfully installed!")
 		os.Exit(0)
-	} else {
-		log.Println("cwrap installation incomplete.")
-		os.Exit(1)
 	}
+
+	log.Println("cwrap installation incomplete.")
+	os.Exit(1)
 }
 
 func createconfig() bool {
-	dir := filepath.Dir(configPath())
-	os.MkdirAll(dir, 0755)
+	dir :=
+		filepath.Dir(
+			configPath(),
+		)
 
-	cfg := Config{
-		Version:     model.Version,
-		InstalledAt: time.Now(),
-		UpdatedAt:   time.Now(),
+	if err :=
+		os.MkdirAll(
+			dir,
+			0755,
+		); err != nil {
+
+		log.Println(
+			"Failed to create config directory:",
+			err,
+		)
+
+		return false
 	}
 
-	b, err := json.MarshalIndent(cfg, "", "  ")
+	cfg :=
+		Config{
+			Version:     model.Version,
+			InstalledAt: time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+
+	b,
+		err :=
+		json.MarshalIndent(
+			cfg,
+			"",
+			"  ",
+		)
+
 	if err != nil {
+		log.Println(
+			"Failed to marshal config:",
+			err,
+		)
+
 		return false
 	}
 
-	if err := os.WriteFile(configPath(), b, 0644); err != nil {
+	if err :=
+		os.WriteFile(
+			configPath(),
+			b,
+			0644,
+		); err != nil {
+
+		log.Println(
+			"Failed to write config:",
+			err,
+		)
+
 		return false
 	}
+
 	return true
 }
 
 func createbinary() bool {
-	// build
-	cmd := exec.Command("go", "build", "-ldflags", "-X cwrap/internal/model.Version="+model.Version, "-o", "/tmp/cwrap", ".")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		log.Println("Failed to build binary.")
+	err :=
+		instll.SetBinaryName(
+			"cwrap",
+		)
+
+	if err != nil {
+		log.Println(
+			"Failed to set binary name:",
+			err,
+		)
+
 		return false
 	}
-	log.Println("Binary successfully built.")
 
-	// install to ~/.local/bin
-	home, _ := os.UserHomeDir()
-	binDir := filepath.Join(home, ".local", "bin")
-	os.MkdirAll(binDir, 0755)
-	dest := filepath.Join(binDir, "cwrap")
+	err =
+		instll.Install(
+			true,
+			true,
+		)
 
-	// check if binary already exists
-	if _, err := os.Stat(dest); err == nil {
-		fmt.Printf("cwrap already exists at %s. Replace? (y/n): ", dest)
-		var input string
-		fmt.Scanln(&input)
-		if input != "y" && input != "Y" {
-			log.Println("Installation aborted.")
-			return false
-		} else {
-			err := os.Remove(dest)
-			if err != nil {
-				log.Println("Failed to remove: " + dest)
-				return false
-			}
-		}
-	}
+	if err != nil {
+		log.Println(
+			"Failed to install binary:",
+			err,
+		)
 
-	src, _ := os.ReadFile("/tmp/cwrap")
-	if err := os.WriteFile(dest, src, 0755); err != nil {
-		log.Println("Failed to install binary: ", err)
 		return false
 	}
-	log.Printf("cwrap installed to %s", dest)
-	log.Printf("Run 'hash -r' or open a new terminal if cwrap command is not found")
-	log.Printf("Make sure %s is in your PATH", binDir)
+
 	return true
 }
