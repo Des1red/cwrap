@@ -43,7 +43,7 @@ func removeBinary() bool {
 
 	err =
 		instll.Uninstall(
-			false,
+			true,
 			true,
 		)
 
